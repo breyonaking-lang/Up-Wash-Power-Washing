@@ -731,9 +731,9 @@ const BookingPage = () => {
                   <div className="border-t border-slate-200 mt-4 pt-4 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
-                      <span>${pricing.subtotal.toFixed(2)}</span>
+                      <span>${(pricing.subtotal || getLocalSubtotal()).toFixed(2)}</span>
                     </div>
-                    {isMonthly && pricing.discount > 0 && (
+                    {isMonthly && (pricing.discount > 0 || getLocalSubtotal() > 0) && (
                       <div className="flex justify-between text-green-600">
                         <span>Monthly Discount (10%)</span>
                         <span>-${pricing.discount.toFixed(2)}</span>
