@@ -274,6 +274,23 @@ const BookingPage = () => {
     return 25 + (binQuantity - 2) * 8;
   };
 
+  // Calculate local subtotal for instant UI feedback
+  const getLocalSubtotal = () => {
+    let total = 0;
+    if (selectedServices.recycling_bin) total += getBinPrice();
+    if (selectedServices.patio) total += 30;
+    if (selectedServices.driveway) total += 30;
+    if (selectedServices.dumpster) total += 120 + (scentBombs * 3);
+    return total;
+  };
+
+  const getLocalTotal = () => {
+    const subtotal = getLocalSubtotal();
+    const discount = isMonthly ? subtotal * 0.10 : 0;
+    const travelFee = distance > 15 ? (distance - 15) * 1 : 0;
+    return subtotal - discount + travelFee;
+  };
+
   return (
     <div className="min-h-screen py-12 md:py-20">
       <div className="container mx-auto max-w-5xl px-4">
