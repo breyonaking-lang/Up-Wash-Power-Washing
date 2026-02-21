@@ -1,0 +1,350 @@
+#!/usr/bin/env python3
+
+import requests
+import sys
+import json
+from datetime import datetime, timedelta
+
+class PowerWashingAPITester:
+    def __init__(self, base_url="https://clean-pro-dispatch.preview.emergentagent.com/api"):
+        self.base_url = base_url
+        self.tests_run = 0
+        self.tests_passed = 0
+        self.failed_tests = []
+
+    def log_test(self, name, success, response_data=None, error=None):
+        """Log test result"""
+        self.tests_run += 1
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {name} - PASSED")
+        else:
+            self.failed_tests.append({
+                "test": name,
+                "error": error,
+                "response": response_data
+            })
+            print(f"❌ {name} - FAILED: {error}")
+
+    def test_api_root(self):
+        """Test API root endpoint"""
+        try:
+            response = requests.get(f"{self.base_url}/", timeout=10)
+            success = response.status_code == 200
+            data = response.json() if success else {}
+            
+            if success and data.get("message") == "Upwash Power Washing API":
+                self.log_test("API Root", True, data)
+                return True
+            else:
+                self.log_test("API Root", False, data, f"Status: {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("API Root", False, None, str(e))
+            return False
+
+    def test_get_services(self):
+        """Test services endpoint"""
+        try:
+            response = requests.get(f"{self.base_url}/services", timeout=10)
+            success = response.status_code == 200
+            data = response.json() if success else {}
+            
+            if success:
+                services = data.get("services", [])
+                expected_services = ["recycling_bin", "patio", "driveway", "dumpster", "scent_bomb"]
+                service_ids = [s.get("service_id") for s in services]
+                
+                if all(svc in service_ids for svc in expected_services):
+                    self.log_test("Get Services", True, f"Found {len(services)} services")
+                    return True, data
+                else:
+                    self.log_test("Get Services", False, data, "Missing expected services")
+                    return False, data
+            else:
+                self.log_test("Get Services", False, data, f"Status: {response.status_code}")
+                return False, {}
+        except Exception as e:
+            self.log_test("Get Services", False, None, str(e))
+            return False, {}
+
+    def test_price_calculation(self):
+        """Test price calculation endpoint"""
+        try:
+            # Test bin pricing - 1 bin should be $15
+            test_cases = [
+                {
+                    "name": "1 Recycling Bin",
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 15.0
+                },
+                {
+                    "name": "2 Recycling Bins", 
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 2}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 25.0
+                },
+                {
+                    "name": "3 Recycling Bins",
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 3}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 33.0  # 25 + 8
+                },
+                {
+                    "name": "Patio Cleaning",
+                    "data": {
+                        "services": [{"service_id": "patio", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 30.0
+                },
+                {
+                    "name": "Dumpster with Scent Bombs",
+                    "data": {
+                        "services": [{"service_id": "dumpster", "quantity": 1, "addons": [{"addon_id": "scent_bomb", "quantity": 2}]}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 126.0  # 120 + (2 * 3)
+                },
+                {
+                    "name": "Monthly Discount Test",
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": True
+                    },
+                    "expected_subtotal": 15.0,
+                    "expected_discount": 1.5  # 10% of 15
+                },
+                {
+                    "name": "Travel Fee Test",
+                    "data": {
+                        "services": [{"service_id": "patio", "quantity": 1}],
+                        "distance_miles": 20,  # 5 miles beyond free radius
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 30.0,
+                    "expected_travel_fee": 5.0
+                }
+            ]
+
+            for test_case in test_cases:
+                response = requests.post(f"{self.base_url}/calculate-price", json=test_case["data"], timeout=10)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    # Check subtotal
+                    if abs(result.get("subtotal", 0) - test_case["expected_subtotal"]) < 0.01:
+                        
+                        # Check discount if expected
+                        if "expected_discount" in test_case:
+                            if abs(result.get("discount", 0) - test_case["expected_discount"]) < 0.01:
+                                self.log_test(f"Price Calc - {test_case['name']}", True, result)
+                            else:
+                                self.log_test(f"Price Calc - {test_case['name']}", False, result, f"Wrong discount: {result.get('discount')} vs {test_case['expected_discount']}")
+                        
+                        # Check travel fee if expected
+                        elif "expected_travel_fee" in test_case:
+                            if abs(result.get("travel_fee", 0) - test_case["expected_travel_fee"]) < 0.01:
+                                self.log_test(f"Price Calc - {test_case['name']}", True, result)
+                            else:
+                                self.log_test(f"Price Calc - {test_case['name']}", False, result, f"Wrong travel fee: {result.get('travel_fee')} vs {test_case['expected_travel_fee']}")
+                        else:
+                            self.log_test(f"Price Calc - {test_case['name']}", True, result)
+                    else:
+                        self.log_test(f"Price Calc - {test_case['name']}", False, result, f"Wrong subtotal: {result.get('subtotal')} vs {test_case['expected_subtotal']}")
+                else:
+                    self.log_test(f"Price Calc - {test_case['name']}", False, {}, f"Status: {response.status_code}")
+
+        except Exception as e:
+            self.log_test("Price Calculation", False, None, str(e))
+
+    def test_availability(self):
+        """Test availability endpoint"""
+        try:
+            # Test weekday availability
+            today = datetime.now()
+            weekday_date = today + timedelta(days=1)
+            while weekday_date.weekday() > 4:  # Find next weekday
+                weekday_date += timedelta(days=1)
+            
+            weekday_str = weekday_date.strftime("%Y-%m-%d")
+            
+            response = requests.post(f"{self.base_url}/availability", 
+                                   json={"date": weekday_str}, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                slots = result.get("available_slots", [])
+                
+                # Should have slots for weekdays (9AM-6PM)
+                if len(slots) > 0:
+                    self.log_test("Availability - Weekday", True, f"Found {len(slots)} slots")
+                else:
+                    self.log_test("Availability - Weekday", False, result, "No slots available")
+            else:
+                self.log_test("Availability - Weekday", False, {}, f"Status: {response.status_code}")
+
+            # Test weekend (should have no slots)
+            weekend_date = today + timedelta(days=1)
+            while weekend_date.weekday() < 5:  # Find next weekend
+                weekend_date += timedelta(days=1)
+            
+            weekend_str = weekend_date.strftime("%Y-%m-%d")
+            
+            response = requests.post(f"{self.base_url}/availability", 
+                                   json={"date": weekend_str}, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                slots = result.get("available_slots", [])
+                
+                if len(slots) == 0:
+                    self.log_test("Availability - Weekend", True, "Correctly no slots")
+                else:
+                    self.log_test("Availability - Weekend", False, result, f"Should be no slots but found {len(slots)}")
+            else:
+                self.log_test("Availability - Weekend", False, {}, f"Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Availability", False, None, str(e))
+
+    def test_booking_creation(self):
+        """Test booking creation endpoint"""
+        try:
+            # Get a valid future weekday
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "Test Customer",
+                "customer_email": "test@example.com",
+                "customer_phone": "(817) 555-1234",
+                "customer_address": "123 Test St, Burleson, TX",
+                "distance_miles": 5.0,
+                "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                "booking_date": booking_date.strftime("%Y-%m-%d"),
+                "booking_time": "10:00",
+                "is_monthly": False,
+                "notes": "Test booking"
+            }
+
+            response = requests.post(f"{self.base_url}/bookings", 
+                                   json=booking_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                booking_id = result.get("id")
+                
+                if booking_id:
+                    self.log_test("Create Booking", True, f"Booking ID: {booking_id}")
+                    return booking_id
+                else:
+                    self.log_test("Create Booking", False, result, "No booking ID returned")
+                    return None
+            else:
+                self.log_test("Create Booking", False, {}, f"Status: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            self.log_test("Create Booking", False, None, str(e))
+            return None
+
+    def test_get_booking(self, booking_id):
+        """Test get booking by ID"""
+        if not booking_id:
+            return
+            
+        try:
+            response = requests.get(f"{self.base_url}/bookings/{booking_id}", timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                self.log_test("Get Booking", True, f"Retrieved booking for {result.get('customer_name')}")
+            else:
+                self.log_test("Get Booking", False, {}, f"Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Get Booking", False, None, str(e))
+
+    def test_admin_endpoints(self):
+        """Test admin endpoints"""
+        try:
+            # Test stats
+            response = requests.get(f"{self.base_url}/admin/stats", timeout=10)
+            if response.status_code == 200:
+                stats = response.json()
+                required_fields = ["total_bookings", "pending", "confirmed", "completed", "today_bookings", "total_revenue"]
+                
+                if all(field in stats for field in required_fields):
+                    self.log_test("Admin Stats", True, stats)
+                else:
+                    self.log_test("Admin Stats", False, stats, "Missing required fields")
+            else:
+                self.log_test("Admin Stats", False, {}, f"Status: {response.status_code}")
+
+            # Test calendar
+            response = requests.get(f"{self.base_url}/admin/calendar", timeout=10)
+            if response.status_code == 200:
+                calendar_data = response.json()
+                self.log_test("Admin Calendar", True, f"Calendar data retrieved")
+            else:
+                self.log_test("Admin Calendar", False, {}, f"Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Admin Endpoints", False, None, str(e))
+
+    def run_all_tests(self):
+        """Run all API tests"""
+        print("🧪 Starting Upwash Power Washing API Tests")
+        print("=" * 60)
+
+        # Test basic connectivity
+        self.test_api_root()
+        
+        # Test services
+        self.test_get_services()
+        
+        # Test pricing
+        self.test_price_calculation()
+        
+        # Test availability
+        self.test_availability()
+        
+        # Test booking flow
+        booking_id = self.test_booking_creation()
+        if booking_id:
+            self.test_get_booking(booking_id)
+        
+        # Test admin endpoints
+        self.test_admin_endpoints()
+
+        print("\n" + "=" * 60)
+        print(f"📊 Results: {self.tests_passed}/{self.tests_run} tests passed")
+        
+        if self.failed_tests:
+            print("\n❌ Failed Tests:")
+            for failure in self.failed_tests:
+                print(f"  - {failure['test']}: {failure['error']}")
+        
+        return self.tests_passed == self.tests_run
+
+if __name__ == "__main__":
+    tester = PowerWashingAPITester()
+    success = tester.run_all_tests()
+    sys.exit(0 if success else 1)
