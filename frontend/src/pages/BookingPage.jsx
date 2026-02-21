@@ -736,13 +736,13 @@ const BookingPage = () => {
                     {isMonthly && (pricing.discount > 0 || getLocalSubtotal() > 0) && (
                       <div className="flex justify-between text-green-600">
                         <span>Monthly Discount (10%)</span>
-                        <span>-${pricing.discount.toFixed(2)}</span>
+                        <span>-${(pricing.discount || getLocalSubtotal() * 0.10).toFixed(2)}</span>
                       </div>
                     )}
-                    {pricing.travel_fee > 0 && (
+                    {(pricing.travel_fee > 0 || (distance > 15)) && (
                       <div className="flex justify-between text-orange-600">
                         <span>Travel Fee</span>
-                        <span>+${pricing.travel_fee.toFixed(2)}</span>
+                        <span>+${(pricing.travel_fee || (distance > 15 ? (distance - 15) : 0)).toFixed(2)}</span>
                       </div>
                     )}
                   </div>
@@ -751,7 +751,7 @@ const BookingPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-slate-900">Total</span>
                       <span className="text-2xl font-extrabold text-blue-600 price-tag" data-testid="total-price">
-                        ${pricing.total.toFixed(2)}
+                        ${(pricing.total || getLocalTotal()).toFixed(2)}
                       </span>
                     </div>
                   </div>
