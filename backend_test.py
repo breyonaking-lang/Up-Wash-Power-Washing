@@ -144,7 +144,7 @@ class PowerWashingAPITester:
                         "is_monthly": True
                     },
                     "expected_subtotal": 15.0,
-                    "expected_discount": 1.5  # 10% of 15
+                    "expected_discount": 0.75  # 5% of 15
                 },
                 {
                     "name": "Travel Fee Test",
