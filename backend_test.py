@@ -327,6 +327,166 @@ class PowerWashingAPITester:
         except Exception as e:
             self.log_test("Admin Endpoints", False, None, str(e))
 
+    def test_sms_status(self):
+        """Test SMS configuration status"""
+        try:
+            response = requests.get(f"{self.base_url}/sms/status", timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                configured = result.get("configured", False)
+                phone_number = result.get("phone_number", "")
+                
+                if configured and phone_number:
+                    self.log_test("SMS Status - Configured", True, f"SMS configured with phone: {phone_number}")
+                    return True
+                else:
+                    self.log_test("SMS Status - Configured", False, result, "SMS not properly configured")
+                    return False
+            else:
+                self.log_test("SMS Status", False, {}, f"Status: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("SMS Status", False, None, str(e))
+            return False
+
+    def test_booking_with_sms_optin(self):
+        """Test booking creation with SMS opt-in"""
+        try:
+            # Get a valid future weekday
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "SMS Test Customer",
+                "customer_email": "smstest@example.com",
+                "customer_phone": "+15551234567",  # Test phone number
+                "customer_address": "456 SMS Test St, Burleson, TX",
+                "distance_miles": 3.0,
+                "services": [{"service_id": "patio", "quantity": 1}],
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],
+                "is_monthly": False,
+                "sms_opt_in": True,  # SMS opt-in enabled
+                "notes": "SMS test booking"
+            }
+
+            response = requests.post(f"{self.base_url}/bookings", 
+                                   json=booking_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                booking_id = result.get("id")
+                sms_opt_in = result.get("sms_opt_in", False)
+                
+                if booking_id and sms_opt_in:
+                    self.log_test("SMS Booking Creation", True, f"Booking {booking_id} with SMS opt-in")
+                    return booking_id
+                else:
+                    self.log_test("SMS Booking Creation", False, result, "SMS opt-in not saved correctly")
+                    return None
+            else:
+                self.log_test("SMS Booking Creation", False, {}, f"Status: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            self.log_test("SMS Booking Creation", False, None, str(e))
+            return None
+
+    def test_manual_sms_send(self, booking_id):
+        """Test manual SMS sending via API"""
+        if not booking_id:
+            self.log_test("Manual SMS Send", False, None, "No booking ID provided")
+            return
+            
+        try:
+            sms_data = {
+                "booking_id": booking_id,
+                "message_type": "reminder"
+            }
+
+            response = requests.post(f"{self.base_url}/sms/send", 
+                                   json=sms_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                message = result.get("message", "")
+                to_phone = result.get("to", "")
+                
+                if "SMS sent successfully" in message:
+                    self.log_test("Manual SMS Send", True, f"SMS sent to {to_phone}")
+                else:
+                    self.log_test("Manual SMS Send", False, result, "Unexpected response message")
+            else:
+                error_detail = "Unknown error"
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get("detail", "Unknown error")
+                except:
+                    pass
+                self.log_test("Manual SMS Send", False, {}, f"Status: {response.status_code}, Error: {error_detail}")
+                
+        except Exception as e:
+            self.log_test("Manual SMS Send", False, None, str(e))
+
+    def test_sms_send_without_optin(self):
+        """Test SMS send attempt for booking without SMS opt-in (should fail)"""
+        try:
+            # Create booking without SMS opt-in
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "No SMS Customer",
+                "customer_email": "nosms@example.com",
+                "customer_phone": "+15559876543",
+                "customer_address": "789 No SMS St, Burleson, TX",
+                "distance_miles": 2.0,
+                "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],
+                "is_monthly": False,
+                "sms_opt_in": False,  # SMS opt-in disabled
+                "notes": "No SMS test booking"
+            }
+
+            # Create the booking
+            booking_response = requests.post(f"{self.base_url}/bookings", 
+                                           json=booking_data, timeout=10)
+            
+            if booking_response.status_code == 200:
+                booking_result = booking_response.json()
+                booking_id = booking_result.get("id")
+                
+                # Try to send SMS (should fail)
+                sms_data = {
+                    "booking_id": booking_id,
+                    "message_type": "reminder"
+                }
+
+                sms_response = requests.post(f"{self.base_url}/sms/send", 
+                                           json=sms_data, timeout=10)
+                
+                if sms_response.status_code == 400:
+                    try:
+                        error_data = sms_response.json()
+                        if "has not opted in for SMS" in error_data.get("detail", ""):
+                            self.log_test("SMS Send Without Opt-in", True, "Correctly blocked SMS for non-opted customer")
+                        else:
+                            self.log_test("SMS Send Without Opt-in", False, error_data, "Wrong error message")
+                    except:
+                        self.log_test("SMS Send Without Opt-in", False, {}, "Could not parse error response")
+                else:
+                    self.log_test("SMS Send Without Opt-in", False, {}, f"Expected 400, got {sms_response.status_code}")
+            else:
+                self.log_test("SMS Send Without Opt-in", False, {}, "Could not create test booking")
+                
+        except Exception as e:
+            self.log_test("SMS Send Without Opt-in", False, None, str(e))
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🧪 Starting Upwash Power Washing API Tests")
