@@ -259,7 +259,10 @@ const AdminPage = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="font-medium text-slate-900">{booking.customer_name}</p>
-                              <p className="text-slate-500">{formatTime(booking.booking_time)}</p>
+                              <p className="text-slate-500">{booking.customer_phone}</p>
+                              {booking.is_monthly && (
+                                <span className="text-xs text-green-600 font-medium">Monthly</span>
+                              )}
                             </div>
                             <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(booking.status)}`}>
                               {booking.status}
