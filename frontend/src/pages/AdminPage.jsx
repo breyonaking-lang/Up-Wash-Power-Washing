@@ -18,7 +18,8 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 
@@ -28,6 +29,7 @@ const AdminPage = () => {
   const [stats, setStats] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [calendarData, setCalendarData] = useState({});
+  const [smsConfigured, setSmsConfigured] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
