@@ -15,6 +15,7 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutStatusResponse, 
     CheckoutSessionRequest
 )
+from twilio.rest import Client as TwilioClient
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -26,6 +27,16 @@ db = client[os.environ['DB_NAME']]
 
 # Stripe setup
 stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
+
+# Twilio setup
+twilio_account_sid = os.environ.get('TWILIO_ACCOUNT_SID', '')
+twilio_auth_token = os.environ.get('TWILIO_AUTH_TOKEN', '')
+twilio_phone_number = os.environ.get('TWILIO_PHONE_NUMBER', '')
+
+# Initialize Twilio client
+twilio_client = None
+if twilio_account_sid and twilio_auth_token:
+    twilio_client = TwilioClient(twilio_account_sid, twilio_auth_token)
 
 # Create the main app
 app = FastAPI(title="Upwash Power Washing API")
