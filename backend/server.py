@@ -187,17 +187,24 @@ def calculate_service_price(service_id: str, quantity: int) -> float:
     if not service:
         return 0.0
     
-    if service["pricing_type"] == "tiered" and service_id == "recycling_bin":
+    if service["pricing_type"] == "tiered":
         tier_pricing = service["tier_pricing"]
-        if quantity == 1:
-            return tier_pricing["1"]
-        elif quantity == 2:
-            return tier_pricing["2"]
-        else:
-            # First 2 bins = $25, then $8 for each additional
-            return tier_pricing["2"] + (quantity - 2) * tier_pricing["additional"]
-    else:
-        return service["base_price"] * quantity
+        if service_id == "recycling_bin":
+            if quantity == 1:
+                return tier_pricing["1"]
+            elif quantity == 2:
+                return tier_pricing["2"]
+            else:
+                # First 2 bins = $25, then $8 for each additional
+                return tier_pricing["2"] + (quantity - 2) * tier_pricing["additional"]
+        elif service_id == "dumpster":
+            if quantity == 1:
+                return tier_pricing["1"]
+            else:
+                # First dumpster = $70, then $45 for each additional
+                return tier_pricing["1"] + (quantity - 1) * tier_pricing["additional"]
+    
+    return service["base_price"] * quantity
 
 def calculate_travel_fee(distance_miles: float) -> float:
     """Calculate travel fee based on distance"""
