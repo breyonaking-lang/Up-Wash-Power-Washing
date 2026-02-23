@@ -418,6 +418,10 @@ async def create_booking(booking_data: BookingCreate):
     
     await db.bookings.insert_one(doc)
     
+    # Send confirmation SMS if opted in
+    if booking_data.sms_opt_in:
+        send_booking_confirmation_sms(doc)
+    
     return booking
 
 @api_router.get("/bookings/{booking_id}")
