@@ -272,48 +272,48 @@ async def calculate_price(request: Dict):
     services = request.get("services", [])
     distance_miles = request.get("distance_miles", 0)
     is_monthly = request.get("is_monthly", False)
+    num_service_days = request.get("num_service_days", 1)
     
-    pricing = calculate_booking_total(services, distance_miles, is_monthly)
+    pricing = calculate_booking_total(services, distance_miles, is_monthly, num_service_days)
     return pricing
 
-@api_router.post("/availability")
-async def check_availability(request: AvailabilityRequest):
-    """Check available time slots for a date"""
-    date_str = request.date
+@api_router.post("/check-date")
+async def check_date(request: Dict):
+    """Check if a date is available (weekday only)"""
+    date_str = request.get("date", "")
     
-    # Get existing bookings for the date
-    existing = await db.bookings.find(
-        {"booking_date": date_str, "status": {"$nin": ["cancelled"]}},
-        {"_id": 0, "booking_time": 1, "booking_date": 1}
-    ).to_list(100)
+    if not date_str:
+        return {"available": False, "reason": "No date provided"}
     
-    slots = get_available_slots(date_str, existing)
+    if not is_weekday(date_str):
+        return {"available": False, "reason": "Weekends not available. We operate Monday-Friday."}
     
-    return {
-        "date": date_str,
-        "available_slots": slots,
-        "business_hours": BUSINESS_HOURS
-    }
+    # Check if date is not in the past
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d")
+        if date.date() < datetime.now(timezone.utc).date():
+            return {"available": False, "reason": "Cannot book past dates"}
+    except ValueError:
+        return {"available": False, "reason": "Invalid date format"}
+    
+    return {"available": True, "date": date_str}
 
 @api_router.post("/bookings", response_model=Booking)
 async def create_booking(booking_data: BookingCreate):
     """Create a new booking"""
+    # Validate dates are weekdays
+    for date_str in booking_data.booking_dates:
+        if not is_weekday(date_str):
+            raise HTTPException(status_code=400, detail=f"Date {date_str} is not a weekday")
+    
     # Calculate pricing
+    num_days = len(booking_data.booking_dates)
     pricing = calculate_booking_total(
         booking_data.services,
         booking_data.distance_miles,
-        booking_data.is_monthly
+        booking_data.is_monthly,
+        num_days
     )
-    
-    # Check availability
-    existing = await db.bookings.find(
-        {"booking_date": booking_data.booking_date, "status": {"$nin": ["cancelled"]}},
-        {"_id": 0, "booking_time": 1}
-    ).to_list(100)
-    
-    booked_times = [b.get("booking_time") for b in existing]
-    if booking_data.booking_time in booked_times:
-        raise HTTPException(status_code=400, detail="Time slot not available")
     
     # Create booking
     booking = Booking(
@@ -323,11 +323,15 @@ async def create_booking(booking_data: BookingCreate):
         customer_address=booking_data.customer_address,
         distance_miles=booking_data.distance_miles,
         services=booking_data.services,
-        booking_date=booking_data.booking_date,
-        booking_time=booking_data.booking_time,
+        booking_dates=booking_data.booking_dates,
         is_monthly=booking_data.is_monthly,
+        monthly_days=booking_data.monthly_days,
+        sms_opt_in=booking_data.sms_opt_in,
         notes=booking_data.notes,
-        **pricing
+        subtotal=pricing["subtotal"],
+        travel_fee=pricing["travel_fee"],
+        discount=pricing["discount"],
+        total=pricing["total"]
     )
     
     doc = booking.model_dump()
