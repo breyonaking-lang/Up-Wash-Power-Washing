@@ -549,23 +549,24 @@ async def admin_calendar(start_date: Optional[str] = None, end_date: Optional[st
     """Get calendar view for admin"""
     query = {"status": {"$nin": ["cancelled"]}}
     
-    if start_date:
-        query["booking_date"] = {"$gte": start_date}
-    if end_date:
-        if "booking_date" in query:
-            query["booking_date"]["$lte"] = end_date
-        else:
-            query["booking_date"] = {"$lte": end_date}
+    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
     
-    bookings = await db.bookings.find(query, {"_id": 0}).sort("booking_date", 1).to_list(1000)
-    
-    # Group by date
+    # Group by date - handle booking_dates array
     calendar = {}
     for booking in bookings:
-        date = booking["booking_date"]
-        if date not in calendar:
-            calendar[date] = []
-        calendar[date].append(booking)
+        dates = booking.get("booking_dates", [])
+        # Handle legacy bookings with single booking_date
+        if not dates and booking.get("booking_date"):
+            dates = [booking.get("booking_date")]
+        
+        for date in dates:
+            if start_date and date < start_date:
+                continue
+            if end_date and date > end_date:
+                continue
+            if date not in calendar:
+                calendar[date] = []
+            calendar[date].append(booking)
     
     return {"calendar": calendar, "bookings": bookings}
 
