@@ -256,9 +256,9 @@ class PowerWashingAPITester:
                 "customer_address": "123 Test St, Burleson, TX",
                 "distance_miles": 5.0,
                 "services": [{"service_id": "recycling_bin", "quantity": 1}],
-                "booking_date": booking_date.strftime("%Y-%m-%d"),
-                "booking_time": "10:00",
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],  # Array of dates
                 "is_monthly": False,
+                "sms_opt_in": True,  # Test SMS opt-in
                 "notes": "Test booking"
             }
 
