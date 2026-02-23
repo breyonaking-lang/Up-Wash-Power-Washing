@@ -341,8 +341,8 @@ class PowerWashingAPITester:
         # Test pricing
         self.test_price_calculation()
         
-        # Test availability
-        self.test_availability()
+        # Test date checking (no time slots)
+        self.test_check_date()
         
         # Test booking flow
         booking_id = self.test_booking_creation()
