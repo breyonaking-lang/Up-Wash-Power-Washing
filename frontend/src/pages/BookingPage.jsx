@@ -14,6 +14,7 @@ import {
   Warehouse, 
   Car, 
   Sparkles,
+  Droplets,
   Plus,
   Minus,
   ArrowRight,
@@ -21,7 +22,9 @@ import {
   Check,
   CreditCard,
   MapPin,
-  Clock
+  MessageSquare,
+  CalendarDays,
+  Star
 } from "lucide-react";
 import { format, addDays, isWeekend, isBefore, startOfToday } from "date-fns";
 
@@ -60,11 +63,11 @@ const SERVICES = [
     description: "Commercial dumpster & surrounding area",
     icon: Warehouse,
     color: "bg-purple-500",
-    price: 120,
-    pricingType: "fixed",
-    hasAddon: true
+    pricingType: "tiered"
   }
 ];
+
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 const BookingPage = () => {
   const [searchParams] = useSearchParams();
@@ -72,16 +75,20 @@ const BookingPage = () => {
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [bookingMode, setBookingMode] = useState("single"); // "single" or "monthly"
+  
+  // Single booking date
   const [selectedDate, setSelectedDate] = useState(null);
-  const [availableSlots, setAvailableSlots] = useState([]);
-  const [selectedTime, setSelectedTime] = useState(null);
-  const [loadingSlots, setLoadingSlots] = useState(false);
+  
+  // Monthly subscription - 2 days per month
+  const [monthlyDays, setMonthlyDays] = useState([]);
+  const [monthlyStartDate, setMonthlyStartDate] = useState(null);
 
   // Service selections
   const [selectedServices, setSelectedServices] = useState({});
   const [binQuantity, setBinQuantity] = useState(1);
+  const [dumpsterQuantity, setDumpsterQuantity] = useState(1);
   const [scentBombs, setScentBombs] = useState(0);
-  const [isMonthly, setIsMonthly] = useState(false);
 
   // Customer info
   const [customerInfo, setCustomerInfo] = useState({
@@ -92,13 +99,17 @@ const BookingPage = () => {
     notes: ""
   });
   const [distance, setDistance] = useState(0);
+  const [smsOptIn, setSmsOptIn] = useState(false);
 
   // Pricing
   const [pricing, setPricing] = useState({
+    subtotal_per_day: 0,
     subtotal: 0,
     travel_fee: 0,
     discount: 0,
-    total: 0
+    discount_percent: 5,
+    total: 0,
+    num_service_days: 1
   });
 
   // Booking result
@@ -113,14 +124,7 @@ const BookingPage = () => {
   // Calculate pricing whenever selections change
   useEffect(() => {
     calculatePrice();
-  }, [selectedServices, binQuantity, scentBombs, isMonthly, distance]);
-
-  // Fetch available slots when date changes
-  useEffect(() => {
-    if (selectedDate) {
-      fetchAvailableSlots(format(selectedDate, "yyyy-MM-dd"));
-    }
-  }, [selectedDate]);
+  }, [selectedServices, binQuantity, dumpsterQuantity, scentBombs, bookingMode, monthlyDays, distance]);
 
   const calculatePrice = async () => {
     const services = [];
@@ -135,40 +139,29 @@ const BookingPage = () => {
       services.push({ service_id: "driveway", quantity: 1 });
     }
     if (selectedServices.dumpster) {
-      services.push({ 
-        service_id: "dumpster", 
-        quantity: 1,
-        addons: scentBombs > 0 ? [{ addon_id: "scent_bomb", quantity: scentBombs }] : []
-      });
+      services.push({ service_id: "dumpster", quantity: dumpsterQuantity });
+    }
+    if (scentBombs > 0) {
+      services.push({ service_id: "scent_bomb", quantity: scentBombs });
     }
 
     if (services.length === 0) {
-      setPricing({ subtotal: 0, travel_fee: 0, discount: 0, total: 0 });
+      setPricing({ subtotal_per_day: 0, subtotal: 0, travel_fee: 0, discount: 0, discount_percent: 5, total: 0, num_service_days: 1 });
       return;
     }
+
+    const numDays = bookingMode === "monthly" ? monthlyDays.length : 1;
 
     try {
       const response = await axios.post(`${API}/calculate-price`, {
         services,
         distance_miles: distance,
-        is_monthly: isMonthly
+        is_monthly: bookingMode === "monthly",
+        num_service_days: numDays
       });
       setPricing(response.data);
     } catch (error) {
       console.error("Error calculating price:", error);
-    }
-  };
-
-  const fetchAvailableSlots = async (dateStr) => {
-    setLoadingSlots(true);
-    try {
-      const response = await axios.post(`${API}/availability`, { date: dateStr });
-      setAvailableSlots(response.data.available_slots || []);
-    } catch (error) {
-      console.error("Error fetching slots:", error);
-      setAvailableSlots([]);
-    } finally {
-      setLoadingSlots(false);
     }
   };
 
@@ -179,20 +172,44 @@ const BookingPage = () => {
     }));
   };
 
+  const toggleMonthlyDay = (day) => {
+    if (monthlyDays.includes(day)) {
+      setMonthlyDays(monthlyDays.filter(d => d !== day));
+    } else if (monthlyDays.length < 2) {
+      setMonthlyDays([...monthlyDays, day]);
+    }
+  };
+
   const isDateDisabled = (date) => {
     return isWeekend(date) || isBefore(date, startOfToday());
   };
 
   const hasSelectedServices = Object.values(selectedServices).some(v => v);
 
+  const canProceedToStep2 = hasSelectedServices;
+  const canProceedToStep3 = bookingMode === "single" 
+    ? selectedDate !== null 
+    : monthlyDays.length === 2 && monthlyStartDate !== null;
+
+  const getBookingDates = () => {
+    if (bookingMode === "single" && selectedDate) {
+      return [format(selectedDate, "yyyy-MM-dd")];
+    }
+    if (bookingMode === "monthly" && monthlyStartDate) {
+      // For monthly, we'll store the start date and the selected days
+      return [format(monthlyStartDate, "yyyy-MM-dd")];
+    }
+    return [];
+  };
+
   const handleSubmitBooking = async () => {
-    if (!hasSelectedServices || !selectedDate || !selectedTime) {
-      toast.error("Please complete all required fields");
+    if (!hasSelectedServices) {
+      toast.error("Please select at least one service");
       return;
     }
 
-    if (!customerInfo.name || !customerInfo.email || !customerInfo.phone || !customerInfo.address) {
-      toast.error("Please fill in all customer information");
+    if (!customerInfo.name || !customerInfo.phone || !customerInfo.address) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
@@ -209,24 +226,24 @@ const BookingPage = () => {
       services.push({ service_id: "driveway", quantity: 1 });
     }
     if (selectedServices.dumpster) {
-      services.push({ 
-        service_id: "dumpster", 
-        quantity: 1,
-        addons: scentBombs > 0 ? [{ addon_id: "scent_bomb", quantity: scentBombs }] : []
-      });
+      services.push({ service_id: "dumpster", quantity: dumpsterQuantity });
+    }
+    if (scentBombs > 0) {
+      services.push({ service_id: "scent_bomb", quantity: scentBombs });
     }
 
     try {
       const response = await axios.post(`${API}/bookings`, {
         customer_name: customerInfo.name,
-        customer_email: customerInfo.email,
+        customer_email: customerInfo.email || "noemail@upwash.com",
         customer_phone: customerInfo.phone,
         customer_address: customerInfo.address,
         distance_miles: distance,
         services,
-        booking_date: format(selectedDate, "yyyy-MM-dd"),
-        booking_time: selectedTime,
-        is_monthly: isMonthly,
+        booking_dates: getBookingDates(),
+        is_monthly: bookingMode === "monthly",
+        monthly_days: bookingMode === "monthly" ? monthlyDays : null,
+        sms_opt_in: smsOptIn,
         notes: customerInfo.notes
       });
 
@@ -262,31 +279,37 @@ const BookingPage = () => {
     }
   };
 
-  const formatTime = (time) => {
-    const [hour] = time.split(":");
-    const h = parseInt(hour);
-    return `${h > 12 ? h - 12 : h}:00 ${h >= 12 ? "PM" : "AM"}`;
-  };
-
   const getBinPrice = () => {
     if (binQuantity === 1) return 15;
     if (binQuantity === 2) return 25;
     return 25 + (binQuantity - 2) * 8;
   };
 
+  const getDumpsterPrice = () => {
+    if (dumpsterQuantity === 1) return 70;
+    return 70 + (dumpsterQuantity - 1) * 45;
+  };
+
   // Calculate local subtotal for instant UI feedback
-  const getLocalSubtotal = () => {
+  const getLocalSubtotalPerDay = () => {
     let total = 0;
     if (selectedServices.recycling_bin) total += getBinPrice();
     if (selectedServices.patio) total += 30;
     if (selectedServices.driveway) total += 30;
-    if (selectedServices.dumpster) total += 120 + (scentBombs * 3);
+    if (selectedServices.dumpster) total += getDumpsterPrice();
+    if (scentBombs > 0) total += scentBombs * 3.50;
     return total;
   };
 
+  const getNumServiceDays = () => {
+    return bookingMode === "monthly" ? monthlyDays.length : 1;
+  };
+
   const getLocalTotal = () => {
-    const subtotal = getLocalSubtotal();
-    const discount = isMonthly ? subtotal * 0.10 : 0;
+    const subtotalPerDay = getLocalSubtotalPerDay();
+    const numDays = getNumServiceDays();
+    const subtotal = subtotalPerDay * numDays;
+    const discount = bookingMode === "monthly" ? subtotal * 0.05 : 0;
     const travelFee = distance > 15 ? (distance - 15) * 1 : 0;
     return subtotal - discount + travelFee;
   };
@@ -400,55 +423,80 @@ const BookingPage = () => {
                               </div>
                             )}
 
-                            {/* Scent bomb addon for dumpster */}
+                            {/* Dumpster quantity selector */}
                             {service.id === "dumpster" && selectedServices.dumpster && (
                               <div className="mt-4 flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                                <span className="text-sm text-slate-600">Scent Bombs ($3 each):</span>
+                                <span className="text-sm text-slate-600">Quantity:</span>
                                 <div className="flex items-center gap-2">
                                   <button
-                                    onClick={() => setScentBombs(Math.max(0, scentBombs - 1))}
+                                    onClick={() => setDumpsterQuantity(Math.max(1, dumpsterQuantity - 1))}
                                     className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
-                                    data-testid="scent-bomb-minus"
+                                    data-testid="dumpster-quantity-minus"
                                   >
                                     <Minus size={16} />
                                   </button>
-                                  <span className="w-8 text-center font-bold" data-testid="scent-bomb-value">{scentBombs}</span>
+                                  <span className="w-8 text-center font-bold" data-testid="dumpster-quantity-value">{dumpsterQuantity}</span>
                                   <button
-                                    onClick={() => setScentBombs(scentBombs + 1)}
+                                    onClick={() => setDumpsterQuantity(dumpsterQuantity + 1)}
                                     className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
-                                    data-testid="scent-bomb-plus"
+                                    data-testid="dumpster-quantity-plus"
                                   >
                                     <Plus size={16} />
                                   </button>
                                 </div>
+                                <span className="text-blue-600 font-bold">${getDumpsterPrice()}</span>
+                                <span className="text-xs text-slate-400">($70 first, $45 each additional)</span>
                               </div>
                             )}
                           </div>
                         </div>
                       </div>
                     ))}
-                  </div>
 
-                  {/* Monthly option */}
-                  <div className="mt-6 p-4 bg-green-50 rounded-2xl border border-green-200">
-                    <div className="flex items-center gap-3">
-                      <Checkbox 
-                        id="monthly" 
-                        checked={isMonthly}
-                        onCheckedChange={setIsMonthly}
-                        data-testid="monthly-checkbox"
-                      />
-                      <Label htmlFor="monthly" className="cursor-pointer">
-                        <span className="font-bold text-green-700">Monthly Plan</span>
-                        <span className="text-green-600 ml-2">- Save 10% (2x weekly cleaning)</span>
-                      </Label>
+                    {/* Scent Bomb Add-on - Standalone */}
+                    <div
+                      className={`p-4 rounded-2xl border-2 ${
+                        scentBombs > 0 
+                          ? "border-green-500 bg-green-50" 
+                          : "border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <Droplets className="text-white" size={24} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-slate-900">Scent Bomb Add-on</h3>
+                          <p className="text-sm text-slate-500">Deodorizing scent treatment - $3.50 each</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setScentBombs(Math.max(0, scentBombs - 1))}
+                            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
+                            data-testid="scent-bomb-minus"
+                          >
+                            <Minus size={16} />
+                          </button>
+                          <span className="w-8 text-center font-bold" data-testid="scent-bomb-value">{scentBombs}</span>
+                          <button
+                            onClick={() => setScentBombs(scentBombs + 1)}
+                            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
+                            data-testid="scent-bomb-plus"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                        {scentBombs > 0 && (
+                          <span className="text-green-600 font-bold">${(scentBombs * 3.50).toFixed(2)}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-8 flex justify-end">
                     <Button
                       onClick={() => setStep(2)}
-                      disabled={!hasSelectedServices}
+                      disabled={!canProceedToStep2}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 rounded-full"
                       data-testid="continue-to-schedule-btn"
                     >
@@ -458,23 +506,59 @@ const BookingPage = () => {
                 </div>
               )}
 
-              {/* Step 2: Schedule */}
+              {/* Step 2: Choose Booking Type & Schedule */}
               {step === 2 && (
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900 mb-6">Choose Date & Time</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 mb-6">Choose Your Plan</h2>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Calendar */}
+                  {/* Booking Type Selection */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <div
+                      onClick={() => setBookingMode("single")}
+                      className={`p-6 rounded-2xl border-2 cursor-pointer transition-all ${
+                        bookingMode === "single" 
+                          ? "border-blue-500 bg-blue-50" 
+                          : "border-slate-200 hover:border-blue-300"
+                      }`}
+                      data-testid="single-booking-option"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <CalendarDays className={bookingMode === "single" ? "text-blue-600" : "text-slate-400"} size={24} />
+                        <h3 className="font-bold text-lg">Single Service</h3>
+                      </div>
+                      <p className="text-sm text-slate-500">Book a one-time cleaning for a specific date</p>
+                    </div>
+
+                    <div
+                      onClick={() => setBookingMode("monthly")}
+                      className={`p-6 rounded-2xl border-2 cursor-pointer transition-all relative overflow-hidden ${
+                        bookingMode === "monthly" 
+                          ? "border-green-500 bg-green-50" 
+                          : "border-slate-200 hover:border-green-300"
+                      }`}
+                      data-testid="monthly-booking-option"
+                    >
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                        SAVE 5%
+                      </div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <Star className={bookingMode === "monthly" ? "text-green-600" : "text-slate-400"} size={24} />
+                        <h3 className="font-bold text-lg">Monthly Subscription</h3>
+                      </div>
+                      <p className="text-sm text-slate-500">Choose 2 days per month for regular cleanings</p>
+                    </div>
+                  </div>
+
+                  {/* Single Booking Calendar */}
+                  {bookingMode === "single" && (
                     <div>
-                      <Label className="mb-2 block">Select Date</Label>
-                      <div className="border rounded-2xl p-4 bg-slate-50">
+                      <Label className="mb-2 block text-lg font-semibold">Select Your Service Date</Label>
+                      <p className="text-sm text-slate-500 mb-4">We operate Monday through Friday</p>
+                      <div className="border rounded-2xl p-4 bg-slate-50 inline-block">
                         <Calendar
                           mode="single"
                           selected={selectedDate}
-                          onSelect={(date) => {
-                            setSelectedDate(date);
-                            setSelectedTime(null);
-                          }}
+                          onSelect={setSelectedDate}
                           disabled={isDateDisabled}
                           fromDate={startOfToday()}
                           toDate={addDays(new Date(), 60)}
@@ -482,41 +566,64 @@ const BookingPage = () => {
                           data-testid="booking-calendar"
                         />
                       </div>
-                      <p className="text-sm text-slate-500 mt-2 flex items-center gap-2">
-                        <Clock size={14} />
-                        Mon-Fri, 9AM - 6PM
-                      </p>
+                      {selectedDate && (
+                        <p className="mt-4 text-blue-600 font-medium">
+                          Selected: {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                        </p>
+                      )}
                     </div>
+                  )}
 
-                    {/* Time Slots */}
+                  {/* Monthly Subscription */}
+                  {bookingMode === "monthly" && (
                     <div>
-                      <Label className="mb-2 block">Select Time</Label>
-                      {!selectedDate ? (
-                        <p className="text-slate-400 text-center py-12">Select a date first</p>
-                      ) : loadingSlots ? (
-                        <p className="text-slate-400 text-center py-12">Loading available times...</p>
-                      ) : availableSlots.length === 0 ? (
-                        <p className="text-orange-500 text-center py-12">No available slots for this date</p>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                          {availableSlots.map((slot) => (
+                      <div className="mb-6">
+                        <Label className="mb-2 block text-lg font-semibold">Select 2 Days of the Week</Label>
+                        <p className="text-sm text-slate-500 mb-4">Choose which 2 days you'd like service each month</p>
+                        <div className="flex flex-wrap gap-2">
+                          {WEEKDAYS.map((day) => (
                             <button
-                              key={slot}
-                              onClick={() => setSelectedTime(slot)}
-                              className={`time-slot p-3 rounded-xl border-2 font-medium transition-all ${
-                                selectedTime === slot
-                                  ? "border-blue-500 bg-blue-600 text-white"
-                                  : "border-slate-200 hover:border-blue-300"
+                              key={day}
+                              onClick={() => toggleMonthlyDay(day)}
+                              disabled={!monthlyDays.includes(day) && monthlyDays.length >= 2}
+                              className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                                monthlyDays.includes(day)
+                                  ? "bg-green-500 text-white"
+                                  : monthlyDays.length >= 2
+                                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                               }`}
-                              data-testid={`time-slot-${slot}`}
+                              data-testid={`monthly-day-${day}`}
                             >
-                              {formatTime(slot)}
+                              {day}
                             </button>
                           ))}
                         </div>
-                      )}
+                        {monthlyDays.length > 0 && (
+                          <p className="mt-2 text-green-600 font-medium">
+                            Selected: {monthlyDays.join(" & ")}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label className="mb-2 block text-lg font-semibold">Start Date</Label>
+                        <p className="text-sm text-slate-500 mb-4">When should your subscription begin?</p>
+                        <div className="border rounded-2xl p-4 bg-slate-50 inline-block">
+                          <Calendar
+                            mode="single"
+                            selected={monthlyStartDate}
+                            onSelect={setMonthlyStartDate}
+                            disabled={isDateDisabled}
+                            fromDate={startOfToday()}
+                            toDate={addDays(new Date(), 60)}
+                            className="rounded-xl"
+                            data-testid="monthly-start-calendar"
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="mt-8 flex justify-between">
                     <Button
@@ -529,7 +636,7 @@ const BookingPage = () => {
                     </Button>
                     <Button
                       onClick={() => setStep(3)}
-                      disabled={!selectedDate || !selectedTime}
+                      disabled={!canProceedToStep3}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 rounded-full"
                       data-testid="continue-to-info-btn"
                     >
@@ -545,41 +652,15 @@ const BookingPage = () => {
                   <h2 className="text-2xl font-bold text-slate-900 mb-6">Your Information</h2>
                   
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="name">Full Name *</Label>
-                        <Input
-                          id="name"
-                          value={customerInfo.name}
-                          onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
-                          placeholder="John Doe"
-                          className="mt-1 rounded-xl"
-                          data-testid="customer-name-input"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="phone">Phone *</Label>
-                        <Input
-                          id="phone"
-                          value={customerInfo.phone}
-                          onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
-                          placeholder="(817) 555-1234"
-                          className="mt-1 rounded-xl"
-                          data-testid="customer-phone-input"
-                        />
-                      </div>
-                    </div>
-
                     <div>
-                      <Label htmlFor="email">Email *</Label>
+                      <Label htmlFor="name">Full Name *</Label>
                       <Input
-                        id="email"
-                        type="email"
-                        value={customerInfo.email}
-                        onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
-                        placeholder="john@example.com"
+                        id="name"
+                        value={customerInfo.name}
+                        onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+                        placeholder="John Doe"
                         className="mt-1 rounded-xl"
-                        data-testid="customer-email-input"
+                        data-testid="customer-name-input"
                       />
                     </div>
 
@@ -596,6 +677,53 @@ const BookingPage = () => {
                     </div>
 
                     <div>
+                      <Label htmlFor="phone">Phone Number *</Label>
+                      <Input
+                        id="phone"
+                        value={customerInfo.phone}
+                        onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                        placeholder="(817) 555-1234"
+                        className="mt-1 rounded-xl"
+                        data-testid="customer-phone-input"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="email">Email (optional)</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={customerInfo.email}
+                        onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
+                        placeholder="john@example.com"
+                        className="mt-1 rounded-xl"
+                        data-testid="customer-email-input"
+                      />
+                    </div>
+
+                    {/* SMS Opt-in */}
+                    <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                      <div className="flex items-start gap-3">
+                        <Checkbox 
+                          id="smsOptIn" 
+                          checked={smsOptIn}
+                          onCheckedChange={setSmsOptIn}
+                          className="mt-1"
+                          data-testid="sms-opt-in-checkbox"
+                        />
+                        <Label htmlFor="smsOptIn" className="cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <MessageSquare size={18} className="text-blue-600" />
+                            <span className="font-bold text-slate-900">Text Message Reminders</span>
+                          </div>
+                          <p className="text-sm text-slate-600">
+                            Receive service reminders and updates via text message
+                          </p>
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div>
                       <Label htmlFor="distance">Distance from Burleson (miles)</Label>
                       <Input
                         id="distance"
@@ -607,7 +735,8 @@ const BookingPage = () => {
                         className="mt-1 rounded-xl w-32"
                         data-testid="distance-input"
                       />
-                      <p className="text-sm text-slate-500 mt-1">
+                      <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                        <MapPin size={14} />
                         Free within 15 miles, $1/mile beyond
                       </p>
                     </div>
@@ -637,7 +766,7 @@ const BookingPage = () => {
                     </Button>
                     <Button
                       onClick={handleSubmitBooking}
-                      disabled={loading || !customerInfo.name || !customerInfo.email || !customerInfo.phone || !customerInfo.address}
+                      disabled={loading || !customerInfo.name || !customerInfo.phone || !customerInfo.address}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 rounded-full"
                       data-testid="submit-booking-btn"
                     >
@@ -659,10 +788,22 @@ const BookingPage = () => {
                   <div className="bg-slate-50 rounded-2xl p-6 mb-8 text-left max-w-md mx-auto">
                     <h3 className="font-bold text-slate-900 mb-4">Appointment Details</h3>
                     <div className="space-y-2 text-sm">
-                      <p><strong>Date:</strong> {selectedDate && format(selectedDate, "MMMM d, yyyy")}</p>
-                      <p><strong>Time:</strong> {selectedTime && formatTime(selectedTime)}</p>
+                      {bookingMode === "single" && selectedDate && (
+                        <p><strong>Date:</strong> {format(selectedDate, "EEEE, MMMM d, yyyy")}</p>
+                      )}
+                      {bookingMode === "monthly" && (
+                        <>
+                          <p><strong>Plan:</strong> Monthly Subscription (5% off)</p>
+                          <p><strong>Service Days:</strong> {monthlyDays.join(" & ")}</p>
+                          {monthlyStartDate && (
+                            <p><strong>Starting:</strong> {format(monthlyStartDate, "MMMM d, yyyy")}</p>
+                          )}
+                        </>
+                      )}
                       <p><strong>Name:</strong> {customerInfo.name}</p>
+                      <p><strong>Phone:</strong> {customerInfo.phone}</p>
                       <p><strong>Address:</strong> {customerInfo.address}</p>
+                      {smsOptIn && <p className="text-blue-600">✓ Text reminders enabled</p>}
                     </div>
                   </div>
 
@@ -674,7 +815,7 @@ const BookingPage = () => {
                       data-testid="pay-now-btn"
                     >
                       <CreditCard className="mr-2" size={20} />
-                      {loading ? "Processing..." : `Pay Now - $${pricing.total.toFixed(2)}`}
+                      {loading ? "Processing..." : `Pay Now - $${(pricing.total || getLocalTotal()).toFixed(2)}`}
                     </Button>
                     
                     <p className="text-slate-500 text-sm">
@@ -691,7 +832,7 @@ const BookingPage = () => {
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sticky top-24">
               <h3 className="font-bold text-slate-900 text-lg mb-4">Order Summary</h3>
               
-              {hasSelectedServices ? (
+              {hasSelectedServices || scentBombs > 0 ? (
                 <>
                   <div className="space-y-3 text-sm">
                     {selectedServices.recycling_bin && (
@@ -713,36 +854,40 @@ const BookingPage = () => {
                       </div>
                     )}
                     {selectedServices.dumpster && (
-                      <>
-                        <div className="flex justify-between">
-                          <span>Dumpster Cleaning</span>
-                          <span className="font-medium">$120</span>
-                        </div>
-                        {scentBombs > 0 && (
-                          <div className="flex justify-between text-slate-500">
-                            <span>Scent Bombs ({scentBombs})</span>
-                            <span>${scentBombs * 3}</span>
-                          </div>
-                        )}
-                      </>
+                      <div className="flex justify-between">
+                        <span>Dumpster ({dumpsterQuantity})</span>
+                        <span className="font-medium">${getDumpsterPrice()}</span>
+                      </div>
+                    )}
+                    {scentBombs > 0 && (
+                      <div className="flex justify-between text-pink-600">
+                        <span>Scent Bombs ({scentBombs})</span>
+                        <span>${(scentBombs * 3.50).toFixed(2)}</span>
+                      </div>
                     )}
                   </div>
 
                   <div className="border-t border-slate-200 mt-4 pt-4 space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span>Subtotal</span>
-                      <span>${(pricing.subtotal || getLocalSubtotal()).toFixed(2)}</span>
+                      <span>Per Day</span>
+                      <span>${getLocalSubtotalPerDay().toFixed(2)}</span>
                     </div>
-                    {isMonthly && (pricing.discount > 0 || getLocalSubtotal() > 0) && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Monthly Discount (10%)</span>
-                        <span>-${(pricing.discount || getLocalSubtotal() * 0.10).toFixed(2)}</span>
+                    {bookingMode === "monthly" && monthlyDays.length > 0 && (
+                      <div className="flex justify-between text-slate-500">
+                        <span>× {monthlyDays.length} days/month</span>
+                        <span>${(getLocalSubtotalPerDay() * monthlyDays.length).toFixed(2)}</span>
                       </div>
                     )}
-                    {(pricing.travel_fee > 0 || (distance > 15)) && (
+                    {bookingMode === "monthly" && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Monthly Discount (5%)</span>
+                        <span>-${(getLocalSubtotalPerDay() * getNumServiceDays() * 0.05).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {distance > 15 && (
                       <div className="flex justify-between text-orange-600">
                         <span>Travel Fee</span>
-                        <span>+${(pricing.travel_fee || (distance > 15 ? (distance - 15) : 0)).toFixed(2)}</span>
+                        <span>+${(distance - 15).toFixed(2)}</span>
                       </div>
                     )}
                   </div>
@@ -751,15 +896,26 @@ const BookingPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-slate-900">Total</span>
                       <span className="text-2xl font-extrabold text-blue-600 price-tag" data-testid="total-price">
-                        ${(pricing.total || getLocalTotal()).toFixed(2)}
+                        ${getLocalTotal().toFixed(2)}
                       </span>
                     </div>
+                    {bookingMode === "monthly" && (
+                      <p className="text-xs text-slate-500 mt-1">per month</p>
+                    )}
                   </div>
 
-                  {selectedDate && selectedTime && (
+                  {bookingMode === "single" && selectedDate && (
                     <div className="mt-4 p-3 bg-blue-50 rounded-xl text-sm">
                       <p className="font-medium text-blue-900">
-                        {format(selectedDate, "MMM d")} at {formatTime(selectedTime)}
+                        {format(selectedDate, "EEEE, MMM d")}
+                      </p>
+                    </div>
+                  )}
+
+                  {bookingMode === "monthly" && monthlyDays.length > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 rounded-xl text-sm">
+                      <p className="font-medium text-green-900">
+                        Every {monthlyDays.join(" & ")}
                       </p>
                     </div>
                   )}
