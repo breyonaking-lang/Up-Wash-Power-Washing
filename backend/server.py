@@ -72,9 +72,10 @@ class Booking(BaseModel):
     customer_address: str
     distance_miles: float
     services: List[Dict]
-    booking_date: str
-    booking_time: str
+    booking_dates: List[str]  # List of service dates
     is_monthly: bool
+    monthly_days: Optional[List[str]] = None
+    sms_opt_in: bool = False
     notes: Optional[str] = None
     subtotal: float
     travel_fee: float
