@@ -243,13 +243,13 @@ const HomePage = () => {
             <div className="relative">
               <div className="inline-flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full mb-6">
                 <Star className="text-yellow-300" size={18} />
-                <span className="font-semibold">Save 10% with Monthly Plans</span>
+                <span className="font-semibold">Save 5% with Monthly Subscription</span>
               </div>
               <h2 className="text-4xl md:text-5xl font-extrabold mb-4 uppercase">
-                Monthly Cleaning Service
+                Monthly Subscription
               </h2>
               <p className="text-xl text-white/90 max-w-2xl mx-auto mb-8">
-                Schedule regular cleanings twice a week and save 10% on every service. 
+                Choose 2 days per month for regular cleanings and save 5% on every service. 
                 Perfect for restaurants, businesses, and HOA communities.
               </p>
               <Link to="/booking">
