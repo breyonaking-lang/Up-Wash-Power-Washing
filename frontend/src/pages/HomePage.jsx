@@ -43,7 +43,7 @@ const services = [
     id: "dumpster",
     name: "Dumpster Cleaning",
     description: "Commercial dumpster & area cleaning",
-    price: "$120",
+    price: "From $70",
     icon: Warehouse,
     color: "bg-purple-500"
   }
