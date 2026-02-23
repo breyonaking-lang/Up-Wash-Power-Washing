@@ -55,9 +55,10 @@ class BookingCreate(BaseModel):
     customer_address: str
     distance_miles: float = 0
     services: List[Dict]  # [{service_id, quantity, addons}]
-    booking_date: str  # ISO date
-    booking_time: str  # "09:00", "10:00", etc
+    booking_dates: List[str]  # List of ISO dates for service days
     is_monthly: bool = False
+    monthly_days: Optional[List[str]] = None  # Selected days for monthly plan (e.g., ["Monday", "Thursday"])
+    sms_opt_in: bool = False  # Opt-in for text reminders
     notes: Optional[str] = None
 
 class Booking(BaseModel):
