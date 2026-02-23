@@ -363,7 +363,7 @@ class PowerWashingAPITester:
             booking_data = {
                 "customer_name": "SMS Test Customer",
                 "customer_email": "smstest@example.com",
-                "customer_phone": "+15551234567",  # Test phone number
+                "customer_phone": "+15005550006",  # Twilio test number (valid format)
                 "customer_address": "456 SMS Test St, Burleson, TX",
                 "distance_miles": 3.0,
                 "services": [{"service_id": "patio", "quantity": 1}],
