@@ -261,6 +261,72 @@ def is_weekday(date_str: str) -> bool:
     except ValueError:
         return False
 
+# ===================== SMS FUNCTIONS =====================
+
+def format_phone_number(phone: str) -> str:
+    """Format phone number to E.164 format for Twilio"""
+    # Remove all non-digit characters
+    digits = ''.join(filter(str.isdigit, phone))
+    # Add +1 if it's a 10-digit US number
+    if len(digits) == 10:
+        return f"+1{digits}"
+    elif len(digits) == 11 and digits.startswith('1'):
+        return f"+{digits}"
+    return f"+{digits}"
+
+def send_sms(to_phone: str, message: str) -> bool:
+    """Send SMS via Twilio"""
+    if not twilio_client:
+        logging.warning("Twilio not configured, skipping SMS")
+        return False
+    
+    try:
+        formatted_phone = format_phone_number(to_phone)
+        twilio_client.messages.create(
+            body=message,
+            from_=twilio_phone_number,
+            to=formatted_phone
+        )
+        logging.info(f"SMS sent to {formatted_phone}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to send SMS: {e}")
+        return False
+
+def send_booking_confirmation_sms(booking: dict) -> bool:
+    """Send booking confirmation SMS"""
+    if not booking.get("sms_opt_in"):
+        return False
+    
+    customer_name = booking.get("customer_name", "")
+    dates = booking.get("booking_dates", [])
+    total = booking.get("total", 0)
+    is_monthly = booking.get("is_monthly", False)
+    monthly_days = booking.get("monthly_days", [])
+    
+    if is_monthly and monthly_days:
+        date_info = f"every {' & '.join(monthly_days)}"
+    elif dates:
+        date_info = dates[0]
+    else:
+        date_info = "scheduled"
+    
+    message = f"Hi {customer_name}! Your Upwash Power Washing booking is confirmed for {date_info}. Total: ${total:.2f}. Questions? Call (817) 750-3211. Thank you!"
+    
+    return send_sms(booking.get("customer_phone", ""), message)
+
+def send_payment_confirmation_sms(booking: dict) -> bool:
+    """Send payment confirmation SMS"""
+    if not booking.get("sms_opt_in"):
+        return False
+    
+    customer_name = booking.get("customer_name", "")
+    total = booking.get("total", 0)
+    
+    message = f"Hi {customer_name}! Payment of ${total:.2f} received for your Upwash Power Washing service. We'll see you soon! Questions? (817) 750-3211"
+    
+    return send_sms(booking.get("customer_phone", ""), message)
+
 # ===================== API ROUTES =====================
 
 @api_router.get("/")
@@ -287,6 +353,7 @@ async def calculate_price(request: Dict):
     
     pricing = calculate_booking_total(services, distance_miles, is_monthly, num_service_days)
     return pricing
+
 
 @api_router.post("/check-date")
 async def check_date(request: Dict):
