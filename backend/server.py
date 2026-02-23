@@ -146,26 +146,28 @@ SERVICES = {
         "service_id": "dumpster",
         "name": "Restaurant Dumpster Cleaning",
         "description": "Dumpster and surrounding area cleaning",
-        "base_price": 120.0,
-        "pricing_type": "fixed",
+        "base_price": 70.0,
+        "pricing_type": "tiered",
+        "tier_pricing": {
+            "1": 70.0,
+            "additional": 45.0
+        },
         "is_addon": False
     },
     "scent_bomb": {
         "service_id": "scent_bomb",
         "name": "Scent Bomb",
-        "description": "Deodorizing scent treatment",
-        "base_price": 3.0,
+        "description": "Deodorizing scent treatment add-on",
+        "base_price": 3.50,
         "pricing_type": "addon",
         "is_addon": True
     }
 }
 
-# Business hours
+# Business hours - removed time slots, just weekdays
 BUSINESS_HOURS = {
     "days": [0, 1, 2, 3, 4],  # Monday=0 to Friday=4
-    "start_hour": 9,
-    "end_hour": 18,  # 6 PM
-    "slot_duration": 60  # minutes
+    "day_names": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 }
 
 # Service area
@@ -175,7 +177,7 @@ SERVICE_AREA = {
     "per_mile_charge": 1.0
 }
 
-MONTHLY_DISCOUNT = 0.10  # 10% discount
+MONTHLY_DISCOUNT = 0.05  # 5% discount for monthly subscription
 
 # ===================== HELPER FUNCTIONS =====================
 
