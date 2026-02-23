@@ -213,56 +213,42 @@ def calculate_travel_fee(distance_miles: float) -> float:
     extra_miles = distance_miles - SERVICE_AREA["free_radius_miles"]
     return extra_miles * SERVICE_AREA["per_mile_charge"]
 
-def calculate_booking_total(services: List[Dict], distance_miles: float, is_monthly: bool) -> Dict:
+def calculate_booking_total(services: List[Dict], distance_miles: float, is_monthly: bool, num_service_days: int = 1) -> Dict:
     """Calculate total booking amount"""
-    subtotal = 0.0
+    subtotal_per_day = 0.0
     
     for service_item in services:
         service_id = service_item.get("service_id")
         quantity = service_item.get("quantity", 1)
-        addons = service_item.get("addons", [])
         
         # Main service price
-        subtotal += calculate_service_price(service_id, quantity)
-        
-        # Addon prices
-        for addon in addons:
-            addon_id = addon.get("addon_id")
-            addon_qty = addon.get("quantity", 1)
-            subtotal += calculate_service_price(addon_id, addon_qty)
+        subtotal_per_day += calculate_service_price(service_id, quantity)
+    
+    # Multiply by number of service days
+    subtotal = subtotal_per_day * num_service_days
     
     travel_fee = calculate_travel_fee(distance_miles)
+    # 5% discount for monthly subscription
     discount = subtotal * MONTHLY_DISCOUNT if is_monthly else 0.0
     total = subtotal - discount + travel_fee
     
     return {
+        "subtotal_per_day": round(subtotal_per_day, 2),
         "subtotal": round(subtotal, 2),
         "travel_fee": round(travel_fee, 2),
         "discount": round(discount, 2),
-        "total": round(total, 2)
+        "discount_percent": int(MONTHLY_DISCOUNT * 100),
+        "total": round(total, 2),
+        "num_service_days": num_service_days
     }
 
-def get_available_slots(date_str: str, existing_bookings: List[Dict]) -> List[str]:
-    """Get available time slots for a given date"""
+def is_weekday(date_str: str) -> bool:
+    """Check if date is a weekday"""
     try:
         date = datetime.strptime(date_str, "%Y-%m-%d")
+        return date.weekday() in BUSINESS_HOURS["days"]
     except ValueError:
-        return []
-    
-    # Check if it's a weekday (Monday=0 to Friday=4)
-    if date.weekday() not in BUSINESS_HOURS["days"]:
-        return []
-    
-    # Generate all possible slots
-    slots = []
-    for hour in range(BUSINESS_HOURS["start_hour"], BUSINESS_HOURS["end_hour"]):
-        slots.append(f"{hour:02d}:00")
-    
-    # Remove booked slots
-    booked_times = [b.get("booking_time") for b in existing_bookings if b.get("booking_date") == date_str]
-    available = [s for s in slots if s not in booked_times]
-    
-    return available
+        return False
 
 # ===================== API ROUTES =====================
 
