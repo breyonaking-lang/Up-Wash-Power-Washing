@@ -47,13 +47,19 @@ const AdminPage = () => {
       setStats(statsRes.data);
       setBookings(bookingsRes.data.bookings || []);
 
-      // Build calendar data
+      // Build calendar data - handle booking_dates array
       const calData = {};
       (bookingsRes.data.bookings || []).forEach(booking => {
-        if (!calData[booking.booking_date]) {
-          calData[booking.booking_date] = [];
-        }
-        calData[booking.booking_date].push(booking);
+        const dates = booking.booking_dates || [];
+        // Handle legacy bookings with single booking_date
+        const allDates = dates.length > 0 ? dates : (booking.booking_date ? [booking.booking_date] : []);
+        
+        allDates.forEach(date => {
+          if (!calData[date]) {
+            calData[date] = [];
+          }
+          calData[date].push(booking);
+        });
       });
       setCalendarData(calData);
     } catch (error) {
