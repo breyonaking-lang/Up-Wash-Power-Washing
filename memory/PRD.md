@@ -11,7 +11,7 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - Service Area: 15-mile radius free, $1/mile beyond
 - Scheduling: Mon-Fri (weekdays only, no time slots)
 - Payment: Stripe + Cash App
-- SMS Reminders: Opt-in for text notifications
+- SMS Reminders: Twilio integration for text notifications
 
 ## Architecture
 
@@ -19,6 +19,7 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - `/app/backend/server.py` - Main API server
 - Collections: `bookings`, `payment_transactions`
 - Stripe integration via `emergentintegrations` library
+- Twilio SMS for notifications
 
 ### Frontend (React + Tailwind + Shadcn UI)
 - `/app/frontend/src/pages/` - Page components
@@ -42,7 +43,9 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - [x] Travel fee calculation ($1/mile beyond 15 miles)
 - [x] Customer info: name, address, phone, SMS opt-in
 - [x] Stripe payment integration
+- [x] Twilio SMS integration
 - [x] Admin dashboard with calendar view
+- [x] Admin SMS reminder sending
 - [x] Booking management (confirm/complete/cancel)
 
 ## What's Been Implemented
@@ -52,6 +55,10 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - Monthly subscription: choose 2 weekdays, 5% discount
 - Removed time slots - date only selection
 - SMS opt-in checkbox for text reminders
+- Twilio SMS integration:
+  - Booking confirmation SMS
+  - Payment confirmation SMS
+  - Admin "Send Reminder" button
 - Admin dashboard with stats and booking management
 - Mobile-responsive design
 
@@ -62,10 +69,10 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - [x] Updated pricing structure
 - [x] Monthly subscription (2 days, 5%)
 - [x] Payment integration
+- [x] SMS integration (Twilio)
 - [x] Admin calendar view
 
 ### P1 (Important) - Pending
-- [ ] Twilio SMS integration (requires API credentials)
 - [ ] HoneyBook API integration (requires API key)
 - [ ] Email confirmation notifications
 
@@ -76,6 +83,6 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - [ ] Review/testimonial system
 
 ## Next Tasks
-1. Get Twilio credentials for SMS reminders
-2. Get HoneyBook API key for CRM sync
-3. Add email notification system
+1. Get HoneyBook API key for CRM sync
+2. Add email notification system
+3. Upgrade Twilio to paid account for production SMS
