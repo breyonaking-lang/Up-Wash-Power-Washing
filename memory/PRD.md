@@ -5,12 +5,13 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - Recycling Bin Cleaning: $15 (1), $25 (2), $8 each additional
 - Patio Cleaning: $30
 - Driveway Cleaning: $30
-- Restaurant Dumpster Cleaning: $120 + $3 scent bombs
-- Monthly Plans: 10% discount, 2x weekly
+- Restaurant Dumpster Cleaning: $70 first, $45 each additional
+- Scent Bomb Add-on: $3.50 each (standalone, any service)
+- Monthly Subscription: 5% discount, choose 2 days per month
 - Service Area: 15-mile radius free, $1/mile beyond
-- Scheduling: Mon-Fri, 9AM-6PM, hourly
+- Scheduling: Mon-Fri (weekdays only, no time slots)
 - Payment: Stripe + Cash App
-- Integration: HoneyBook (booking/CRM sync)
+- SMS Reminders: Opt-in for text notifications
 
 ## Architecture
 
@@ -33,11 +34,13 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - [x] Service listing with pricing
 - [x] Multi-step booking wizard
 - [x] Calendar with weekday-only scheduling (Mon-Fri)
-- [x] Time slot selection (9AM-6PM, hourly)
 - [x] Dynamic pricing calculator
 - [x] Tiered pricing for recycling bins
-- [x] Monthly plan discount (10%)
+- [x] Tiered pricing for dumpsters ($70 first, $45 additional)
+- [x] Scent bomb standalone add-on ($3.50 each)
+- [x] Monthly subscription: 2 days/month, 5% discount
 - [x] Travel fee calculation ($1/mile beyond 15 miles)
+- [x] Customer info: name, address, phone, SMS opt-in
 - [x] Stripe payment integration
 - [x] Admin dashboard with calendar view
 - [x] Booking management (confirm/complete/cancel)
@@ -45,36 +48,34 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 ## What's Been Implemented
 **Date: Feb 21, 2026**
 - Complete booking website with 4-step wizard
-- All services with correct pricing
-- Calendar integration with availability checking
-- Stripe checkout integration (test mode)
+- Updated pricing: dumpster $70/$45, scent bomb $3.50
+- Monthly subscription: choose 2 weekdays, 5% discount
+- Removed time slots - date only selection
+- SMS opt-in checkbox for text reminders
 - Admin dashboard with stats and booking management
-- Contact page with business info
 - Mobile-responsive design
-- Professional UI following design guidelines
 
 ## Prioritized Backlog
 
 ### P0 (Critical) - DONE
 - [x] Core booking flow
+- [x] Updated pricing structure
+- [x] Monthly subscription (2 days, 5%)
 - [x] Payment integration
 - [x] Admin calendar view
 
-### P1 (Important) - Future
+### P1 (Important) - Pending
+- [ ] Twilio SMS integration (requires API credentials)
 - [ ] HoneyBook API integration (requires API key)
 - [ ] Email confirmation notifications
-- [ ] SMS reminders
-- [ ] Customer account/login
 
 ### P2 (Nice to Have)
 - [ ] Google Calendar sync for admin
-- [ ] Recurring booking management UI
+- [ ] Customer account/login
 - [ ] Customer booking history
 - [ ] Review/testimonial system
-- [ ] Service area map visualization
 
 ## Next Tasks
-1. Get HoneyBook API key from client for full CRM sync
-2. Add email notification system (SendGrid/Resend)
-3. Implement customer login for booking history
-4. Add Google Calendar sync for admin
+1. Get Twilio credentials for SMS reminders
+2. Get HoneyBook API key for CRM sync
+3. Add email notification system
