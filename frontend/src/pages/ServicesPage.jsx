@@ -6,9 +6,10 @@ import {
   Warehouse, 
   Car, 
   Sparkles,
+  Droplets,
   Plus,
-  Minus,
-  ArrowRight
+  ArrowRight,
+  Star
 } from "lucide-react";
 
 const ServicesPage = () => {
@@ -55,10 +56,10 @@ const ServicesPage = () => {
       icon: Warehouse,
       color: "bg-purple-500",
       pricing: [
-        { label: "Dumpster + Area", price: 120 },
-        { label: "Scent Bomb (Add-on)", price: 3 }
+        { label: "First Dumpster", price: 70 },
+        { label: "Each Additional", price: 45 }
       ],
-      features: ["Dumpster cleaning", "Surrounding area included", "Deodorizing available"]
+      features: ["Dumpster cleaning", "Surrounding area included", "Commercial grade"]
     }
   ];
 
@@ -137,6 +138,30 @@ const ServicesPage = () => {
           ))}
         </div>
 
+        {/* Scent Bomb Add-on */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-8 bg-gradient-to-br from-pink-50 to-purple-50 rounded-3xl border border-pink-100 p-8 md:p-10"
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-pink-500 rounded-2xl flex items-center justify-center">
+                <Droplets className="text-white" size={28} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-slate-900">Scent Bomb Add-on</h3>
+                <p className="text-slate-600">Deodorizing scent treatment for any service</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-3xl font-extrabold text-pink-600 price-tag">$3.50</span>
+              <span className="text-slate-500 ml-2">each</span>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Monthly Plan Section */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -147,14 +172,14 @@ const ServicesPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
               <span className="inline-block bg-green-500/20 text-green-400 px-4 py-2 rounded-full text-sm font-semibold mb-4">
-                Save 10%
+                <Star className="inline mr-1" size={16} /> Save 5%
               </span>
               <h2 className="text-3xl md:text-4xl font-extrabold uppercase mb-4">
-                Monthly Cleaning Plans
+                Monthly Subscription
               </h2>
               <p className="text-slate-300 text-lg">
-                Schedule regular cleanings twice a week and get a 10% discount on all services. 
-                Perfect for restaurants, businesses, and communities.
+                Choose 2 days per month for regular cleanings and get a 5% discount on all services. 
+                Charged per day of service. Perfect for restaurants, businesses, and communities.
               </p>
             </div>
             <div className="bg-white/10 rounded-2xl p-6">
@@ -162,11 +187,11 @@ const ServicesPage = () => {
               <ul className="space-y-3">
                 <li className="flex items-center gap-3">
                   <Plus className="text-green-400 flex-shrink-0" size={20} />
-                  <span>10% off all services</span>
+                  <span>5% off all services</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Plus className="text-green-400 flex-shrink-0" size={20} />
-                  <span>Twice weekly cleaning</span>
+                  <span>Choose any 2 days per month</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Plus className="text-green-400 flex-shrink-0" size={20} />
@@ -174,7 +199,7 @@ const ServicesPage = () => {
                 </li>
                 <li className="flex items-center gap-3">
                   <Plus className="text-green-400 flex-shrink-0" size={20} />
-                  <span>Flexible service options</span>
+                  <span>Text message reminders</span>
                 </li>
               </ul>
             </div>
