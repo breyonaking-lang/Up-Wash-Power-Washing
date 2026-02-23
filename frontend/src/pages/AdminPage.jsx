@@ -378,7 +378,19 @@ const AdminPage = () => {
                             </div>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
+                            {/* SMS Reminder Button */}
+                            {smsConfigured && booking.sms_opt_in && booking.status !== "cancelled" && booking.status !== "completed" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => sendReminder(booking.id)}
+                                className="rounded-full text-blue-600 border-blue-200 hover:bg-blue-50"
+                                data-testid={`send-reminder-${booking.id}`}
+                              >
+                                <MessageSquare size={16} className="mr-1" /> Send Reminder
+                              </Button>
+                            )}
                             {booking.status === "pending" && (
                               <>
                                 <Button
