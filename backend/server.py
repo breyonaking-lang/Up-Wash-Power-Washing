@@ -570,6 +570,12 @@ async def get_checkout_status(session_id: str, http_request: Request):
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
+            
+            # Send payment confirmation SMS
+            booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+            if booking:
+                send_payment_confirmation_sms(booking)
+                
     elif status.status == "expired":
         await db.payment_transactions.update_one(
             {"session_id": session_id},
