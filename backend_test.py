@@ -110,13 +110,31 @@ class PowerWashingAPITester:
                     "expected_subtotal": 30.0
                 },
                 {
-                    "name": "Dumpster with Scent Bombs",
+                    "name": "1 Dumpster",
                     "data": {
-                        "services": [{"service_id": "dumpster", "quantity": 1, "addons": [{"addon_id": "scent_bomb", "quantity": 2}]}],
+                        "services": [{"service_id": "dumpster", "quantity": 1}],
                         "distance_miles": 0,
                         "is_monthly": False
                     },
-                    "expected_subtotal": 126.0  # 120 + (2 * 3)
+                    "expected_subtotal": 70.0  # First dumpster $70
+                },
+                {
+                    "name": "2 Dumpsters", 
+                    "data": {
+                        "services": [{"service_id": "dumpster", "quantity": 2}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 115.0  # $70 + $45
+                },
+                {
+                    "name": "Scent Bombs Standalone",
+                    "data": {
+                        "services": [{"service_id": "scent_bomb", "quantity": 2}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 7.0  # 2 * 3.50
                 },
                 {
                     "name": "Monthly Discount Test",
