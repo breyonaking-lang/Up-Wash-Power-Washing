@@ -311,7 +311,7 @@ const AdminPage = () => {
                       >
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
                               <span className="font-bold text-slate-900">{booking.customer_name}</span>
                               <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(booking.status)}`}>
                                 {booking.status}
@@ -319,19 +319,36 @@ const AdminPage = () => {
                               <span className={`px-2 py-1 rounded-full text-xs ${getPaymentStatusColor(booking.payment_status)}`}>
                                 {booking.payment_status}
                               </span>
+                              {booking.is_monthly && (
+                                <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-700">
+                                  Monthly
+                                </span>
+                              )}
+                              {booking.sms_opt_in && (
+                                <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
+                                  SMS
+                                </span>
+                              )}
                             </div>
                             <div className="text-sm text-slate-500 space-y-1">
                               <p>
-                                <strong>Date:</strong> {booking.booking_date} at {formatTime(booking.booking_time)}
+                                <strong>Dates:</strong> {(booking.booking_dates || [booking.booking_date]).join(", ")}
+                                {booking.monthly_days && booking.monthly_days.length > 0 && (
+                                  <span className="text-green-600 ml-2">({booking.monthly_days.join(" & ")})</span>
+                                )}
                               </p>
                               <p>
-                                <strong>Services:</strong> {booking.services?.map(s => s.service_id).join(", ")}
+                                <strong>Services:</strong> {booking.services?.map(s => `${s.service_id}${s.quantity > 1 ? ` (${s.quantity})` : ''}`).join(", ")}
                               </p>
                               <p>
                                 <strong>Total:</strong> ${booking.total?.toFixed(2)}
                               </p>
                               <p>
-                                <strong>Contact:</strong> {booking.customer_phone} | {booking.customer_email}
+                                <strong>Contact:</strong> {booking.customer_phone}
+                                {booking.customer_email && booking.customer_email !== "noemail@upwash.com" && ` | ${booking.customer_email}`}
+                              </p>
+                              <p>
+                                <strong>Address:</strong> {booking.customer_address}
                               </p>
                             </div>
                           </div>
