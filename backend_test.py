@@ -504,10 +504,29 @@ class PowerWashingAPITester:
         # Test date checking (no time slots)
         self.test_check_date()
         
+        # Test SMS configuration status
+        sms_configured = self.test_sms_status()
+        
         # Test booking flow
         booking_id = self.test_booking_creation()
         if booking_id:
             self.test_get_booking(booking_id)
+        
+        # Test SMS-specific functionality if configured
+        if sms_configured:
+            print("\n🔔 Testing SMS functionality...")
+            
+            # Test booking with SMS opt-in 
+            sms_booking_id = self.test_booking_with_sms_optin()
+            
+            # Test manual SMS sending
+            if sms_booking_id:
+                self.test_manual_sms_send(sms_booking_id)
+            
+            # Test SMS rejection for non-opted customers
+            self.test_sms_send_without_optin()
+        else:
+            print("\n⚠️  SMS not configured - skipping SMS tests")
         
         # Test admin endpoints
         self.test_admin_endpoints()
