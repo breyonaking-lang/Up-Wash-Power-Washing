@@ -36,7 +36,17 @@ const AdminPage = () => {
 
   useEffect(() => {
     fetchData();
+    checkSmsStatus();
   }, []);
+
+  const checkSmsStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/sms/status`);
+      setSmsConfigured(response.data.configured);
+    } catch (error) {
+      console.error("Error checking SMS status:", error);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -69,6 +79,19 @@ const AdminPage = () => {
       toast.error("Failed to load admin data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendReminder = async (bookingId) => {
+    try {
+      await axios.post(`${API}/sms/send`, {
+        booking_id: bookingId,
+        message_type: "reminder"
+      });
+      toast.success("Reminder SMS sent!");
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      toast.error(error.response?.data?.detail || "Failed to send reminder");
     }
   };
 
