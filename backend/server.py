@@ -461,6 +461,61 @@ async def update_booking_status(booking_id: str, status: str):
     
     return {"message": "Status updated", "booking_id": booking_id, "status": status}
 
+# ===================== SMS ROUTES =====================
+
+class SendSMSRequest(BaseModel):
+    """Request to send SMS"""
+    booking_id: str
+    message_type: str = "reminder"  # "reminder", "custom"
+    custom_message: Optional[str] = None
+
+@api_router.post("/sms/send")
+async def send_sms_to_customer(request: SendSMSRequest):
+    """Send SMS to a customer (admin function)"""
+    booking = await db.bookings.find_one({"id": request.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if not booking.get("sms_opt_in"):
+        raise HTTPException(status_code=400, detail="Customer has not opted in for SMS")
+    
+    phone = booking.get("customer_phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="No phone number on file")
+    
+    if request.message_type == "custom" and request.custom_message:
+        message = request.custom_message
+    else:
+        # Default reminder message
+        customer_name = booking.get("customer_name", "")
+        dates = booking.get("booking_dates", [])
+        is_monthly = booking.get("is_monthly", False)
+        monthly_days = booking.get("monthly_days", [])
+        
+        if is_monthly and monthly_days:
+            date_info = f"every {' & '.join(monthly_days)}"
+        elif dates:
+            date_info = dates[0]
+        else:
+            date_info = "soon"
+        
+        message = f"Hi {customer_name}! Reminder: Your Upwash Power Washing service is scheduled for {date_info}. Questions? (817) 750-3211"
+    
+    success = send_sms(phone, message)
+    
+    if success:
+        return {"message": "SMS sent successfully", "to": phone}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send SMS")
+
+@api_router.get("/sms/status")
+async def get_sms_status():
+    """Check if SMS is configured"""
+    return {
+        "configured": twilio_client is not None,
+        "phone_number": twilio_phone_number if twilio_client else None
+    }
+
 # ===================== PAYMENT ROUTES =====================
 
 @api_router.post("/checkout/session")
