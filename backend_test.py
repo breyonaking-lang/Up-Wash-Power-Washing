@@ -190,10 +190,10 @@ class PowerWashingAPITester:
         except Exception as e:
             self.log_test("Price Calculation", False, None, str(e))
 
-    def test_availability(self):
-        """Test availability endpoint"""
+    def test_check_date(self):
+        """Test date availability endpoint"""
         try:
-            # Test weekday availability
+            # Test weekday availability - no time slots needed
             today = datetime.now()
             weekday_date = today + timedelta(days=1)
             while weekday_date.weekday() > 4:  # Find next weekday
@@ -201,44 +201,44 @@ class PowerWashingAPITester:
             
             weekday_str = weekday_date.strftime("%Y-%m-%d")
             
-            response = requests.post(f"{self.base_url}/availability", 
+            response = requests.post(f"{self.base_url}/check-date", 
                                    json={"date": weekday_str}, timeout=10)
             
             if response.status_code == 200:
                 result = response.json()
-                slots = result.get("available_slots", [])
+                available = result.get("available", False)
                 
-                # Should have slots for weekdays (9AM-6PM)
-                if len(slots) > 0:
-                    self.log_test("Availability - Weekday", True, f"Found {len(slots)} slots")
+                # Should be available for weekdays
+                if available:
+                    self.log_test("Date Check - Weekday", True, f"Date {weekday_str} available")
                 else:
-                    self.log_test("Availability - Weekday", False, result, "No slots available")
+                    self.log_test("Date Check - Weekday", False, result, "Weekday not available")
             else:
-                self.log_test("Availability - Weekday", False, {}, f"Status: {response.status_code}")
+                self.log_test("Date Check - Weekday", False, {}, f"Status: {response.status_code}")
 
-            # Test weekend (should have no slots)
+            # Test weekend (should not be available)
             weekend_date = today + timedelta(days=1)
             while weekend_date.weekday() < 5:  # Find next weekend
                 weekend_date += timedelta(days=1)
             
             weekend_str = weekend_date.strftime("%Y-%m-%d")
             
-            response = requests.post(f"{self.base_url}/availability", 
+            response = requests.post(f"{self.base_url}/check-date", 
                                    json={"date": weekend_str}, timeout=10)
             
             if response.status_code == 200:
                 result = response.json()
-                slots = result.get("available_slots", [])
+                available = result.get("available", False)
                 
-                if len(slots) == 0:
-                    self.log_test("Availability - Weekend", True, "Correctly no slots")
+                if not available:
+                    self.log_test("Date Check - Weekend", True, "Correctly unavailable on weekend")
                 else:
-                    self.log_test("Availability - Weekend", False, result, f"Should be no slots but found {len(slots)}")
+                    self.log_test("Date Check - Weekend", False, result, "Weekend should not be available")
             else:
-                self.log_test("Availability - Weekend", False, {}, f"Status: {response.status_code}")
+                self.log_test("Date Check - Weekend", False, {}, f"Status: {response.status_code}")
                 
         except Exception as e:
-            self.log_test("Availability", False, None, str(e))
+            self.log_test("Date Check", False, None, str(e))
 
     def test_booking_creation(self):
         """Test booking creation endpoint"""
