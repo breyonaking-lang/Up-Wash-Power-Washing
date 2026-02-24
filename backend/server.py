@@ -741,6 +741,12 @@ async def create_booking(booking_data: BookingCreate):
         num_days
     )
     
+    # Check if this booking includes quote-based services
+    is_quote_service = any(
+        SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
+        for s in booking_data.services
+    )
+    
     # Create booking
     booking = Booking(
         customer_name=booking_data.customer_name,
@@ -760,7 +766,8 @@ async def create_booking(booking_data: BookingCreate):
         subtotal=pricing["subtotal"],
         travel_fee=pricing["travel_fee"],
         discount=pricing["discount"],
-        total=pricing["total"]
+        total=pricing["total"],
+        is_quote_service=is_quote_service
     )
     
     doc = booking.model_dump()
