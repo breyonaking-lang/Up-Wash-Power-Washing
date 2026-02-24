@@ -326,6 +326,55 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
         logging.warning("Google Maps API key not configured - distance calculation unavailable")
         return {"success": False, "error": "Distance calculation not configured", "distance_miles": 0}
     
+    # First try the Routes API (newer)
+    try:
+        routes_url = 'https://routes.googleapis.com/directions/v2:computeRoutes'
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': google_maps_api_key,
+            'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration'
+        }
+        body = {
+            "origin": {"address": customer_address},
+            "destination": {"address": burleson_address},
+            "travelMode": "DRIVE"
+        }
+        
+        response = requests.post(routes_url, headers=headers, json=body, timeout=10)
+        data = response.json()
+        
+        if 'routes' in data and len(data['routes']) > 0:
+            route = data['routes'][0]
+            distance_meters = route.get('distanceMeters', 0)
+            duration_str = route.get('duration', '0s')
+            
+            # Parse duration (e.g., "3600s" -> "1 hour")
+            duration_seconds = int(duration_str.replace('s', ''))
+            if duration_seconds >= 3600:
+                hours = duration_seconds // 3600
+                mins = (duration_seconds % 3600) // 60
+                duration_text = f"{hours} hr {mins} min" if mins else f"{hours} hr"
+            else:
+                duration_text = f"{duration_seconds // 60} min"
+            
+            distance_miles = distance_meters / 1609.34
+            distance_text = f"{distance_miles:.1f} mi"
+            
+            travel_fee = calculate_travel_fee(distance_miles)
+            
+            return {
+                "success": True,
+                "distance_miles": round(distance_miles, 1),
+                "distance_text": distance_text,
+                "duration_text": duration_text,
+                "travel_fee": round(travel_fee, 2),
+                "free_radius": SERVICE_AREA["free_radius_miles"],
+                "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"]
+            }
+    except Exception as e:
+        logging.warning(f"Routes API failed, trying legacy Distance Matrix: {e}")
+    
+    # Fallback to legacy Distance Matrix API
     try:
         url = 'https://maps.googleapis.com/maps/api/distancematrix/json'
         params = {
@@ -340,7 +389,11 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
         data = response.json()
         
         if data.get('status') != 'OK':
-            return {"success": False, "error": data.get('error_message', 'API request failed'), "distance_miles": 0}
+            error_msg = data.get('error_message', 'API request failed')
+            # Provide helpful message for API enablement
+            if 'not enabled' in error_msg.lower() or 'legacy' in error_msg.lower():
+                error_msg = "Please enable 'Distance Matrix API' or 'Routes API' in Google Cloud Console"
+            return {"success": False, "error": error_msg, "distance_miles": 0}
         
         element = data['rows'][0]['elements'][0]
         if element.get('status') != 'OK':
