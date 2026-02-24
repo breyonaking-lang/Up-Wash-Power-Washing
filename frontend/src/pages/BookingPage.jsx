@@ -273,7 +273,10 @@ const BookingPage = () => {
         is_monthly: bookingMode === "monthly",
         monthly_days: bookingMode === "monthly" ? monthlyDays : null,
         sms_opt_in: smsOptIn,
-        notes: customerInfo.notes
+        recurring_payment: savePaymentMethod,
+        notes: customerInfo.notes,
+        quote_description: hasQuoteService() ? quoteDescription : null,
+        quote_photos: hasQuoteService() && quotePhotos.length > 0 ? quotePhotos : null
       });
 
       setBookingId(response.data.id);
