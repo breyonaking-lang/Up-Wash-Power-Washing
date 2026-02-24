@@ -9,7 +9,9 @@ import {
   Droplets,
   Plus,
   ArrowRight,
-  Star
+  Star,
+  Home,
+  HardHat
 } from "lucide-react";
 
 const ServicesPage = () => {
