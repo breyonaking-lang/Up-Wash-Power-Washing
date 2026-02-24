@@ -616,7 +616,10 @@ async def create_booking(booking_data: BookingCreate):
         is_monthly=booking_data.is_monthly,
         monthly_days=booking_data.monthly_days,
         sms_opt_in=booking_data.sms_opt_in,
+        recurring_payment=booking_data.recurring_payment,
         notes=booking_data.notes,
+        quote_description=booking_data.quote_description,
+        quote_photos=booking_data.quote_photos,
         subtotal=pricing["subtotal"],
         travel_fee=pricing["travel_fee"],
         discount=pricing["discount"],
@@ -632,6 +635,12 @@ async def create_booking(booking_data: BookingCreate):
     # Send confirmation SMS if opted in
     if booking_data.sms_opt_in:
         send_booking_confirmation_sms(doc)
+    
+    # Send confirmation email to customer
+    send_booking_confirmation_email(doc)
+    
+    # Send notification email to admin
+    send_admin_notification_email(doc)
     
     return booking
 
