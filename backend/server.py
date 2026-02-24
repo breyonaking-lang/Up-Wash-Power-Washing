@@ -170,7 +170,7 @@ SERVICES = {
         "service_id": "patio",
         "name": "Patio Cleaning",
         "description": "Complete patio power washing service",
-        "base_price": 30.0,
+        "base_price": 85.0,
         "pricing_type": "fixed",
         "is_addon": False
     },
@@ -178,7 +178,7 @@ SERVICES = {
         "service_id": "driveway",
         "name": "Driveway Cleaning",
         "description": "Professional driveway power washing",
-        "base_price": 30.0,
+        "base_price": 85.0,
         "pricing_type": "fixed",
         "is_addon": False
     },
@@ -186,10 +186,10 @@ SERVICES = {
         "service_id": "dumpster",
         "name": "Restaurant Dumpster Cleaning",
         "description": "Dumpster and surrounding area cleaning",
-        "base_price": 70.0,
+        "base_price": 85.0,
         "pricing_type": "tiered",
         "tier_pricing": {
-            "1": 70.0,
+            "1": 85.0,
             "additional": 45.0
         },
         "is_addon": False
