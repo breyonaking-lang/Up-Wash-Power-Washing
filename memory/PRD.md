@@ -1,5 +1,9 @@
 # Upwash Power Washing - Product Requirements Document
 
+## Latest Update (Feb 24, 2026)
+- **Pricing Fix**: Updated Patio and Driveway cleaning to $85 on homepage
+- **Quote Requirements**: Made description and photo uploads REQUIRED for quote-based services (Home Power Washing, Construction Cleanup)
+
 ## Original Problem Statement
 Build a power washing cleaning services website for "Upwash Power Washing Cleaning Services" in Burleson, TX with:
 - Recycling Bin Cleaning: $15 (1), $25 (2), $8 each additional
