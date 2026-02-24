@@ -6,6 +6,8 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - Patio Cleaning: $30
 - Driveway Cleaning: $30
 - Restaurant Dumpster Cleaning: $70 first, $45 each additional
+- **Home Power Washing: Quote-based**
+- **Construction Site Cleanup: Quote-based**
 - Scent Bomb Add-on: $3.50 each (standalone, any service)
 - Monthly Subscription: 5% discount, choose 2 days per month
 - Service Area: 15-mile radius free, $1/mile beyond
@@ -26,18 +28,24 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - `/app/frontend/src/components/` - Shared components
 - Routing: react-router-dom
 
-## User Personas
-1. **Residential Customer** - Homeowners needing bin/patio/driveway cleaning
-2. **Commercial Customer** - Restaurants needing dumpster cleaning
-3. **Business Owner (Admin)** - Managing bookings and calendar
+## Services List
+| Service | Pricing |
+|---------|---------|
+| Recycling Bin | $15 (1), $25 (2), +$8 each |
+| Patio Cleaning | $30 |
+| Driveway Cleaning | $30 |
+| Dumpster Cleaning | $70 first, +$45 each |
+| Home Power Washing | Quote |
+| Construction Cleanup | Quote |
+| Scent Bomb Add-on | $3.50 each |
 
 ## Core Requirements (Static)
-- [x] Service listing with pricing
+- [x] Service listing with pricing (fixed + quote-based)
 - [x] Multi-step booking wizard
 - [x] Calendar with weekday-only scheduling (Mon-Fri)
 - [x] Dynamic pricing calculator
-- [x] Tiered pricing for recycling bins
-- [x] Tiered pricing for dumpsters ($70 first, $45 additional)
+- [x] Tiered pricing for recycling bins & dumpsters
+- [x] Quote-based services (Home Power Washing, Construction Cleanup)
 - [x] Scent bomb standalone add-on ($3.50 each)
 - [x] Monthly subscription: 2 days/month, 5% discount
 - [x] Travel fee calculation ($1/mile beyond 15 miles)
@@ -51,36 +59,11 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 ## What's Been Implemented
 **Date: Feb 21, 2026**
 - Complete booking website with 4-step wizard
-- Updated pricing: dumpster $70/$45, scent bomb $3.50
+- 6 services: 4 fixed-price + 2 quote-based
 - Monthly subscription: choose 2 weekdays, 5% discount
-- Removed time slots - date only selection
-- SMS opt-in checkbox for text reminders
-- Twilio SMS integration:
-  - Booking confirmation SMS
-  - Payment confirmation SMS
-  - Admin "Send Reminder" button
+- SMS opt-in with Twilio integration
 - Admin dashboard with stats and booking management
 - Mobile-responsive design
-
-## Prioritized Backlog
-
-### P0 (Critical) - DONE
-- [x] Core booking flow
-- [x] Updated pricing structure
-- [x] Monthly subscription (2 days, 5%)
-- [x] Payment integration
-- [x] SMS integration (Twilio)
-- [x] Admin calendar view
-
-### P1 (Important) - Pending
-- [ ] HoneyBook API integration (requires API key)
-- [ ] Email confirmation notifications
-
-### P2 (Nice to Have)
-- [ ] Google Calendar sync for admin
-- [ ] Customer account/login
-- [ ] Customer booking history
-- [ ] Review/testimonial system
 
 ## Next Tasks
 1. Get HoneyBook API key for CRM sync
