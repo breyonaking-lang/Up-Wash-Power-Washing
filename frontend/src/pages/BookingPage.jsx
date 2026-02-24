@@ -324,6 +324,37 @@ const BookingPage = () => {
     return selectedServices.home_powerwash || selectedServices.construction_cleanup;
   };
 
+  // Handle photo uploads - convert to base64
+  const handlePhotoUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length + quotePhotos.length > 5) {
+      toast.error("Maximum 5 photos allowed");
+      return;
+    }
+
+    const newPhotos = [];
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} is too large. Max 5MB per photo.`);
+        continue;
+      }
+      
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+      newPhotos.push(base64);
+    }
+    
+    setQuotePhotos([...quotePhotos, ...newPhotos]);
+    toast.success(`${newPhotos.length} photo(s) added`);
+  };
+
+  const removePhoto = (index) => {
+    setQuotePhotos(quotePhotos.filter((_, i) => i !== index));
+  };
+
   // Calculate local subtotal for instant UI feedback
   const getLocalSubtotalPerDay = () => {
     let total = 0;
