@@ -369,6 +369,9 @@ const AdminPage = () => {
                               </p>
                               <p>
                                 <strong>Total:</strong> ${booking.total?.toFixed(2)}
+                                {booking.services?.some(s => s.service_id === "home_powerwash" || s.service_id === "construction_cleanup") && (
+                                  <span className="text-amber-600 ml-2 font-medium">(+ Quote)</span>
+                                )}
                               </p>
                               <p>
                                 <strong>Contact:</strong> {booking.customer_phone}
@@ -377,6 +380,51 @@ const AdminPage = () => {
                               <p>
                                 <strong>Address:</strong> {booking.customer_address}
                               </p>
+                              
+                              {/* Quote Description */}
+                              {booking.quote_description && (
+                                <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                                  <div className="flex items-center gap-2 text-amber-800 font-medium mb-1">
+                                    <FileText size={16} />
+                                    Quote Request Details
+                                  </div>
+                                  <p className="text-amber-700 whitespace-pre-wrap">{booking.quote_description}</p>
+                                </div>
+                              )}
+                              
+                              {/* Quote Photos */}
+                              {booking.quote_photos && booking.quote_photos.length > 0 && (
+                                <div className="mt-2">
+                                  <div className="flex items-center gap-2 text-amber-800 font-medium mb-2">
+                                    <ImageIcon size={16} />
+                                    Customer Photos ({booking.quote_photos.length})
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {booking.quote_photos.map((photo, idx) => (
+                                      <a 
+                                        key={idx} 
+                                        href={photo} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="block"
+                                      >
+                                        <img 
+                                          src={photo} 
+                                          alt={`Quote photo ${idx + 1}`}
+                                          className="w-16 h-16 object-cover rounded-lg border border-amber-200 hover:border-amber-400 transition-colors"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Notes */}
+                              {booking.notes && (
+                                <p className="mt-2 italic text-slate-600">
+                                  <strong>Notes:</strong> {booking.notes}
+                                </p>
+                              )}
                             </div>
                           </div>
 
