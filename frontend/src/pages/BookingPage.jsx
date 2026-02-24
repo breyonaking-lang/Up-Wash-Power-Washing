@@ -328,8 +328,8 @@ const BookingPage = () => {
   const getLocalSubtotalPerDay = () => {
     let total = 0;
     if (selectedServices.recycling_bin) total += getBinPrice();
-    if (selectedServices.patio) total += 30;
-    if (selectedServices.driveway) total += 30;
+    if (selectedServices.patio) total += 85;
+    if (selectedServices.driveway) total += 85;
     if (selectedServices.dumpster) total += getDumpsterPrice();
     if (scentBombs > 0) total += scentBombs * 3.50;
     // Quote services don't add to total
