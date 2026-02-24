@@ -35,6 +35,7 @@ const AdminPage = () => {
   const [bookings, setBookings] = useState([]);
   const [calendarData, setCalendarData] = useState({});
   const [smsConfigured, setSmsConfigured] = useState(false);
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -42,6 +43,18 @@ const AdminPage = () => {
   useEffect(() => {
     fetchData();
     checkSmsStatus();
+    checkGoogleCalendarStatus();
+    
+    // Check URL params for calendar connection status
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('calendar') === 'connected') {
+      toast.success("Google Calendar connected successfully!");
+      window.history.replaceState({}, '', '/admin');
+    }
+    if (params.get('error')) {
+      toast.error(`Calendar connection error: ${params.get('error')}`);
+      window.history.replaceState({}, '', '/admin');
+    }
   }, []);
 
   const checkSmsStatus = async () => {
@@ -50,6 +63,36 @@ const AdminPage = () => {
       setSmsConfigured(response.data.configured);
     } catch (error) {
       console.error("Error checking SMS status:", error);
+    }
+  };
+
+  const checkGoogleCalendarStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/auth/google/status`);
+      setGoogleCalendarConnected(response.data.connected);
+    } catch (error) {
+      console.error("Error checking Google Calendar status:", error);
+    }
+  };
+
+  const connectGoogleCalendar = async () => {
+    try {
+      const response = await axios.get(`${API}/auth/google`);
+      if (response.data.auth_url) {
+        window.location.href = response.data.auth_url;
+      }
+    } catch (error) {
+      toast.error("Failed to initiate Google Calendar connection");
+    }
+  };
+
+  const disconnectGoogleCalendar = async () => {
+    try {
+      await axios.post(`${API}/auth/google/disconnect`);
+      setGoogleCalendarConnected(false);
+      toast.success("Google Calendar disconnected");
+    } catch (error) {
+      toast.error("Failed to disconnect Google Calendar");
     }
   };
 
