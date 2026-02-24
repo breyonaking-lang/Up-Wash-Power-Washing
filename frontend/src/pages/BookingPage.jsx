@@ -26,7 +26,10 @@ import {
   CalendarDays,
   Star,
   Home,
-  HardHat
+  HardHat,
+  Camera,
+  FileText,
+  Mail
 } from "lucide-react";
 import { format, addDays, isWeekend, isBefore, startOfToday } from "date-fns";
 
