@@ -526,12 +526,13 @@ def send_admin_notification_email(booking: dict) -> bool:
     """
     
     try:
-        resend.emails.send({
+        params: resend.Emails.SendParams = {
             "from": sender_email,
             "to": [admin_email],
             "subject": f"New Booking: {customer_name} - {service_list}",
             "html": html_content
-        })
+        }
+        resend.Emails.send(params)
         logging.info(f"Admin notification sent for booking {booking.get('id')}")
         return True
     except Exception as e:
