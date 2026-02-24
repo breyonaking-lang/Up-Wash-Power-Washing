@@ -121,6 +121,14 @@ const BookingPage = () => {
   });
   const [distance, setDistance] = useState(0);
   const [smsOptIn, setSmsOptIn] = useState(false);
+  
+  // Quote service details
+  const [quoteDescription, setQuoteDescription] = useState("");
+  const [quotePhotos, setQuotePhotos] = useState([]);
+  
+  // Subscription options
+  const [subscribeMonthly, setSubscribeMonthly] = useState(false);
+  const [savePaymentMethod, setSavePaymentMethod] = useState(false);
 
   // Pricing
   const [pricing, setPricing] = useState({
