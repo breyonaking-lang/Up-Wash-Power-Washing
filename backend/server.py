@@ -43,11 +43,15 @@ twilio_phone_number = os.environ.get('TWILIO_PHONE_NUMBER', '')
 
 # Resend setup
 resend_api_key = os.environ.get('RESEND_API_KEY', '')
-sender_email = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+sender_email = os.environ.get('SENDER_EMAIL', 'bookings@upwashpowerwashing.com')
 admin_email = os.environ.get('ADMIN_EMAIL', 'upwashpressurewashing@gmail.com')
 
 if resend_api_key:
     resend.api_key = resend_api_key
+
+# Google Maps setup for distance calculation
+google_maps_api_key = os.environ.get('GOOGLE_MAPS_API_KEY', '')
+burleson_address = os.environ.get('BURLESON_ADDRESS', 'Burleson, TX')
 
 # Google Calendar setup
 google_client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
