@@ -896,11 +896,11 @@ const BookingPage = () => {
                           <h3 className="font-bold text-amber-900">Quote Request Details</h3>
                         </div>
                         <p className="text-sm text-amber-700 mb-4">
-                          Help us provide an accurate quote by describing your project and uploading photos.
+                          Help us provide an accurate quote by describing your project and uploading photos. Both are required.
                         </p>
                         
                         <div>
-                          <Label htmlFor="quoteDescription" className="text-amber-900">Describe Your Project *</Label>
+                          <Label htmlFor="quoteDescription" className="text-amber-900">Describe Your Project <span className="text-red-500">*</span></Label>
                           <Textarea
                             id="quoteDescription"
                             value={quoteDescription}
@@ -908,12 +908,13 @@ const BookingPage = () => {
                             placeholder="Describe the area, size, current condition, any specific concerns..."
                             className="mt-1 rounded-xl bg-white"
                             rows={4}
+                            required
                             data-testid="quote-description-input"
                           />
                         </div>
 
                         <div>
-                          <Label className="text-amber-900 mb-2 block">Upload Photos (optional, max 5)</Label>
+                          <Label className="text-amber-900 mb-2 block">Upload Photos <span className="text-red-500">*</span> (at least 1, max 5)</Label>
                           <div className="flex flex-wrap gap-2 mb-3">
                             {quotePhotos.map((photo, index) => (
                               <div key={index} className="relative group">

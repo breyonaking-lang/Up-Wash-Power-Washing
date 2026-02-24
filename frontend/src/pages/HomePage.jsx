@@ -29,7 +29,7 @@ const services = [
     id: "patio",
     name: "Patio Cleaning",
     description: "Restore your outdoor living space",
-    price: "$30",
+    price: "$85",
     icon: Sparkles,
     color: "bg-blue-500"
   },
@@ -37,7 +37,7 @@ const services = [
     id: "driveway",
     name: "Driveway Cleaning",
     description: "Make your driveway look brand new",
-    price: "$30",
+    price: "$85",
     icon: Car,
     color: "bg-orange-500"
   },
