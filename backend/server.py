@@ -1140,6 +1140,12 @@ async def update_booking_status(booking_id: str, status: str):
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Booking not found")
     
+    # Create calendar event when booking is confirmed
+    if status == "confirmed":
+        booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+        if booking:
+            await create_calendar_event(booking)
+    
     return {"message": "Status updated", "booking_id": booking_id, "status": status}
 
 # ===================== SMS ROUTES =====================
