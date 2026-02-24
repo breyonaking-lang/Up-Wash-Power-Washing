@@ -445,7 +445,9 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
             "duration_text": duration_text,
             "travel_fee": round(travel_fee, 2),
             "free_radius": SERVICE_AREA["free_radius_miles"],
-            "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"]
+            "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"],
+            "customer_coords": customer_coords,
+            "burleson_coords": BURLESON_COORDS
         }
     except requests.exceptions.Timeout:
         return {"success": False, "error": "Distance calculation timed out", "distance_miles": 0}
