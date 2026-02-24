@@ -24,7 +24,9 @@ import {
   MapPin,
   MessageSquare,
   CalendarDays,
-  Star
+  Star,
+  Home,
+  HardHat
 } from "lucide-react";
 import { format, addDays, isWeekend, isBefore, startOfToday } from "date-fns";
 
@@ -64,6 +66,22 @@ const SERVICES = [
     icon: Warehouse,
     color: "bg-purple-500",
     pricingType: "tiered"
+  },
+  {
+    id: "home_powerwash",
+    name: "Home Power Washing",
+    description: "Complete home exterior - siding, deck, porch & more",
+    icon: Home,
+    color: "bg-cyan-500",
+    pricingType: "quote"
+  },
+  {
+    id: "construction_cleanup",
+    name: "Construction Site Cleanup",
+    description: "Post-construction cleaning and debris removal",
+    icon: HardHat,
+    color: "bg-amber-500",
+    pricingType: "quote"
   }
 ];
 
