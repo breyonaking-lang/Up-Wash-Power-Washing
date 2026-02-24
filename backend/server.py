@@ -257,8 +257,12 @@ def calculate_service_price(service_id: str, quantity: int) -> float:
             if quantity == 1:
                 return tier_pricing["1"]
             else:
-                # First dumpster = $70, then $45 for each additional
+                # First dumpster = $85, then $45 for each additional
                 return tier_pricing["1"] + (quantity - 1) * tier_pricing["additional"]
+    
+    # Quote-based services have no price calculation
+    if service["pricing_type"] == "quote":
+        return 0.0
     
     return service["base_price"] * quantity
 
