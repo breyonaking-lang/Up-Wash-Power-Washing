@@ -961,15 +961,6 @@ const BookingPage = () => {
                       </div>
                     </div>
                   )}
-                      <span className="font-bold text-slate-900">Total</span>
-                      <span className="text-2xl font-extrabold text-blue-600 price-tag" data-testid="total-price">
-                        ${getLocalTotal().toFixed(2)}
-                      </span>
-                    </div>
-                    {bookingMode === "monthly" && (
-                      <p className="text-xs text-slate-500 mt-1">per month</p>
-                    )}
-                  </div>
 
                   {bookingMode === "single" && selectedDate && (
                     <div className="mt-4 p-3 bg-blue-50 rounded-xl text-sm">
