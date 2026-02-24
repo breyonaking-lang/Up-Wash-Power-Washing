@@ -11,7 +11,9 @@ import {
   Clock,
   MapPin,
   Phone,
-  Star
+  Star,
+  Home,
+  HardHat
 } from "lucide-react";
 
 const services = [
@@ -46,6 +48,24 @@ const services = [
     price: "From $70",
     icon: Warehouse,
     color: "bg-purple-500"
+  },
+  {
+    id: "home_powerwash",
+    name: "Home Power Washing",
+    description: "Complete home exterior cleaning",
+    price: "Get Quote",
+    icon: Home,
+    color: "bg-cyan-500",
+    isQuote: true
+  },
+  {
+    id: "construction_cleanup",
+    name: "Construction Cleanup",
+    description: "Post-construction site cleaning",
+    price: "Get Quote",
+    icon: HardHat,
+    color: "bg-amber-500",
+    isQuote: true
   }
 ];
 
