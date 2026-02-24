@@ -816,6 +816,21 @@ const BookingPage = () => {
                                   <span className="text-orange-600"> ({(distanceInfo.distance_miles - 15).toFixed(1)} miles beyond free radius)</span>
                                 </p>
                               )}
+                              
+                              {/* Map Preview */}
+                              {distanceInfo.customer_coords && distanceInfo.burleson_coords && (
+                                <div className="mt-3 rounded-xl overflow-hidden border border-slate-200">
+                                  <img 
+                                    src={`https://maps.googleapis.com/maps/api/staticmap?size=400x200&scale=2&markers=color:red%7Clabel:S%7C${distanceInfo.customer_coords.lat},${distanceInfo.customer_coords.lng}&markers=color:blue%7Clabel:B%7C${distanceInfo.burleson_coords.lat},${distanceInfo.burleson_coords.lng}&path=color:0x007AFF%7Cweight:3%7C${distanceInfo.customer_coords.lat},${distanceInfo.customer_coords.lng}%7C${distanceInfo.burleson_coords.lat},${distanceInfo.burleson_coords.lng}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`}
+                                    alt="Service location map"
+                                    className="w-full h-auto"
+                                  />
+                                  <div className="p-2 bg-slate-50 text-xs text-slate-600 flex justify-between">
+                                    <span><span className="text-red-500">●</span> Your Location</span>
+                                    <span><span className="text-blue-500">●</span> Burleson (Base)</span>
+                                  </div>
+                                </div>
+                              )}
                             </>
                           ) : (
                             <p className="text-red-600">
