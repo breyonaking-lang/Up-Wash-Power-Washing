@@ -883,6 +883,18 @@ const BookingPage = () => {
                         <span className="font-medium">${getDumpsterPrice()}</span>
                       </div>
                     )}
+                    {selectedServices.home_powerwash && (
+                      <div className="flex justify-between text-cyan-600">
+                        <span>Home Power Washing</span>
+                        <span className="font-medium italic">Quote</span>
+                      </div>
+                    )}
+                    {selectedServices.construction_cleanup && (
+                      <div className="flex justify-between text-amber-600">
+                        <span>Construction Cleanup</span>
+                        <span className="font-medium italic">Quote</span>
+                      </div>
+                    )}
                     {scentBombs > 0 && (
                       <div className="flex justify-between text-pink-600">
                         <span>Scent Bombs ({scentBombs})</span>
@@ -891,33 +903,64 @@ const BookingPage = () => {
                     )}
                   </div>
 
-                  <div className="border-t border-slate-200 mt-4 pt-4 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Per Day</span>
-                      <span>${getLocalSubtotalPerDay().toFixed(2)}</span>
+                  {/* Quote Notice */}
+                  {hasQuoteService() && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+                      <p className="text-amber-800 font-medium">Quote-based services</p>
+                      <p className="text-amber-600 text-xs mt-1">We'll contact you with a custom quote after reviewing your request.</p>
                     </div>
-                    {bookingMode === "monthly" && monthlyDays.length > 0 && (
-                      <div className="flex justify-between text-slate-500">
-                        <span>× {monthlyDays.length} days/month</span>
-                        <span>${(getLocalSubtotalPerDay() * monthlyDays.length).toFixed(2)}</span>
-                      </div>
-                    )}
-                    {bookingMode === "monthly" && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Monthly Discount (5%)</span>
-                        <span>-${(getLocalSubtotalPerDay() * getNumServiceDays() * 0.05).toFixed(2)}</span>
-                      </div>
-                    )}
-                    {distance > 15 && (
-                      <div className="flex justify-between text-orange-600">
-                        <span>Travel Fee</span>
-                        <span>+${(distance - 15).toFixed(2)}</span>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
-                  <div className="border-t border-slate-200 mt-4 pt-4">
-                    <div className="flex justify-between items-center">
+                  {getLocalSubtotalPerDay() > 0 && (
+                    <>
+                      <div className="border-t border-slate-200 mt-4 pt-4 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Per Day</span>
+                          <span>${getLocalSubtotalPerDay().toFixed(2)}</span>
+                        </div>
+                        {bookingMode === "monthly" && monthlyDays.length > 0 && (
+                          <div className="flex justify-between text-slate-500">
+                            <span>× {monthlyDays.length} days/month</span>
+                            <span>${(getLocalSubtotalPerDay() * monthlyDays.length).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {bookingMode === "monthly" && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Monthly Discount (5%)</span>
+                            <span>-${(getLocalSubtotalPerDay() * getNumServiceDays() * 0.05).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {distance > 15 && (
+                          <div className="flex justify-between text-orange-600">
+                            <span>Travel Fee</span>
+                            <span>+${(distance - 15).toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-slate-200 mt-4 pt-4">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-slate-900">Total</span>
+                          <span className="text-2xl font-extrabold text-blue-600 price-tag" data-testid="total-price">
+                            ${getLocalTotal().toFixed(2)}
+                            {hasQuoteService() && <span className="text-sm font-normal text-slate-500"> + Quote</span>}
+                          </span>
+                        </div>
+                        {bookingMode === "monthly" && (
+                          <p className="text-xs text-slate-500 mt-1">per month</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {getLocalSubtotalPerDay() === 0 && hasQuoteService() && (
+                    <div className="border-t border-slate-200 mt-4 pt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-slate-900">Total</span>
+                        <span className="text-xl font-bold text-amber-600">Quote Required</span>
+                      </div>
+                    </div>
+                  )}
                       <span className="font-bold text-slate-900">Total</span>
                       <span className="text-2xl font-extrabold text-blue-600 price-tag" data-testid="total-price">
                         ${getLocalTotal().toFixed(2)}
