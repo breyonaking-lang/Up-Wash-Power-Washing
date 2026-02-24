@@ -1214,6 +1214,52 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Background task for processing quote follow-ups
+async def followup_background_task():
+    """Background task that runs every hour to check for pending quote follow-ups"""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Run every hour
+            
+            # Find and process quote follow-ups
+            cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+            
+            query = {
+                "is_quote_service": True,
+                "quote_responded": {"$ne": True},
+                "followup_sent": {"$ne": True},
+                "created_at": {"$lt": cutoff_time}
+            }
+            
+            pending_followups = await db.bookings.find(query, {"_id": 0}).to_list(100)
+            
+            for booking in pending_followups:
+                email_sent = send_quote_followup_email(booking)
+                sms_sent = send_quote_followup_sms(booking)
+                
+                if email_sent or sms_sent:
+                    await db.bookings.update_one(
+                        {"id": booking["id"]},
+                        {"$set": {
+                            "followup_sent": True,
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }}
+                    )
+                    logging.info(f"Auto follow-up sent for booking {booking['id']}")
+            
+            if pending_followups:
+                logging.info(f"Processed {len(pending_followups)} quote follow-ups")
+                
+        except Exception as e:
+            logging.error(f"Error in follow-up background task: {e}")
+            await asyncio.sleep(60)  # Wait a minute before retrying
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on app startup"""
+    asyncio.create_task(followup_background_task())
+    logging.info("Started quote follow-up background task")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
