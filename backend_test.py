@@ -165,6 +165,49 @@ class PowerWashingAPITester:
                     },
                     "expected_subtotal": 30.0,
                     "expected_travel_fee": 5.0
+                },
+                {
+                    "name": "Home Power Washing Quote Service",
+                    "data": {
+                        "services": [{"service_id": "home_powerwash", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 0.0  # Quote services should not add to subtotal
+                },
+                {
+                    "name": "Construction Cleanup Quote Service",
+                    "data": {
+                        "services": [{"service_id": "construction_cleanup", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 0.0  # Quote services should not add to subtotal
+                },
+                {
+                    "name": "Mixed Priced and Quote Services",
+                    "data": {
+                        "services": [
+                            {"service_id": "patio", "quantity": 1},  # $30
+                            {"service_id": "home_powerwash", "quantity": 1},  # Quote (should be $0)
+                            {"service_id": "recycling_bin", "quantity": 1}   # $15
+                        ],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 45.0  # Only priced services: $30 + $15
+                },
+                {
+                    "name": "Quote Services Only",
+                    "data": {
+                        "services": [
+                            {"service_id": "home_powerwash", "quantity": 1},
+                            {"service_id": "construction_cleanup", "quantity": 1}
+                        ],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 0.0  # Only quote services, should be $0
                 }
             ]
 
