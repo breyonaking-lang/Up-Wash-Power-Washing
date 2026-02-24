@@ -211,6 +211,44 @@ const BookingPage = () => {
     }
   };
 
+  // Calculate distance when address changes
+  const calculateDistanceFromAddress = async (address) => {
+    if (!address || address.length < 10) {
+      setDistanceInfo(null);
+      return;
+    }
+
+    setCalculatingDistance(true);
+    try {
+      const response = await axios.post(`${API}/calculate-distance`, { address });
+      if (response.data.success) {
+        setDistanceInfo(response.data);
+        setDistance(response.data.distance_miles);
+        if (response.data.travel_fee > 0) {
+          toast.info(`Travel fee: $${response.data.travel_fee.toFixed(2)} (${response.data.distance_miles} miles from Burleson)`);
+        }
+      } else {
+        setDistanceInfo({ success: false, error: response.data.error });
+      }
+    } catch (error) {
+      console.error("Error calculating distance:", error);
+      setDistanceInfo({ success: false, error: "Could not calculate distance" });
+    } finally {
+      setCalculatingDistance(false);
+    }
+  };
+
+  // Debounce address input for distance calculation
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (customerInfo.address) {
+        calculateDistanceFromAddress(customerInfo.address);
+      }
+    }, 1000); // Wait 1 second after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [customerInfo.address]);
+
   const isDateDisabled = (date) => {
     return isWeekend(date) || isBefore(date, startOfToday());
   };
