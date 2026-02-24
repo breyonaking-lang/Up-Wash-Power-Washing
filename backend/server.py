@@ -1319,6 +1319,8 @@ async def get_checkout_status(session_id: str, http_request: Request):
                 send_payment_confirmation_sms(booking)
                 # Send confirmation email on payment success
                 send_booking_confirmation_email(booking)
+                # Create Google Calendar event
+                await create_calendar_event(booking)
                 
     elif status.status == "expired":
         await db.payment_transactions.update_one(
