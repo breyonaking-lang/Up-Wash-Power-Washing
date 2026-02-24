@@ -52,14 +52,24 @@ class PowerWashingAPITester:
             
             if success:
                 services = data.get("services", [])
-                expected_services = ["recycling_bin", "patio", "driveway", "dumpster", "scent_bomb"]
+                expected_services = ["recycling_bin", "patio", "driveway", "dumpster", "scent_bomb", "home_powerwash", "construction_cleanup"]
                 service_ids = [s.get("service_id") for s in services]
                 
+                # Check for quote-based services specifically
+                quote_services = [s for s in services if s.get("pricing_type") == "quote"]
+                expected_quote_services = ["home_powerwash", "construction_cleanup"]
+                quote_service_ids = [s.get("service_id") for s in quote_services]
+                
                 if all(svc in service_ids for svc in expected_services):
-                    self.log_test("Get Services", True, f"Found {len(services)} services")
-                    return True, data
+                    if all(qsvc in quote_service_ids for qsvc in expected_quote_services):
+                        self.log_test("Get Services", True, f"Found {len(services)} services including {len(quote_services)} quote services")
+                        return True, data
+                    else:
+                        self.log_test("Get Services", False, data, f"Missing quote services. Found: {quote_service_ids}")
+                        return False, data
                 else:
-                    self.log_test("Get Services", False, data, "Missing expected services")
+                    missing = [svc for svc in expected_services if svc not in service_ids]
+                    self.log_test("Get Services", False, data, f"Missing services: {missing}")
                     return False, data
             else:
                 self.log_test("Get Services", False, data, f"Status: {response.status_code}")
