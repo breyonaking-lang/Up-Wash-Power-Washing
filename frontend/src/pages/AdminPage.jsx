@@ -19,7 +19,9 @@ import {
   Clock,
   XCircle,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  FileText,
+  Image as ImageIcon
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 
