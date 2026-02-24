@@ -36,7 +36,7 @@ const ServicesPage = () => {
       icon: Sparkles,
       color: "bg-blue-500",
       pricing: [
-        { label: "Standard Patio", price: 30 }
+        { label: "Standard Patio", price: 85 }
       ],
       features: ["Deep cleaning", "Mold & mildew removal", "Surface restoration"]
     },
@@ -47,7 +47,7 @@ const ServicesPage = () => {
       icon: Car,
       color: "bg-orange-500",
       pricing: [
-        { label: "Standard Driveway", price: 30 }
+        { label: "Standard Driveway", price: 85 }
       ],
       features: ["Oil stain removal", "Tire mark cleaning", "Full surface wash"]
     },
