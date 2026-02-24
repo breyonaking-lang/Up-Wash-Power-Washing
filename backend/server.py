@@ -172,6 +172,22 @@ SERVICES = {
         "base_price": 3.50,
         "pricing_type": "addon",
         "is_addon": True
+    },
+    "home_powerwash": {
+        "service_id": "home_powerwash",
+        "name": "Home Power Washing",
+        "description": "Complete home exterior power washing - siding, deck, porch, and more",
+        "base_price": 0.0,
+        "pricing_type": "quote",
+        "is_addon": False
+    },
+    "construction_cleanup": {
+        "service_id": "construction_cleanup",
+        "name": "Construction Site Cleanup",
+        "description": "Post-construction cleaning and debris removal",
+        "base_price": 0.0,
+        "pricing_type": "quote",
+        "is_addon": False
     }
 }
 
