@@ -318,6 +318,59 @@ def is_weekday(date_str: str) -> bool:
     except ValueError:
         return False
 
+# ===================== DISTANCE CALCULATION =====================
+
+def calculate_distance_from_address(customer_address: str) -> Dict:
+    """Calculate driving distance from customer address to Burleson, TX using Google Maps API"""
+    if not google_maps_api_key:
+        logging.warning("Google Maps API key not configured - distance calculation unavailable")
+        return {"success": False, "error": "Distance calculation not configured", "distance_miles": 0}
+    
+    try:
+        url = 'https://maps.googleapis.com/maps/api/distancematrix/json'
+        params = {
+            'origins': customer_address,
+            'destinations': burleson_address,
+            'mode': 'driving',
+            'units': 'imperial',
+            'key': google_maps_api_key
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        if data.get('status') != 'OK':
+            return {"success": False, "error": data.get('error_message', 'API request failed'), "distance_miles": 0}
+        
+        element = data['rows'][0]['elements'][0]
+        if element.get('status') != 'OK':
+            return {"success": False, "error": f"Could not calculate distance: {element.get('status')}", "distance_miles": 0}
+        
+        # Distance is returned in meters, convert to miles
+        distance_meters = element['distance']['value']
+        distance_miles = distance_meters / 1609.34  # meters to miles
+        distance_text = element['distance']['text']
+        duration_text = element['duration']['text']
+        
+        # Calculate travel fee
+        travel_fee = calculate_travel_fee(distance_miles)
+        
+        return {
+            "success": True,
+            "distance_miles": round(distance_miles, 1),
+            "distance_text": distance_text,
+            "duration_text": duration_text,
+            "travel_fee": round(travel_fee, 2),
+            "free_radius": SERVICE_AREA["free_radius_miles"],
+            "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"]
+        }
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Distance calculation timed out", "distance_miles": 0}
+    except Exception as e:
+        logging.error(f"Distance calculation error: {e}")
+        return {"success": False, "error": str(e), "distance_miles": 0}
+
+
 # ===================== SMS FUNCTIONS =====================
 
 def format_phone_number(phone: str) -> str:
