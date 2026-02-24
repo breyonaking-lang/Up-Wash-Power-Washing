@@ -850,6 +850,8 @@ async def get_checkout_status(session_id: str, http_request: Request):
             booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
             if booking:
                 send_payment_confirmation_sms(booking)
+                # Send confirmation email on payment success
+                send_booking_confirmation_email(booking)
                 
     elif status.status == "expired":
         await db.payment_transactions.update_one(
