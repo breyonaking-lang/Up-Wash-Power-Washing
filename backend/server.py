@@ -360,7 +360,16 @@ def send_booking_confirmation_sms(booking: dict) -> bool:
     else:
         date_info = "scheduled"
     
-    message = f"Hi {customer_name}! Your Upwash Power Washing booking is confirmed for {date_info}. Total: ${total:.2f}. Questions? Call (817) 750-3211. Thank you!"
+    # Check if it's a quote-based booking
+    has_quote_services = any(
+        SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
+        for s in booking.get("services", [])
+    )
+    
+    if has_quote_services:
+        message = f"Hi {customer_name}! Your Upwash Power Washing quote request has been received. We'll contact you with a custom quote soon! Questions? Call (817) 750-3211."
+    else:
+        message = f"Hi {customer_name}! Your Upwash Power Washing booking is confirmed for {date_info}. Total: ${total:.2f}. Questions? Call (817) 750-3211. Thank you!"
     
     return send_sms(booking.get("customer_phone", ""), message)
 
@@ -376,7 +385,160 @@ def send_payment_confirmation_sms(booking: dict) -> bool:
     
     return send_sms(booking.get("customer_phone", ""), message)
 
+# ===================== EMAIL FUNCTIONS =====================
+
+def send_booking_confirmation_email(booking: dict) -> bool:
+    """Send booking confirmation email to customer"""
+    customer_email = booking.get("customer_email")
+    if not customer_email or not resend_api_key:
+        logging.warning("Email not sent - no email or Resend not configured")
+        return False
+    
+    customer_name = booking.get("customer_name", "")
+    dates = booking.get("booking_dates", [])
+    total = booking.get("total", 0)
+    services = booking.get("services", [])
+    address = booking.get("customer_address", "")
+    is_monthly = booking.get("is_monthly", False)
+    monthly_days = booking.get("monthly_days", [])
+    
+    # Build service list
+    service_list = ""
+    for s in services:
+        service_id = s.get("service_id", "")
+        quantity = s.get("quantity", 1)
+        service_info = SERVICES.get(service_id, {})
+        service_name = service_info.get("name", service_id)
+        if quantity > 1:
+            service_list += f"<li>{service_name} (x{quantity})</li>"
+        else:
+            service_list += f"<li>{service_name}</li>"
+    
+    # Check for quote services
+    has_quote = any(
+        SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
+        for s in services
+    )
+    
+    if is_monthly and monthly_days:
+        date_info = f"Every {' & '.join(monthly_days)} (Monthly Subscription - 5% off)"
+    elif dates:
+        date_info = dates[0]
+    else:
+        date_info = "To be scheduled"
+    
+    price_section = f"<strong>Total: ${total:.2f}</strong>"
+    if has_quote:
+        price_section = "<strong>Quote Required</strong> - We'll contact you with a custom quote."
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #007AFF, #00D4FF); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0;">UPWASH</h1>
+            <p style="color: white; margin: 5px 0;">Power Washing Cleaning Services</p>
+        </div>
+        
+        <div style="padding: 30px; background: #f5f5f7;">
+            <h2 style="color: #1d1d1f;">Booking Confirmation</h2>
+            <p>Hi {customer_name},</p>
+            <p>Thank you for choosing Upwash Power Washing! Your booking has been received.</p>
+            
+            <div style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <h3 style="color: #007AFF; margin-top: 0;">Booking Details</h3>
+                <p><strong>Services:</strong></p>
+                <ul>{service_list}</ul>
+                <p><strong>Date:</strong> {date_info}</p>
+                <p><strong>Address:</strong> {address}</p>
+                <p>{price_section}</p>
+            </div>
+            
+            <p>Questions? Contact us:</p>
+            <p>📞 (817) 750-3211<br>
+            ✉️ upwashpowerwashing@gmail.com</p>
+            
+            <p>Thank you for your business!</p>
+            <p><strong>Upwash Power Washing Team</strong></p>
+        </div>
+        
+        <div style="background: #1d1d1f; color: #888; padding: 20px; text-align: center; font-size: 12px;">
+            <p>Burleson, TX | Mon-Fri 9AM-6PM</p>
+        </div>
+    </div>
+    """
+    
+    try:
+        resend.emails.send({
+            "from": sender_email,
+            "to": [customer_email],
+            "subject": "Upwash Power Washing - Booking Confirmation",
+            "html": html_content
+        })
+        logging.info(f"Confirmation email sent to {customer_email}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to send email: {e}")
+        return False
+
+def send_admin_notification_email(booking: dict) -> bool:
+    """Send notification email to admin about new booking"""
+    if not resend_api_key:
+        return False
+    
+    customer_name = booking.get("customer_name", "")
+    customer_phone = booking.get("customer_phone", "")
+    customer_email = booking.get("customer_email", "N/A")
+    address = booking.get("customer_address", "")
+    services = booking.get("services", [])
+    total = booking.get("total", 0)
+    quote_description = booking.get("quote_description", "")
+    has_photos = bool(booking.get("quote_photos"))
+    
+    service_list = ", ".join([s.get("service_id", "") for s in services])
+    
+    # Check for quote services
+    has_quote = any(
+        SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
+        for s in services
+    )
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px;">
+        <h2 style="color: #007AFF;">New Booking Received!</h2>
+        
+        <p><strong>Customer:</strong> {customer_name}</p>
+        <p><strong>Phone:</strong> {customer_phone}</p>
+        <p><strong>Email:</strong> {customer_email}</p>
+        <p><strong>Address:</strong> {address}</p>
+        <p><strong>Services:</strong> {service_list}</p>
+        <p><strong>Total:</strong> ${total:.2f} {"(+ Quote)" if has_quote else ""}</p>
+        
+        {"<h3>Quote Request Details:</h3><p>" + quote_description + "</p>" if quote_description else ""}
+        {"<p><strong>📷 Photos attached by customer</strong></p>" if has_photos else ""}
+        
+        <p style="margin-top: 20px;">
+            <a href="https://clean-pro-dispatch.preview.emergentagent.com/admin" 
+               style="background: #007AFF; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                View in Admin Dashboard
+            </a>
+        </p>
+    </div>
+    """
+    
+    try:
+        resend.emails.send({
+            "from": sender_email,
+            "to": [admin_email],
+            "subject": f"New Booking: {customer_name} - {service_list}",
+            "html": html_content
+        })
+        logging.info(f"Admin notification sent for booking {booking.get('id')}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to send admin notification: {e}")
+        return False
+
 # ===================== API ROUTES =====================
+
 
 @api_router.get("/")
 async def root():
