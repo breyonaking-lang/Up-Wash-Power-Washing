@@ -14,18 +14,20 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - Scheduling: Mon-Fri (weekdays only, no time slots)
 - Payment: Stripe + Cash App
 - SMS Reminders: Twilio integration
-- Email Confirmations: Resend integration
+- Email Confirmations: Resend integration (bookings@upwashpowerwashing.com)
 - Auto Follow-ups: 24-hour follow-up for quote requests
+- Google Calendar: Auto-sync appointments
 
 ## Architecture
 
 ### Backend (FastAPI + MongoDB)
 - `/app/backend/server.py` - Main API server
-- Collections: `bookings`, `payment_transactions`
+- Collections: `bookings`, `payment_transactions`, `settings`
 - Stripe integration via `emergentintegrations` library
 - Twilio SMS for notifications
 - Resend for email confirmations
 - Google Maps Routes API for distance calculation
+- Google Calendar API for appointment sync
 
 ### Frontend (React + Tailwind + Shadcn UI)
 - `/app/frontend/src/pages/` - Page components
@@ -51,14 +53,17 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - [x] Tiered pricing for recycling bins & dumpsters
 - [x] Quote-based services with description & photo uploads
 - [x] **Automatic distance calculation** from customer address
+- [x] **Map visual** showing service location and route to Burleson
 - [x] **Travel fee auto-calculated** ($1/mile beyond 15 miles)
 - [x] Monthly subscription: 2 days/month, 5% discount
 - [x] SMS opt-in with Twilio integration
-- [x] Email confirmations via Resend (bookings@upwashpowerwashing.com)
+- [x] Email confirmations via Resend
 - [x] **24-hour auto follow-up** for quote requests
+- [x] **Google Calendar integration** - auto-sync appointments
 - [x] Admin dashboard with calendar view
 - [x] Admin SMS reminder sending
 - [x] Admin quote management (pending quotes, mark responded)
+- [x] Admin Integrations panel (SMS + Calendar status)
 - [x] Booking management (confirm/complete/cancel)
 
 ## Integrations
@@ -67,12 +72,19 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 | Stripe | Active | Using test key |
 | Twilio | Active | User credentials |
 | Resend | Active | bookings@upwashpowerwashing.com |
-| Google Maps | Active | Routes API for distance |
+| Google Maps | Active | Routes API + Static Maps |
+| Google Calendar | Ready | OAuth flow configured |
 
 ## API Endpoints
 ### Distance & Pricing
 - `POST /api/calculate-distance` - Calculate distance from address to Burleson
 - `POST /api/calculate-price` - Calculate service pricing with travel fee
+
+### Google Calendar
+- `GET /api/auth/google` - Get OAuth authorization URL
+- `GET /api/auth/google/callback` - Handle OAuth callback
+- `GET /api/auth/google/status` - Check if calendar is connected
+- `POST /api/auth/google/disconnect` - Disconnect calendar
 
 ### Quote Management
 - `GET /api/admin/pending-quotes` - Get quotes awaiting admin response
@@ -87,14 +99,25 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - Complete booking website with 4-step wizard
 - 6 services: 4 fixed-price + 2 quote-based
 - Automatic distance calculation using Google Maps Routes API
+- **Map visual** showing route from customer to Burleson with markers
 - Travel fee automatically calculated and added to invoices
 - Email confirmations from verified domain
 - 24-hour auto follow-up system for quote requests
-- Admin dashboard with quote management
+- Google Calendar integration (OAuth flow + auto event creation)
+- Admin dashboard with Integrations panel
+
+## How to Connect Google Calendar
+1. Go to Admin Dashboard (/admin)
+2. Find the "Integrations" section
+3. Click "Connect" next to Google Calendar
+4. Sign in with your Google account (upwashpressurewashing@gmail.com)
+5. Grant calendar access permissions
+6. You'll be redirected back - calendar will show as "Connected"
+
+Once connected, booking confirmations automatically create calendar events.
 
 ## Next Tasks (P1)
-1. Google Calendar integration for appointment sync
-2. HoneyBook CRM sync (requires API key)
+1. HoneyBook CRM sync (requires API key)
 
 ## Future Tasks (P2)
 1. Customer portal for booking history
