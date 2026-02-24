@@ -286,6 +286,62 @@ const AdminPage = () => {
               </motion.div>
             </div>
 
+            {/* Integrations Section */}
+            <div className="mb-8 bg-white rounded-2xl border border-slate-100 p-6">
+              <h2 className="text-lg font-bold text-slate-900 mb-4">Integrations</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* SMS Status */}
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className={smsConfigured ? "text-green-600" : "text-slate-400"} size={20} />
+                    <div>
+                      <p className="font-medium text-slate-900">SMS Notifications</p>
+                      <p className="text-sm text-slate-500">
+                        {smsConfigured ? "Connected via Twilio" : "Not configured"}
+                      </p>
+                    </div>
+                  </div>
+                  {smsConfigured && (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">Active</span>
+                  )}
+                </div>
+
+                {/* Google Calendar */}
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <CalendarIcon className={googleCalendarConnected ? "text-green-600" : "text-slate-400"} size={20} />
+                    <div>
+                      <p className="font-medium text-slate-900">Google Calendar</p>
+                      <p className="text-sm text-slate-500">
+                        {googleCalendarConnected ? "Connected - events auto-sync" : "Connect to sync appointments"}
+                      </p>
+                    </div>
+                  </div>
+                  {googleCalendarConnected ? (
+                    <Button 
+                      onClick={disconnectGoogleCalendar}
+                      variant="outline" 
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      data-testid="disconnect-calendar-btn"
+                    >
+                      <Unlink size={16} className="mr-1" /> Disconnect
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={connectGoogleCalendar}
+                      variant="outline" 
+                      size="sm"
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      data-testid="connect-calendar-btn"
+                    >
+                      <Link size={16} className="mr-1" /> Connect
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Calendar & Bookings */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Calendar */}
