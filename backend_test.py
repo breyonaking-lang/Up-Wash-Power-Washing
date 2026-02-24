@@ -532,6 +532,8 @@ class PowerWashingAPITester:
         except Exception as e:
             self.log_test("Quote Services Booking", False, None, str(e))
             return None
+
+    def test_sms_send_without_optin(self):
         """Test SMS send attempt for booking without SMS opt-in (should fail)"""
         try:
             # Create booking without SMS opt-in
