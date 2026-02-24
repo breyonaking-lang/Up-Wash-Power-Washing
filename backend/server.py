@@ -320,11 +320,39 @@ def is_weekday(date_str: str) -> bool:
 
 # ===================== DISTANCE CALCULATION =====================
 
+# Burleson, TX coordinates (center of service area)
+BURLESON_COORDS = {"lat": 32.5421, "lng": -97.3208}
+
+def geocode_address(address: str) -> Dict:
+    """Get coordinates for an address using Google Geocoding API"""
+    if not google_maps_api_key:
+        return None
+    
+    try:
+        url = 'https://maps.googleapis.com/maps/api/geocode/json'
+        params = {
+            'address': address,
+            'key': google_maps_api_key
+        }
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        if data.get('status') == 'OK' and data.get('results'):
+            location = data['results'][0]['geometry']['location']
+            return {"lat": location['lat'], "lng": location['lng']}
+    except Exception as e:
+        logging.warning(f"Geocoding failed: {e}")
+    
+    return None
+
 def calculate_distance_from_address(customer_address: str) -> Dict:
     """Calculate driving distance from customer address to Burleson, TX using Google Maps API"""
     if not google_maps_api_key:
         logging.warning("Google Maps API key not configured - distance calculation unavailable")
         return {"success": False, "error": "Distance calculation not configured", "distance_miles": 0}
+    
+    # Get coordinates for map display
+    customer_coords = geocode_address(customer_address)
     
     # First try the Routes API (newer)
     try:
@@ -369,7 +397,9 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
                 "duration_text": duration_text,
                 "travel_fee": round(travel_fee, 2),
                 "free_radius": SERVICE_AREA["free_radius_miles"],
-                "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"]
+                "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"],
+                "customer_coords": customer_coords,
+                "burleson_coords": BURLESON_COORDS
             }
     except Exception as e:
         logging.warning(f"Routes API failed, trying legacy Distance Matrix: {e}")
