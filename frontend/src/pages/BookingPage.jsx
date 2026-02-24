@@ -47,7 +47,7 @@ const SERVICES = [
     description: "Deep clean your outdoor patio",
     icon: Sparkles,
     color: "bg-blue-500",
-    price: 30,
+    price: 85,
     pricingType: "fixed"
   },
   {
@@ -56,7 +56,7 @@ const SERVICES = [
     description: "Remove stains and restore your driveway",
     icon: Car,
     color: "bg-orange-500",
-    price: 30,
+    price: 85,
     pricingType: "fixed"
   },
   {
