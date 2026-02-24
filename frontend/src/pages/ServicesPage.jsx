@@ -58,7 +58,7 @@ const ServicesPage = () => {
       icon: Warehouse,
       color: "bg-purple-500",
       pricing: [
-        { label: "First Dumpster", price: 70 },
+        { label: "First Dumpster", price: 85 },
         { label: "Each Additional", price: 45 }
       ],
       features: ["Dumpster cleaning", "Surrounding area included", "Commercial grade"]
