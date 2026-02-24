@@ -484,7 +484,54 @@ class PowerWashingAPITester:
         except Exception as e:
             self.log_test("Manual SMS Send", False, None, str(e))
 
-    def test_sms_send_without_optin(self):
+    def test_booking_with_quote_services(self):
+        """Test booking creation with quote-based services"""
+        try:
+            # Get a valid future weekday
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "Quote Service Customer",
+                "customer_email": "quote@example.com",
+                "customer_phone": "(817) 555-9999",
+                "customer_address": "999 Quote St, Burleson, TX",
+                "distance_miles": 10.0,
+                "services": [
+                    {"service_id": "home_powerwash", "quantity": 1},
+                    {"service_id": "patio", "quantity": 1}  # Mix quote + regular service
+                ],
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],
+                "is_monthly": False,
+                "sms_opt_in": False,
+                "notes": "Quote services test booking"
+            }
+
+            response = requests.post(f"{self.base_url}/bookings", 
+                                   json=booking_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                booking_id = result.get("id")
+                subtotal = result.get("subtotal", 0)
+                total = result.get("total", 0)
+                
+                # Should have subtotal of $30 (only patio service counted)
+                if booking_id and abs(subtotal - 30.0) < 0.01:
+                    self.log_test("Quote Services Booking", True, f"Booking {booking_id} with mixed services, subtotal: ${subtotal}")
+                    return booking_id
+                else:
+                    self.log_test("Quote Services Booking", False, result, f"Wrong subtotal: ${subtotal}, expected $30")
+                    return None
+            else:
+                self.log_test("Quote Services Booking", False, {}, f"Status: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            self.log_test("Quote Services Booking", False, None, str(e))
+            return None
         """Test SMS send attempt for booking without SMS opt-in (should fail)"""
         try:
             # Create booking without SMS opt-in
