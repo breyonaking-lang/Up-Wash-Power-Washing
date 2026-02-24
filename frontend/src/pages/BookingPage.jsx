@@ -120,6 +120,8 @@ const BookingPage = () => {
     notes: ""
   });
   const [distance, setDistance] = useState(0);
+  const [distanceInfo, setDistanceInfo] = useState(null);
+  const [calculatingDistance, setCalculatingDistance] = useState(false);
   const [smsOptIn, setSmsOptIn] = useState(false);
   
   // Quote service details
