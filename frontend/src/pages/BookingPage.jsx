@@ -1014,13 +1014,13 @@ const BookingPage = () => {
                     {selectedServices.patio && (
                       <div className="flex justify-between">
                         <span>Patio Cleaning</span>
-                        <span className="font-medium">$30</span>
+                        <span className="font-medium">$85</span>
                       </div>
                     )}
                     {selectedServices.driveway && (
                       <div className="flex justify-between">
                         <span>Driveway Cleaning</span>
-                        <span className="font-medium">$30</span>
+                        <span className="font-medium">$85</span>
                       </div>
                     )}
                     {selectedServices.dumpster && (
