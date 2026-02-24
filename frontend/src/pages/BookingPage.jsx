@@ -792,6 +792,107 @@ const BookingPage = () => {
                       </div>
                     </div>
 
+                    {/* Quote Service Details - only show if quote service selected */}
+                    {hasQuoteService() && (
+                      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText size={20} className="text-amber-600" />
+                          <h3 className="font-bold text-amber-900">Quote Request Details</h3>
+                        </div>
+                        <p className="text-sm text-amber-700 mb-4">
+                          Help us provide an accurate quote by describing your project and uploading photos.
+                        </p>
+                        
+                        <div>
+                          <Label htmlFor="quoteDescription" className="text-amber-900">Describe Your Project *</Label>
+                          <Textarea
+                            id="quoteDescription"
+                            value={quoteDescription}
+                            onChange={(e) => setQuoteDescription(e.target.value)}
+                            placeholder="Describe the area, size, current condition, any specific concerns..."
+                            className="mt-1 rounded-xl bg-white"
+                            rows={4}
+                            data-testid="quote-description-input"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-amber-900 mb-2 block">Upload Photos (optional, max 5)</Label>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {quotePhotos.map((photo, index) => (
+                              <div key={index} className="relative group">
+                                <img 
+                                  src={photo} 
+                                  alt={`Quote photo ${index + 1}`}
+                                  className="w-20 h-20 object-cover rounded-lg border-2 border-amber-200"
+                                />
+                                <button
+                                  onClick={() => removePhoto(index)}
+                                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  type="button"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          {quotePhotos.length < 5 && (
+                            <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-amber-300 rounded-xl cursor-pointer hover:bg-amber-50 transition-colors">
+                              <Camera size={18} className="text-amber-600" />
+                              <span className="text-amber-900 font-medium">Add Photos</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handlePhotoUpload}
+                                className="hidden"
+                                data-testid="quote-photo-input"
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Email Notifications - show if email provided */}
+                    {customerInfo.email && (
+                      <div className="p-4 bg-green-50 rounded-2xl border border-green-100">
+                        <div className="flex items-center gap-2">
+                          <Mail size={18} className="text-green-600" />
+                          <span className="text-green-900 font-medium">Email Confirmation</span>
+                        </div>
+                        <p className="text-sm text-green-700 mt-1">
+                          A booking confirmation will be sent to {customerInfo.email}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Subscription Options - for fixed price services with monthly booking */}
+                    {bookingMode === "monthly" && !hasQuoteService() && (
+                      <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 space-y-3">
+                        <h3 className="font-bold text-purple-900 flex items-center gap-2">
+                          <CreditCard size={18} />
+                          Payment Options
+                        </h3>
+                        
+                        <div className="flex items-start gap-3">
+                          <Checkbox 
+                            id="savePaymentMethod" 
+                            checked={savePaymentMethod}
+                            onCheckedChange={setSavePaymentMethod}
+                            className="mt-1"
+                            data-testid="save-payment-checkbox"
+                          />
+                          <Label htmlFor="savePaymentMethod" className="cursor-pointer">
+                            <span className="font-medium text-slate-900">Save card for recurring payments</span>
+                            <p className="text-sm text-slate-600">
+                              Automatically charge monthly for your subscription
+                            </p>
+                          </Label>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <Label htmlFor="distance">Distance from Burleson (miles)</Label>
                       <Input
