@@ -1110,6 +1110,92 @@ async def admin_stats():
         "total_revenue": round(total_revenue, 2)
     }
 
+# ===================== QUOTE FOLLOW-UP ROUTES =====================
+
+@api_router.post("/admin/quote/{booking_id}/respond")
+async def mark_quote_responded(booking_id: str):
+    """Mark a quote booking as responded by admin"""
+    result = await db.bookings.update_one(
+        {"id": booking_id, "is_quote_service": True},
+        {"$set": {
+            "quote_responded": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Quote booking not found")
+    
+    return {"message": "Quote marked as responded", "booking_id": booking_id}
+
+@api_router.post("/admin/process-followups")
+async def process_quote_followups():
+    """Process and send follow-up notifications for quote bookings older than 24 hours"""
+    # Find quote bookings that:
+    # - Are quote services
+    # - Admin hasn't responded
+    # - Follow-up hasn't been sent
+    # - Created more than 24 hours ago
+    cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    
+    query = {
+        "is_quote_service": True,
+        "quote_responded": {"$ne": True},
+        "followup_sent": {"$ne": True},
+        "created_at": {"$lt": cutoff_time}
+    }
+    
+    pending_followups = await db.bookings.find(query, {"_id": 0}).to_list(100)
+    
+    sent_count = 0
+    for booking in pending_followups:
+        # Send follow-up email
+        email_sent = send_quote_followup_email(booking)
+        
+        # Send follow-up SMS if opted in
+        sms_sent = send_quote_followup_sms(booking)
+        
+        if email_sent or sms_sent:
+            # Mark as follow-up sent
+            await db.bookings.update_one(
+                {"id": booking["id"]},
+                {"$set": {
+                    "followup_sent": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            sent_count += 1
+            logging.info(f"Follow-up sent for booking {booking['id']}")
+    
+    return {
+        "processed": len(pending_followups),
+        "followups_sent": sent_count,
+        "message": f"Processed {len(pending_followups)} pending quotes, sent {sent_count} follow-ups"
+    }
+
+@api_router.get("/admin/pending-quotes")
+async def get_pending_quotes():
+    """Get all quote bookings that need admin attention"""
+    query = {
+        "is_quote_service": True,
+        "quote_responded": {"$ne": True}
+    }
+    
+    pending_quotes = await db.bookings.find(query, {"_id": 0}).sort("created_at", 1).to_list(100)
+    
+    # Calculate time since creation for each
+    now = datetime.now(timezone.utc)
+    for quote in pending_quotes:
+        created_at = quote.get("created_at")
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        if created_at:
+            hours_waiting = (now - created_at).total_seconds() / 3600
+            quote["hours_waiting"] = round(hours_waiting, 1)
+            quote["needs_followup"] = hours_waiting >= 24 and not quote.get("followup_sent")
+    
+    return {"pending_quotes": pending_quotes, "count": len(pending_quotes)}
+
 # Include the router in the main app
 app.include_router(api_router)
 
