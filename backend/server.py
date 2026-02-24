@@ -750,6 +750,194 @@ def send_quote_followup_sms(booking: dict) -> bool:
     
     return send_sms(booking.get("customer_phone", ""), message)
 
+# ===================== GOOGLE CALENDAR FUNCTIONS =====================
+
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+import json
+
+def get_google_auth_url() -> str:
+    """Generate Google OAuth URL for calendar access"""
+    if not google_client_id or not google_client_secret:
+        return None
+    
+    flow = Flow.from_client_config(
+        {
+            "web": {
+                "client_id": google_client_id,
+                "client_secret": google_client_secret,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [google_redirect_uri]
+            }
+        },
+        scopes=google_scopes
+    )
+    flow.redirect_uri = google_redirect_uri
+    
+    auth_url, _ = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent'
+    )
+    return auth_url
+
+async def exchange_code_for_tokens(code: str) -> Dict:
+    """Exchange authorization code for tokens"""
+    try:
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": google_client_id,
+                    "client_secret": google_client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [google_redirect_uri]
+                }
+            },
+            scopes=google_scopes
+        )
+        flow.redirect_uri = google_redirect_uri
+        flow.fetch_token(code=code)
+        
+        credentials = flow.credentials
+        
+        # Store tokens in database
+        token_doc = {
+            "type": "google_calendar",
+            "token": credentials.token,
+            "refresh_token": credentials.refresh_token,
+            "token_uri": credentials.token_uri,
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+            "scopes": list(credentials.scopes),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.settings.update_one(
+            {"type": "google_calendar"},
+            {"$set": token_doc},
+            upsert=True
+        )
+        
+        return {"success": True, "message": "Google Calendar connected successfully"}
+    except Exception as e:
+        logging.error(f"Failed to exchange code for tokens: {e}")
+        return {"success": False, "error": str(e)}
+
+async def get_google_credentials():
+    """Get stored Google credentials"""
+    token_doc = await db.settings.find_one({"type": "google_calendar"}, {"_id": 0})
+    if not token_doc or not token_doc.get("token"):
+        return None
+    
+    try:
+        credentials = Credentials(
+            token=token_doc.get("token"),
+            refresh_token=token_doc.get("refresh_token"),
+            token_uri=token_doc.get("token_uri"),
+            client_id=token_doc.get("client_id"),
+            client_secret=token_doc.get("client_secret"),
+            scopes=token_doc.get("scopes")
+        )
+        
+        # Refresh if expired
+        if credentials.expired and credentials.refresh_token:
+            from google.auth.transport.requests import Request
+            credentials.refresh(Request())
+            
+            # Update stored token
+            await db.settings.update_one(
+                {"type": "google_calendar"},
+                {"$set": {
+                    "token": credentials.token,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        
+        return credentials
+    except Exception as e:
+        logging.error(f"Failed to get Google credentials: {e}")
+        return None
+
+async def create_calendar_event(booking: dict) -> bool:
+    """Create a Google Calendar event for a confirmed booking"""
+    credentials = await get_google_credentials()
+    if not credentials:
+        logging.warning("Google Calendar not connected - skipping event creation")
+        return False
+    
+    try:
+        service = build('calendar', 'v3', credentials=credentials)
+        
+        # Build event details
+        customer_name = booking.get("customer_name", "")
+        customer_phone = booking.get("customer_phone", "")
+        customer_address = booking.get("customer_address", "")
+        services = booking.get("services", [])
+        total = booking.get("total", 0)
+        notes = booking.get("notes", "")
+        booking_dates = booking.get("booking_dates", [])
+        is_monthly = booking.get("is_monthly", False)
+        monthly_days = booking.get("monthly_days", [])
+        
+        service_names = ", ".join([
+            SERVICES.get(s.get("service_id", ""), {}).get("name", s.get("service_id", ""))
+            for s in services
+        ])
+        
+        # Create event for each booking date
+        for date_str in booking_dates:
+            event_date = datetime.strptime(date_str, "%Y-%m-%d")
+            
+            # Default to 9 AM - 10 AM slot
+            start_time = event_date.replace(hour=9, minute=0)
+            end_time = event_date.replace(hour=10, minute=0)
+            
+            description = f"""
+Customer: {customer_name}
+Phone: {customer_phone}
+Address: {customer_address}
+
+Services: {service_names}
+Total: ${total:.2f}
+{"Monthly Subscription: " + " & ".join(monthly_days) if is_monthly else "One-time service"}
+
+{f"Notes: {notes}" if notes else ""}
+
+Booking ID: {booking.get("id", "")}
+            """.strip()
+            
+            event = {
+                'summary': f'🧹 Upwash - {customer_name}',
+                'location': customer_address,
+                'description': description,
+                'start': {
+                    'dateTime': start_time.isoformat(),
+                    'timeZone': 'America/Chicago',
+                },
+                'end': {
+                    'dateTime': end_time.isoformat(),
+                    'timeZone': 'America/Chicago',
+                },
+                'reminders': {
+                    'useDefault': False,
+                    'overrides': [
+                        {'method': 'popup', 'minutes': 60},
+                        {'method': 'popup', 'minutes': 1440},  # 1 day before
+                    ],
+                },
+            }
+            
+            service.events().insert(calendarId='primary', body=event).execute()
+            logging.info(f"Calendar event created for booking {booking.get('id')} on {date_str}")
+        
+        return True
+    except Exception as e:
+        logging.error(f"Failed to create calendar event: {e}")
+        return False
+
 # ===================== API ROUTES =====================
 
 
