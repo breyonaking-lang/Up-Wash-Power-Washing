@@ -614,6 +614,11 @@ class PowerWashingAPITester:
         if booking_id:
             self.test_get_booking(booking_id)
         
+        # Test quote services booking
+        quote_booking_id = self.test_booking_with_quote_services()
+        if quote_booking_id:
+            self.test_get_booking(quote_booking_id)
+        
         # Test SMS-specific functionality if configured
         if sms_configured:
             print("\n🔔 Testing SMS functionality...")
