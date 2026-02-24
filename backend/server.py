@@ -600,6 +600,69 @@ def send_admin_notification_email(booking: dict) -> bool:
         logging.error(f"Failed to send admin notification: {e}")
         return False
 
+def send_quote_followup_email(booking: dict) -> bool:
+    """Send 24-hour follow-up email for quote requests"""
+    customer_email = booking.get("customer_email")
+    if not customer_email or not resend_api_key:
+        return False
+    
+    customer_name = booking.get("customer_name", "")
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #007AFF, #00D4FF); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0;">UPWASH</h1>
+            <p style="color: white; margin: 5px 0;">Power Washing Cleaning Services</p>
+        </div>
+        
+        <div style="padding: 30px; background: #f5f5f7;">
+            <h2 style="color: #1d1d1f;">Quote Update</h2>
+            <p>Hi {customer_name},</p>
+            
+            <p style="font-size: 16px; line-height: 1.6;">
+                No worries. We are analyzing your quote for the best price. 
+                We will contact you as soon as we have your quote ready.
+            </p>
+            
+            <p style="margin-top: 20px;">Thank you for your patience!</p>
+            
+            <p>Questions? Contact us:</p>
+            <p>📞 (817) 750-3211<br>
+            ✉️ upwashpowerwashing@gmail.com</p>
+            
+            <p><strong>Upwash Power Washing Team</strong></p>
+        </div>
+        
+        <div style="background: #1d1d1f; color: #888; padding: 20px; text-align: center; font-size: 12px;">
+            <p>Burleson, TX | Mon-Fri 9AM-6PM</p>
+        </div>
+    </div>
+    """
+    
+    try:
+        params: resend.Emails.SendParams = {
+            "from": sender_email,
+            "to": [customer_email],
+            "subject": "Upwash Power Washing - Your Quote is Being Prepared",
+            "html": html_content
+        }
+        resend.Emails.send(params)
+        logging.info(f"Quote follow-up email sent to {customer_email}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to send quote follow-up email: {e}")
+        return False
+
+def send_quote_followup_sms(booking: dict) -> bool:
+    """Send 24-hour follow-up SMS for quote requests"""
+    if not booking.get("sms_opt_in") or not twilio_client:
+        return False
+    
+    customer_name = booking.get("customer_name", "")
+    message = f"Hi {customer_name}! No worries - we're analyzing your quote for the best price. We'll contact you as soon as your quote is ready. Questions? (817) 750-3211 - Upwash Power Washing"
+    
+    return send_sms(booking.get("customer_phone", ""), message)
+
 # ===================== API ROUTES =====================
 
 
