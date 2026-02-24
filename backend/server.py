@@ -977,6 +977,48 @@ async def calculate_distance(request: Dict):
     result = calculate_distance_from_address(address)
     return result
 
+# ===================== GOOGLE CALENDAR OAUTH ROUTES =====================
+
+@api_router.get("/auth/google")
+async def google_auth():
+    """Initiate Google OAuth flow for calendar access"""
+    auth_url = get_google_auth_url()
+    if not auth_url:
+        raise HTTPException(status_code=500, detail="Google Calendar not configured")
+    return {"auth_url": auth_url}
+
+@api_router.get("/auth/google/callback")
+async def google_callback(code: str = None, error: str = None):
+    """Handle Google OAuth callback"""
+    if error:
+        return RedirectResponse(url=f"/admin?error={error}")
+    
+    if not code:
+        return RedirectResponse(url="/admin?error=no_code")
+    
+    result = await exchange_code_for_tokens(code)
+    
+    if result.get("success"):
+        return RedirectResponse(url="/admin?calendar=connected")
+    else:
+        return RedirectResponse(url=f"/admin?error={result.get('error', 'unknown')}")
+
+@api_router.get("/auth/google/status")
+async def google_auth_status():
+    """Check if Google Calendar is connected"""
+    credentials = await get_google_credentials()
+    return {
+        "connected": credentials is not None,
+        "configured": bool(google_client_id and google_client_secret)
+    }
+
+@api_router.post("/auth/google/disconnect")
+async def google_disconnect():
+    """Disconnect Google Calendar"""
+    await db.settings.delete_one({"type": "google_calendar"})
+    return {"message": "Google Calendar disconnected"}
+
+
 
 @api_router.post("/check-date")
 async def check_date(request: Dict):
