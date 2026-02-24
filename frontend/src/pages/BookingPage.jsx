@@ -315,8 +315,8 @@ const BookingPage = () => {
   };
 
   const getDumpsterPrice = () => {
-    if (dumpsterQuantity === 1) return 70;
-    return 70 + (dumpsterQuantity - 1) * 45;
+    if (dumpsterQuantity === 1) return 85;
+    return 85 + (dumpsterQuantity - 1) * 45;
   };
 
   // Check if any quote-based service is selected
