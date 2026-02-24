@@ -74,23 +74,27 @@ class ServicePricing(BaseModel):
     name: str
     base_price: float
     description: str
-    pricing_type: str  # "fixed", "tiered", "addon"
+    pricing_type: str  # "fixed", "tiered", "addon", "quote"
     tier_pricing: Optional[Dict] = None  # For tiered pricing like bins
     is_addon: bool = False
 
 class BookingCreate(BaseModel):
     """Booking creation request"""
     customer_name: str
-    customer_email: EmailStr
+    customer_email: Optional[EmailStr] = None
     customer_phone: str
     customer_address: str
     distance_miles: float = 0
-    services: List[Dict]  # [{service_id, quantity, addons}]
+    services: List[Dict]  # [{service_id, quantity}]
     booking_dates: List[str]  # List of ISO dates for service days
     is_monthly: bool = False
-    monthly_days: Optional[List[str]] = None  # Selected days for monthly plan (e.g., ["Monday", "Thursday"])
+    monthly_days: Optional[List[str]] = None  # Selected days for monthly plan
     sms_opt_in: bool = False  # Opt-in for text reminders
+    recurring_payment: bool = False  # Opt-in for card on file
     notes: Optional[str] = None
+    # For quote services - description and photos
+    quote_description: Optional[str] = None
+    quote_photos: Optional[List[str]] = None  # Base64 encoded photos
 
 class Booking(BaseModel):
     """Booking model"""
@@ -98,7 +102,7 @@ class Booking(BaseModel):
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     customer_name: str
-    customer_email: str
+    customer_email: Optional[str] = None
     customer_phone: str
     customer_address: str
     distance_miles: float
@@ -107,7 +111,10 @@ class Booking(BaseModel):
     is_monthly: bool
     monthly_days: Optional[List[str]] = None
     sms_opt_in: bool = False
+    recurring_payment: bool = False
     notes: Optional[str] = None
+    quote_description: Optional[str] = None
+    quote_photos: Optional[List[str]] = None
     subtotal: float
     travel_fee: float
     discount: float
@@ -115,8 +122,10 @@ class Booking(BaseModel):
     status: str = "pending"  # pending, confirmed, completed, cancelled
     payment_status: str = "unpaid"  # unpaid, paid, refunded
     payment_session_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None  # For recurring payments
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class PaymentTransaction(BaseModel):
     """Payment transaction model"""
