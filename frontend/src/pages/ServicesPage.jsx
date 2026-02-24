@@ -62,6 +62,30 @@ const ServicesPage = () => {
         { label: "Each Additional", price: 45 }
       ],
       features: ["Dumpster cleaning", "Surrounding area included", "Commercial grade"]
+    },
+    {
+      id: "home_powerwash",
+      name: "Home Power Washing",
+      description: "Complete home exterior power washing service. We clean siding, decks, porches, fences, and more to restore your home's curb appeal.",
+      icon: Home,
+      color: "bg-cyan-500",
+      pricing: [
+        { label: "Custom Quote", price: null, isQuote: true }
+      ],
+      features: ["Siding cleaning", "Deck & porch washing", "Fence cleaning", "Custom assessment"],
+      isQuote: true
+    },
+    {
+      id: "construction_cleanup",
+      name: "Construction Site Cleanup",
+      description: "Professional post-construction cleaning and debris removal. We handle the mess so you can focus on the finished project.",
+      icon: HardHat,
+      color: "bg-amber-500",
+      pricing: [
+        { label: "Custom Quote", price: null, isQuote: true }
+      ],
+      features: ["Debris removal", "Surface cleaning", "Window washing", "Final walkthrough"],
+      isQuote: true
     }
   ];
 
