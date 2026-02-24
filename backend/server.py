@@ -467,12 +467,13 @@ def send_booking_confirmation_email(booking: dict) -> bool:
     """
     
     try:
-        resend.emails.send({
+        params: resend.Emails.SendParams = {
             "from": sender_email,
             "to": [customer_email],
             "subject": "Upwash Power Washing - Booking Confirmation",
             "html": html_content
-        })
+        }
+        resend.Emails.send(params)
         logging.info(f"Confirmation email sent to {customer_email}")
         return True
     except Exception as e:
