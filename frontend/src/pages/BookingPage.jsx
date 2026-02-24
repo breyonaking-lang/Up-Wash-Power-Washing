@@ -308,6 +308,11 @@ const BookingPage = () => {
     return 70 + (dumpsterQuantity - 1) * 45;
   };
 
+  // Check if any quote-based service is selected
+  const hasQuoteService = () => {
+    return selectedServices.home_powerwash || selectedServices.construction_cleanup;
+  };
+
   // Calculate local subtotal for instant UI feedback
   const getLocalSubtotalPerDay = () => {
     let total = 0;
@@ -316,6 +321,7 @@ const BookingPage = () => {
     if (selectedServices.driveway) total += 30;
     if (selectedServices.dumpster) total += getDumpsterPrice();
     if (scentBombs > 0) total += scentBombs * 3.50;
+    // Quote services don't add to total
     return total;
   };
 
