@@ -10,11 +10,12 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - **Construction Site Cleanup: Quote-based**
 - Scent Bomb Add-on: $3.50 each (standalone, any service)
 - Monthly Subscription: 5% discount, choose 2 days per month
-- Service Area: 15-mile radius free, $1/mile beyond
+- Service Area: 15-mile radius free, $1/mile beyond (AUTO-CALCULATED)
 - Scheduling: Mon-Fri (weekdays only, no time slots)
 - Payment: Stripe + Cash App
-- SMS Reminders: Twilio integration for text notifications
+- SMS Reminders: Twilio integration
 - Email Confirmations: Resend integration
+- Auto Follow-ups: 24-hour follow-up for quote requests
 
 ## Architecture
 
@@ -24,6 +25,7 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 - Stripe integration via `emergentintegrations` library
 - Twilio SMS for notifications
 - Resend for email confirmations
+- Google Maps Routes API for distance calculation
 
 ### Frontend (React + Tailwind + Shadcn UI)
 - `/app/frontend/src/pages/` - Page components
@@ -41,49 +43,58 @@ Build a power washing cleaning services website for "Upwash Power Washing Cleani
 | Construction Cleanup | Quote |
 | Scent Bomb Add-on | $3.50 each |
 
-## Core Requirements (Static)
+## Core Features Implemented
 - [x] Service listing with pricing (fixed + quote-based)
 - [x] Multi-step booking wizard
 - [x] Calendar with weekday-only scheduling (Mon-Fri)
 - [x] Dynamic pricing calculator
 - [x] Tiered pricing for recycling bins & dumpsters
-- [x] Quote-based services (Home Power Washing, Construction Cleanup)
-- [x] Quote description field and photo uploads
-- [x] Scent bomb standalone add-on ($3.50 each)
+- [x] Quote-based services with description & photo uploads
+- [x] **Automatic distance calculation** from customer address
+- [x] **Travel fee auto-calculated** ($1/mile beyond 15 miles)
 - [x] Monthly subscription: 2 days/month, 5% discount
-- [x] Travel fee calculation ($1/mile beyond 15 miles)
-- [x] Customer info: name, address, phone, SMS opt-in
-- [x] Stripe payment integration
-- [x] Twilio SMS integration
-- [x] Resend email confirmations
+- [x] SMS opt-in with Twilio integration
+- [x] Email confirmations via Resend (bookings@upwashpowerwashing.com)
+- [x] **24-hour auto follow-up** for quote requests
 - [x] Admin dashboard with calendar view
 - [x] Admin SMS reminder sending
+- [x] Admin quote management (pending quotes, mark responded)
 - [x] Booking management (confirm/complete/cancel)
-- [x] Admin view of quote details and photos
-
-## What's Been Implemented
-**Date: Feb 24, 2026**
-- Complete booking website with 4-step wizard
-- 6 services: 4 fixed-price + 2 quote-based
-- Monthly subscription: choose 2 weekdays, 5% discount
-- SMS opt-in with Twilio integration
-- Email confirmations via Resend (sandbox mode - needs domain verification for production)
-- Quote-based service support with description text and photo uploads
-- Admin dashboard with stats and booking management
-- Admin view shows quote details and customer photos
-- Mobile-responsive design
 
 ## Integrations
 | Integration | Status | Notes |
 |-------------|--------|-------|
 | Stripe | Active | Using test key |
-| Twilio | Active | Using user credentials |
-| Resend | Active | Sandbox mode - customer emails need domain verification |
+| Twilio | Active | User credentials |
+| Resend | Active | bookings@upwashpowerwashing.com |
+| Google Maps | Active | Routes API for distance |
+
+## API Endpoints
+### Distance & Pricing
+- `POST /api/calculate-distance` - Calculate distance from address to Burleson
+- `POST /api/calculate-price` - Calculate service pricing with travel fee
+
+### Quote Management
+- `GET /api/admin/pending-quotes` - Get quotes awaiting admin response
+- `POST /api/admin/quote/{id}/respond` - Mark quote as responded
+- `POST /api/admin/process-followups` - Manually trigger 24hr follow-ups
+
+### Background Tasks
+- Auto follow-up task runs hourly, sends email/SMS for quotes >24hrs old
+
+## What's Been Implemented
+**Date: Feb 24, 2026**
+- Complete booking website with 4-step wizard
+- 6 services: 4 fixed-price + 2 quote-based
+- Automatic distance calculation using Google Maps Routes API
+- Travel fee automatically calculated and added to invoices
+- Email confirmations from verified domain
+- 24-hour auto follow-up system for quote requests
+- Admin dashboard with quote management
 
 ## Next Tasks (P1)
-1. Verify domain in Resend for production email sending
-2. Google Calendar integration (user approved Emergent-managed auth)
-3. HoneyBook CRM sync (deferred, requires API key)
+1. Google Calendar integration for appointment sync
+2. HoneyBook CRM sync (requires API key)
 
 ## Future Tasks (P2)
 1. Customer portal for booking history
