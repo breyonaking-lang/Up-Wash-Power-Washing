@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timedelta
 
 class PowerWashingAPITester:
-    def __init__(self, base_url="https://clean-pro-dispatch.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://upwash-booking.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0

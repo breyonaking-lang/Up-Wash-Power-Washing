@@ -56,7 +56,7 @@ burleson_address = os.environ.get('BURLESON_ADDRESS', 'Burleson, TX')
 # Google Calendar setup
 google_client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
 google_client_secret = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-google_redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI', 'https://clean-pro-dispatch.preview.emergentagent.com/api/auth/google/callback')
+google_redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI', 'https://upwash-booking.preview.emergentagent.com/api/auth/google/callback')
 google_scopes = ['https://www.googleapis.com/auth/calendar.events']
 
 # Initialize Twilio client
@@ -665,7 +665,7 @@ def send_admin_notification_email(booking: dict) -> bool:
         {"<p><strong>📷 Photos attached by customer</strong></p>" if has_photos else ""}
         
         <p style="margin-top: 20px;">
-            <a href="https://clean-pro-dispatch.preview.emergentagent.com/admin" 
+            <a href="https://upwash-booking.preview.emergentagent.com/admin" 
                style="background: #007AFF; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
                 View in Admin Dashboard
             </a>
