@@ -146,18 +146,29 @@ const ServicesPage = () => {
                 </div>
 
                 {/* Pricing */}
-                <div className="bg-slate-50 p-8 md:p-10 border-t lg:border-t-0 lg:border-l border-slate-100">
+                <div className={`p-8 md:p-10 border-t lg:border-t-0 lg:border-l border-slate-100 ${service.isQuote ? 'bg-amber-50' : 'bg-slate-50'}`}>
                   <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Pricing</h3>
                   <div className="space-y-3">
                     {service.pricing.map((price, i) => (
                       <div key={i} className="flex justify-between items-center">
                         <span className="text-slate-700">{price.label}</span>
-                        <span className="text-2xl font-extrabold text-blue-600 price-tag">
-                          ${price.price}
-                        </span>
+                        {price.isQuote ? (
+                          <span className="text-xl font-bold text-amber-600">
+                            Get Quote
+                          </span>
+                        ) : (
+                          <span className="text-2xl font-extrabold text-blue-600 price-tag">
+                            ${price.price}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
+                  {service.isQuote && (
+                    <p className="text-sm text-amber-700 mt-4">
+                      Contact us for a free custom quote based on your specific needs.
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>
