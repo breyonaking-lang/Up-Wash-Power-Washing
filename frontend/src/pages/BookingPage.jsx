@@ -974,23 +974,28 @@ const BookingPage = () => {
                       </div>
                     )}
 
-                    <div>
-                      <Label htmlFor="distance">Distance from Burleson (miles)</Label>
-                      <Input
-                        id="distance"
-                        type="number"
-                        min="0"
-                        value={distance}
-                        onChange={(e) => setDistance(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                        className="mt-1 rounded-xl w-32"
-                        data-testid="distance-input"
-                      />
-                      <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-                        <MapPin size={14} />
-                        Free within 15 miles, $1/mile beyond
-                      </p>
-                    </div>
+                    {/* Manual distance input - shown if auto-calculation not available */}
+                    {(!distanceInfo || !distanceInfo.success) && !calculatingDistance && customerInfo.address && (
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                        <Label htmlFor="distance" className="text-slate-700">Manual Distance Entry (miles from Burleson)</Label>
+                        <div className="flex items-center gap-3 mt-2">
+                          <Input
+                            id="distance"
+                            type="number"
+                            min="0"
+                            value={distance}
+                            onChange={(e) => setDistance(parseFloat(e.target.value) || 0)}
+                            placeholder="0"
+                            className="rounded-xl w-32"
+                            data-testid="distance-input"
+                          />
+                          <p className="text-sm text-slate-500 flex items-center gap-2">
+                            <MapPin size={14} />
+                            Free within 15 miles, $1/mile beyond
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <Label htmlFor="notes">Special Instructions (optional)</Label>
