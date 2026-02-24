@@ -155,7 +155,7 @@ const HomePage = () => {
             </h2>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {services.map((service, index) => (
               <motion.div
                 key={service.id}
@@ -171,7 +171,9 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h3>
                 <p className="text-slate-500 mb-4">{service.description}</p>
-                <p className="text-2xl font-extrabold text-blue-600 price-tag">{service.price}</p>
+                <p className={`text-2xl font-extrabold price-tag ${service.isQuote ? 'text-amber-600' : 'text-blue-600'}`}>
+                  {service.price}
+                </p>
               </motion.div>
             ))}
           </div>
