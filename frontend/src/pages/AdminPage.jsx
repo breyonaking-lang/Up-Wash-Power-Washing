@@ -21,7 +21,10 @@ import {
   RefreshCw,
   MessageSquare,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Calendar as CalendarIcon,
+  Link,
+  Unlink
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 
