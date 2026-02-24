@@ -691,6 +691,17 @@ async def calculate_price(request: Dict):
     pricing = calculate_booking_total(services, distance_miles, is_monthly, num_service_days)
     return pricing
 
+@api_router.post("/calculate-distance")
+async def calculate_distance(request: Dict):
+    """Calculate driving distance from customer address to Burleson, TX"""
+    address = request.get("address", "")
+    
+    if not address:
+        raise HTTPException(status_code=400, detail="Address is required")
+    
+    result = calculate_distance_from_address(address)
+    return result
+
 
 @api_router.post("/check-date")
 async def check_date(request: Dict):
