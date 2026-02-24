@@ -1050,7 +1050,7 @@ const BookingPage = () => {
                     </Button>
                     <Button
                       onClick={handleSubmitBooking}
-                      disabled={loading || !customerInfo.name || !customerInfo.phone || !customerInfo.address}
+                      disabled={loading || !customerInfo.name || !customerInfo.phone || !customerInfo.address || (hasQuoteService() && (!quoteDescription.trim() || quotePhotos.length === 0))}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 rounded-full"
                       data-testid="submit-booking-btn"
                     >
