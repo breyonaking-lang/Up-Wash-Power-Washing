@@ -282,6 +282,18 @@ const BookingPage = () => {
       return;
     }
 
+    // Validate quote requirements
+    if (hasQuoteService()) {
+      if (!quoteDescription || quoteDescription.trim().length === 0) {
+        toast.error("Please provide a description for your quote request");
+        return;
+      }
+      if (quotePhotos.length === 0) {
+        toast.error("Please upload at least one photo for your quote request");
+        return;
+      }
+    }
+
     setLoading(true);
 
     const services = [];
