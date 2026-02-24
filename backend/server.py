@@ -127,6 +127,10 @@ class Booking(BaseModel):
     payment_status: str = "unpaid"  # unpaid, paid, refunded
     payment_session_id: Optional[str] = None
     stripe_customer_id: Optional[str] = None  # For recurring payments
+    # Quote follow-up tracking
+    is_quote_service: bool = False  # True if booking includes quote-based services
+    quote_responded: bool = False  # True when admin has responded to quote
+    followup_sent: bool = False  # True when 24hr followup has been sent
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
