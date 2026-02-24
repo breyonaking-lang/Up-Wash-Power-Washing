@@ -1,9 +1,12 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
+import base64
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict
@@ -16,6 +19,11 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutSessionRequest
 )
 from twilio.rest import Client as TwilioClient
+import resend
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request as GoogleRequest
+from googleapiclient.discovery import build
+import requests
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -32,6 +40,18 @@ stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
 twilio_account_sid = os.environ.get('TWILIO_ACCOUNT_SID', '')
 twilio_auth_token = os.environ.get('TWILIO_AUTH_TOKEN', '')
 twilio_phone_number = os.environ.get('TWILIO_PHONE_NUMBER', '')
+
+# Resend setup
+resend_api_key = os.environ.get('RESEND_API_KEY', '')
+sender_email = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+admin_email = os.environ.get('ADMIN_EMAIL', 'upwashpressurewashing@gmail.com')
+
+if resend_api_key:
+    resend.api_key = resend_api_key
+
+# Google Calendar setup
+google_client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
+google_client_secret = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 
 # Initialize Twilio client
 twilio_client = None
