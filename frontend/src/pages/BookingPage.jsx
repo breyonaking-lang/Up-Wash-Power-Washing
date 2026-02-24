@@ -514,7 +514,7 @@ const BookingPage = () => {
                                   </button>
                                 </div>
                                 <span className="text-blue-600 font-bold">${getDumpsterPrice()}</span>
-                                <span className="text-xs text-slate-400">($70 first, $45 each additional)</span>
+                                <span className="text-xs text-slate-400">($85 first, $45 each additional)</span>
                               </div>
                             )}
                           </div>
