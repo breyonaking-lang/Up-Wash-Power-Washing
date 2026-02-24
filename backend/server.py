@@ -56,6 +56,8 @@ burleson_address = os.environ.get('BURLESON_ADDRESS', 'Burleson, TX')
 # Google Calendar setup
 google_client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
 google_client_secret = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+google_redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI', 'https://clean-pro-dispatch.preview.emergentagent.com/api/auth/google/callback')
+google_scopes = ['https://www.googleapis.com/auth/calendar.events']
 
 # Initialize Twilio client
 twilio_client = None
