@@ -783,6 +783,47 @@ const BookingPage = () => {
                         className="mt-1 rounded-xl"
                         data-testid="customer-address-input"
                       />
+                      
+                      {/* Distance calculation result */}
+                      {calculatingDistance && (
+                        <p className="text-sm text-blue-500 mt-2 flex items-center gap-2">
+                          <span className="animate-spin">⏳</span> Calculating distance...
+                        </p>
+                      )}
+                      
+                      {distanceInfo && !calculatingDistance && (
+                        <div className={`mt-2 p-3 rounded-xl text-sm ${
+                          distanceInfo.success 
+                            ? distanceInfo.is_within_free_radius 
+                              ? "bg-green-50 border border-green-200"
+                              : "bg-orange-50 border border-orange-200"
+                            : "bg-red-50 border border-red-200"
+                        }`}>
+                          {distanceInfo.success ? (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <MapPin size={16} className={distanceInfo.is_within_free_radius ? "text-green-600" : "text-orange-600"} />
+                                <span className="font-medium">
+                                  {distanceInfo.distance_text} from Burleson
+                                </span>
+                                <span className="text-slate-500">({distanceInfo.duration_text} drive)</span>
+                              </div>
+                              {distanceInfo.is_within_free_radius ? (
+                                <p className="text-green-700 mt-1">✓ Within free service area - no travel fee!</p>
+                              ) : (
+                                <p className="text-orange-700 mt-1">
+                                  Travel fee: <strong>${distanceInfo.travel_fee.toFixed(2)}</strong> 
+                                  <span className="text-orange-600"> ({(distanceInfo.distance_miles - 15).toFixed(1)} miles beyond free radius)</span>
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-red-600">
+                              Could not calculate distance. You can enter manually below.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div>
