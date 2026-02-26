@@ -1049,26 +1049,27 @@ async def create_invoice(invoice_req: InvoiceCreate, current_user: dict = Depend
     
     try:
         # Search for existing customer
-        search_result = square_client.customers.search_customers(body={
-            "query": {
+        search_response = square_client.customers.search(
+            query={
                 "filter": {
                     "email_address": {"exact": invoice_req.customer_email}
                 }
             }
-        })
+        )
         
-        if search_result.is_success() and search_result.body.get("customers"):
-            customer_id = search_result.body["customers"][0]["id"]
+        customer_id = None
+        if search_response.customers:
+            customer_id = search_response.customers[0].id
         else:
             # Create customer
-            create_result = square_client.customers.create_customer(body={
-                "email_address": invoice_req.customer_email,
-                "given_name": booking.get("customer_name", "").split()[0],
-                "phone_number": booking.get("customer_phone")
-            })
+            create_response = square_client.customers.create(
+                email_address=invoice_req.customer_email,
+                given_name=booking.get("customer_name", "").split()[0],
+                phone_number=booking.get("customer_phone")
+            )
             
-            if create_result.is_success():
-                customer_id = create_result.body["customer"]["id"]
+            if create_response.customer:
+                customer_id = create_response.customer.id
             else:
                 raise HTTPException(status_code=500, detail="Failed to create customer")
         
