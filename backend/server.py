@@ -1226,7 +1226,7 @@ async def assign_route(route_id: str, assignment: RouteAssignment, current_user:
 
 @api_router.post("/admin/routes/{route_id}/bookings")
 async def add_bookings_to_route(route_id: str, booking_ids: List[str], current_user: dict = Depends(get_admin_user)):
-    result = await db.routes.update_one(
+    await db.routes.update_one(
         {"id": route_id},
         {"$addToSet": {"bookings": {"$each": booking_ids}}}
     )
