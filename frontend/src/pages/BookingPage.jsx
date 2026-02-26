@@ -1163,10 +1163,17 @@ const BookingPage = () => {
                       {bookingMode === "monthly" && (
                         <>
                           <p><strong>Plan:</strong> Monthly Subscription (5% off)</p>
-                          <p><strong>Service Days:</strong> {monthlyDays.join(" & ")}</p>
+                          <p><strong>Service Days:</strong> {serviceDaysPerMonth} day{serviceDaysPerMonth > 1 ? 's' : ''}/month</p>
+                          <p><strong>Days of Month:</strong> {monthlyServiceDays.map((d, i) => {
+                            const suffix = d === 1 || d === 21 || d === 31 ? 'st' : 
+                                          d === 2 || d === 22 ? 'nd' : 
+                                          d === 3 || d === 23 ? 'rd' : 'th';
+                            return `${d}${suffix}${i < monthlyServiceDays.length - 1 ? ', ' : ''}`;
+                          })}</p>
                           {monthlyStartDate && (
                             <p><strong>Starting:</strong> {format(monthlyStartDate, "MMMM d, yyyy")}</p>
                           )}
+                          <p className="text-blue-600 text-sm mt-2">First service charged today, then 3 days before each service</p>
                         </>
                       )}
                       <p><strong>Name:</strong> {customerInfo.name}</p>
