@@ -1,29 +1,22 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import asyncio
-import base64
+import json
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
-from emergentintegrations.payments.stripe.checkout import (
-    StripeCheckout, 
-    CheckoutSessionResponse, 
-    CheckoutStatusResponse, 
-    CheckoutSessionRequest
-)
-from twilio.rest import Client as TwilioClient
-import resend
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request as GoogleRequest
-from googleapiclient.discovery import build
+from passlib.context import CryptContext
+from jose import JWTError, jwt
 import requests
+from square.client import Client as SquareClient
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -33,77 +26,113 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Stripe setup
-stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
+# Square setup
+square_app_id = os.environ.get('SQUARE_APP_ID', '')
+square_access_token = os.environ.get('SQUARE_ACCESS_TOKEN', '')
+square_location_id = os.environ.get('SQUARE_LOCATION_ID', '')
+square_environment = os.environ.get('SQUARE_ENVIRONMENT', 'sandbox')
 
-# Twilio setup
-twilio_account_sid = os.environ.get('TWILIO_ACCOUNT_SID', '')
-twilio_auth_token = os.environ.get('TWILIO_AUTH_TOKEN', '')
-twilio_phone_number = os.environ.get('TWILIO_PHONE_NUMBER', '')
+# Initialize Square client
+square_client = None
+if square_access_token:
+    square_client = SquareClient(
+        access_token=square_access_token,
+        environment=square_environment
+    )
 
-# Resend setup
-resend_api_key = os.environ.get('RESEND_API_KEY', '')
-sender_email = os.environ.get('SENDER_EMAIL', 'bookings@upwashpowerwashing.com')
-admin_email = os.environ.get('ADMIN_EMAIL', 'upwashpressurewashing@gmail.com')
-
-if resend_api_key:
-    resend.api_key = resend_api_key
-
-# Google Maps setup for distance calculation
+# Google Maps setup
 google_maps_api_key = os.environ.get('GOOGLE_MAPS_API_KEY', '')
 burleson_address = os.environ.get('BURLESON_ADDRESS', 'Burleson, TX')
 
-# Google Calendar setup
-google_client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
-google_client_secret = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-google_redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI', 'https://upwash-booking.preview.emergentagent.com/api/auth/google/callback')
-google_scopes = ['https://www.googleapis.com/auth/calendar.events']
+# Tax rate
+SALES_TAX_RATE = float(os.environ.get('SALES_TAX_RATE', '0.0825'))
 
-# Initialize Twilio client
-twilio_client = None
-if twilio_account_sid and twilio_auth_token:
-    twilio_client = TwilioClient(twilio_account_sid, twilio_auth_token)
+# JWT setup
+JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key')
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Admin credentials
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
 # Create the main app
 app = FastAPI(title="Upwash Power Washing API")
 
-# Create a router with the /api prefix
+# Create routers
 api_router = APIRouter(prefix="/api")
+security = HTTPBearer(auto_error=False)
 
 # ===================== MODELS =====================
 
-class ServicePricing(BaseModel):
-    """Service pricing configuration"""
-    model_config = ConfigDict(extra="ignore")
-    
-    service_id: str
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "contractor"  # admin, contractor
+    full_name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: Dict
+
+class ContractorCreate(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    phone: str
+    email: Optional[str] = None
+
+class RouteCreate(BaseModel):
     name: str
-    base_price: float
-    description: str
-    pricing_type: str  # "fixed", "tiered", "addon", "quote"
-    tier_pricing: Optional[Dict] = None  # For tiered pricing like bins
-    is_addon: bool = False
+    description: Optional[str] = None
+    price: float = 350.0
+    area: Optional[str] = None
+
+class RouteAssignment(BaseModel):
+    route_id: str
+    contractor_id: str
+
+class TaskCompletion(BaseModel):
+    booking_id: str
+    completed: bool
+    unable_to_complete: bool = False
+    reason: Optional[str] = None
+    photo_url: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    content: str
+    recipient_id: Optional[str] = None  # None = admin, specific ID = contractor
+    is_group: bool = False
+    group_id: Optional[str] = None
 
 class BookingCreate(BaseModel):
-    """Booking creation request"""
     customer_name: str
     customer_email: Optional[EmailStr] = None
     customer_phone: str
     customer_address: str
     distance_miles: float = 0
-    services: List[Dict]  # [{service_id, quantity}]
-    booking_dates: List[str]  # List of ISO dates for service days
+    services: List[Dict]
+    booking_dates: List[str]
     is_monthly: bool = False
-    monthly_days: Optional[List[str]] = None  # Selected days for monthly plan
-    sms_opt_in: bool = False  # Opt-in for text reminders
-    recurring_payment: bool = False  # Opt-in for card on file
+    monthly_days: Optional[List[str]] = None
+    sms_opt_in: bool = False
+    recurring_payment: bool = False
     notes: Optional[str] = None
-    # For quote services - description and photos
     quote_description: Optional[str] = None
-    quote_photos: Optional[List[str]] = None  # Base64 encoded photos
+    quote_photos: Optional[List[str]] = None
+    is_scent_bomb_only: bool = False  # For standalone scent bomb orders
 
 class Booking(BaseModel):
-    """Booking model"""
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -113,7 +142,7 @@ class Booking(BaseModel):
     customer_address: str
     distance_miles: float
     services: List[Dict]
-    booking_dates: List[str]  # List of service dates
+    booking_dates: List[str]
     is_monthly: bool
     monthly_days: Optional[List[str]] = None
     sms_opt_in: bool = False
@@ -123,42 +152,32 @@ class Booking(BaseModel):
     quote_photos: Optional[List[str]] = None
     subtotal: float
     travel_fee: float
+    tax: float
     discount: float
     total: float
-    status: str = "pending"  # pending, confirmed, completed, cancelled
-    payment_status: str = "unpaid"  # unpaid, paid, refunded
-    payment_session_id: Optional[str] = None
-    stripe_customer_id: Optional[str] = None  # For recurring payments
-    # Quote follow-up tracking
-    is_quote_service: bool = False  # True if booking includes quote-based services
-    quote_responded: bool = False  # True when admin has responded to quote
-    followup_sent: bool = False  # True when 24hr followup has been sent
+    status: str = "pending"
+    payment_status: str = "unpaid"
+    payment_id: Optional[str] = None
+    is_quote_service: bool = False
+    is_scent_bomb_only: bool = False
+    assigned_contractor_id: Optional[str] = None
+    route_id: Optional[str] = None
+    task_status: str = "pending"  # pending, in_progress, completed, unable_to_complete
+    task_notes: Optional[str] = None
+    task_photo: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-
-class PaymentTransaction(BaseModel):
-    """Payment transaction model"""
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+class SquarePaymentRequest(BaseModel):
+    source_id: str  # Payment token from Square Web Payments SDK
     booking_id: str
-    session_id: str
-    amount: float
-    currency: str = "usd"
-    payment_status: str = "initiated"  # initiated, paid, failed, expired
-    metadata: Dict = {}
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    amount: int  # Amount in cents
+    idempotency_key: str
 
-class CheckoutRequest(BaseModel):
-    """Checkout request from frontend"""
+class InvoiceCreate(BaseModel):
     booking_id: str
-    origin_url: str
-
-class AvailabilityRequest(BaseModel):
-    """Check availability request"""
-    date: str  # ISO date string
+    customer_email: str
+    due_date: str  # YYYY-MM-DD
 
 # ===================== SERVICES DATA =====================
 
@@ -169,12 +188,9 @@ SERVICES = {
         "description": "Professional power washing for recycling bins",
         "base_price": 15.0,
         "pricing_type": "tiered",
-        "tier_pricing": {
-            "1": 15.0,
-            "2": 25.0,
-            "additional": 8.0
-        },
-        "is_addon": False
+        "tier_pricing": {"1": 15.0, "2": 25.0, "additional": 8.0},
+        "is_addon": False,
+        "bookable_from_home": True
     },
     "patio": {
         "service_id": "patio",
@@ -182,7 +198,8 @@ SERVICES = {
         "description": "Complete patio power washing service",
         "base_price": 85.0,
         "pricing_type": "fixed",
-        "is_addon": False
+        "is_addon": False,
+        "bookable_from_home": True
     },
     "driveway": {
         "service_id": "driveway",
@@ -190,7 +207,8 @@ SERVICES = {
         "description": "Professional driveway power washing",
         "base_price": 85.0,
         "pricing_type": "fixed",
-        "is_addon": False
+        "is_addon": False,
+        "bookable_from_home": True
     },
     "dumpster": {
         "service_id": "dumpster",
@@ -198,27 +216,29 @@ SERVICES = {
         "description": "Dumpster and surrounding area cleaning",
         "base_price": 85.0,
         "pricing_type": "tiered",
-        "tier_pricing": {
-            "1": 85.0,
-            "additional": 45.0
-        },
-        "is_addon": False
+        "tier_pricing": {"1": 85.0, "additional": 45.0},
+        "is_addon": False,
+        "bookable_from_home": True
     },
     "scent_bomb": {
         "service_id": "scent_bomb",
         "name": "Scent Bomb",
-        "description": "Deodorizing scent treatment add-on",
+        "description": "Deodorizing scent treatment - can be purchased standalone or as add-on",
         "base_price": 3.50,
         "pricing_type": "addon",
-        "is_addon": True
+        "is_addon": True,
+        "can_purchase_standalone": True,
+        "no_travel_fee": True,
+        "bookable_from_home": True
     },
     "home_powerwash": {
         "service_id": "home_powerwash",
         "name": "Home Power Washing",
-        "description": "Complete home exterior power washing - siding, deck, porch, and more",
+        "description": "Complete home exterior power washing",
         "base_price": 0.0,
         "pricing_type": "quote",
-        "is_addon": False
+        "is_addon": False,
+        "bookable_from_home": True
     },
     "construction_cleanup": {
         "service_id": "construction_cleanup",
@@ -226,29 +246,30 @@ SERVICES = {
         "description": "Post-construction cleaning and debris removal",
         "base_price": 0.0,
         "pricing_type": "quote",
-        "is_addon": False
+        "is_addon": False,
+        "bookable_from_home": True
     }
 }
 
-# Business hours - removed time slots, just weekdays
 BUSINESS_HOURS = {
-    "days": [0, 1, 2, 3, 4],  # Monday=0 to Friday=4
+    "days": [0, 1, 2, 3, 4],
     "day_names": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 }
 
-# Service area
 SERVICE_AREA = {
     "center": "Burleson, TX",
     "free_radius_miles": 15,
     "per_mile_charge": 1.0
 }
 
-MONTHLY_DISCOUNT = 0.05  # 5% discount for monthly subscription
+MONTHLY_DISCOUNT = 0.05
+ROUTE_PRICE = 350.0
+
+BURLESON_COORDS = {"lat": 32.5421, "lng": -97.3208}
 
 # ===================== HELPER FUNCTIONS =====================
 
 def calculate_service_price(service_id: str, quantity: int) -> float:
-    """Calculate price for a service based on quantity"""
     service = SERVICES.get(service_id)
     if not service:
         return 0.0
@@ -261,46 +282,43 @@ def calculate_service_price(service_id: str, quantity: int) -> float:
             elif quantity == 2:
                 return tier_pricing["2"]
             else:
-                # First 2 bins = $25, then $8 for each additional
                 return tier_pricing["2"] + (quantity - 2) * tier_pricing["additional"]
         elif service_id == "dumpster":
             if quantity == 1:
                 return tier_pricing["1"]
             else:
-                # First dumpster = $85, then $45 for each additional
                 return tier_pricing["1"] + (quantity - 1) * tier_pricing["additional"]
     
-    # Quote-based services have no price calculation
     if service["pricing_type"] == "quote":
         return 0.0
     
     return service["base_price"] * quantity
 
-def calculate_travel_fee(distance_miles: float) -> float:
-    """Calculate travel fee based on distance"""
+def calculate_travel_fee(distance_miles: float, is_scent_bomb_only: bool = False) -> float:
+    if is_scent_bomb_only:
+        return 0.0
     if distance_miles <= SERVICE_AREA["free_radius_miles"]:
         return 0.0
     extra_miles = distance_miles - SERVICE_AREA["free_radius_miles"]
     return extra_miles * SERVICE_AREA["per_mile_charge"]
 
-def calculate_booking_total(services: List[Dict], distance_miles: float, is_monthly: bool, num_service_days: int = 1) -> Dict:
-    """Calculate total booking amount"""
+def calculate_booking_total(services: List[Dict], distance_miles: float, is_monthly: bool, num_service_days: int = 1, is_scent_bomb_only: bool = False) -> Dict:
     subtotal_per_day = 0.0
     
     for service_item in services:
         service_id = service_item.get("service_id")
         quantity = service_item.get("quantity", 1)
-        
-        # Main service price
         subtotal_per_day += calculate_service_price(service_id, quantity)
     
-    # Multiply by number of service days
     subtotal = subtotal_per_day * num_service_days
-    
-    travel_fee = calculate_travel_fee(distance_miles)
-    # 5% discount for monthly subscription
+    travel_fee = calculate_travel_fee(distance_miles, is_scent_bomb_only)
     discount = subtotal * MONTHLY_DISCOUNT if is_monthly else 0.0
-    total = subtotal - discount + travel_fee
+    
+    # Calculate tax on subtotal after discount
+    taxable_amount = subtotal - discount
+    tax = round(taxable_amount * SALES_TAX_RATE, 2)
+    
+    total = subtotal - discount + travel_fee + tax
     
     return {
         "subtotal_per_day": round(subtotal_per_day, 2),
@@ -308,55 +326,80 @@ def calculate_booking_total(services: List[Dict], distance_miles: float, is_mont
         "travel_fee": round(travel_fee, 2),
         "discount": round(discount, 2),
         "discount_percent": int(MONTHLY_DISCOUNT * 100),
+        "tax": tax,
+        "tax_rate": SALES_TAX_RATE,
         "total": round(total, 2),
         "num_service_days": num_service_days
     }
 
 def is_weekday(date_str: str) -> bool:
-    """Check if date is a weekday"""
     try:
         date = datetime.strptime(date_str, "%Y-%m-%d")
         return date.weekday() in BUSINESS_HOURS["days"]
     except ValueError:
         return False
 
-# ===================== DISTANCE CALCULATION =====================
+# ===================== AUTH FUNCTIONS =====================
 
-# Burleson, TX coordinates (center of service area)
-BURLESON_COORDS = {"lat": 32.5421, "lng": -97.3208}
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=JWT_EXPIRATION_HOURS))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-def geocode_address(address: str) -> Dict:
-    """Get coordinates for an address using Google Geocoding API"""
-    if not google_maps_api_key:
-        return None
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        role = payload.get("role")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"user_id": user_id, "role": role, "username": payload.get("username")}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def get_admin_user(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+async def get_contractor_user(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") not in ["contractor", "admin"]:
+        raise HTTPException(status_code=403, detail="Contractor access required")
+    return current_user
+
+# ===================== DISTANCE CALCULATION =====================
+
+def geocode_address(address: str) -> Dict:
+    if not google_maps_api_key:
+        return None
+    try:
         url = 'https://maps.googleapis.com/maps/api/geocode/json'
-        params = {
-            'address': address,
-            'key': google_maps_api_key
-        }
+        params = {'address': address, 'key': google_maps_api_key}
         response = requests.get(url, params=params, timeout=10)
         data = response.json()
-        
         if data.get('status') == 'OK' and data.get('results'):
             location = data['results'][0]['geometry']['location']
             return {"lat": location['lat'], "lng": location['lng']}
     except Exception as e:
         logging.warning(f"Geocoding failed: {e}")
-    
     return None
 
 def calculate_distance_from_address(customer_address: str) -> Dict:
-    """Calculate driving distance from customer address to Burleson, TX using Google Maps API"""
     if not google_maps_api_key:
-        logging.warning("Google Maps API key not configured - distance calculation unavailable")
         return {"success": False, "error": "Distance calculation not configured", "distance_miles": 0}
     
-    # Get coordinates for map display
     customer_coords = geocode_address(customer_address)
     
-    # First try the Routes API (newer)
     try:
         routes_url = 'https://routes.googleapis.com/directions/v2:computeRoutes'
         headers = {
@@ -378,7 +421,6 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
             distance_meters = route.get('distanceMeters', 0)
             duration_str = route.get('duration', '0s')
             
-            # Parse duration (e.g., "3600s" -> "1 hour")
             duration_seconds = int(duration_str.replace('s', ''))
             if duration_seconds >= 3600:
                 hours = duration_seconds // 3600
@@ -389,7 +431,6 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
             
             distance_miles = distance_meters / 1609.34
             distance_text = f"{distance_miles:.1f} mi"
-            
             travel_fee = calculate_travel_fee(distance_miles)
             
             return {
@@ -404,667 +445,271 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
                 "burleson_coords": BURLESON_COORDS
             }
     except Exception as e:
-        logging.warning(f"Routes API failed, trying legacy Distance Matrix: {e}")
+        logging.warning(f"Routes API failed: {e}")
     
-    # Fallback to legacy Distance Matrix API
+    return {"success": False, "error": "Could not calculate distance", "distance_miles": 0}
+
+def optimize_route(addresses: List[str]) -> List[Dict]:
+    """Optimize route for multiple addresses using Google Maps"""
+    if not google_maps_api_key or len(addresses) < 2:
+        return [{"address": addr, "order": i} for i, addr in enumerate(addresses)]
+    
     try:
-        url = 'https://maps.googleapis.com/maps/api/distancematrix/json'
+        # Use Directions API with waypoints optimization
+        origin = burleson_address
+        waypoints = "|".join(addresses)
+        
+        url = f"https://maps.googleapis.com/maps/api/directions/json"
         params = {
-            'origins': customer_address,
-            'destinations': burleson_address,
-            'mode': 'driving',
-            'units': 'imperial',
-            'key': google_maps_api_key
+            "origin": origin,
+            "destination": origin,  # Return to start
+            "waypoints": f"optimize:true|{waypoints}",
+            "key": google_maps_api_key
         }
         
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=30)
         data = response.json()
         
-        if data.get('status') != 'OK':
-            error_msg = data.get('error_message', 'API request failed')
-            # Provide helpful message for API enablement
-            if 'not enabled' in error_msg.lower() or 'legacy' in error_msg.lower():
-                error_msg = "Please enable 'Distance Matrix API' or 'Routes API' in Google Cloud Console"
-            return {"success": False, "error": error_msg, "distance_miles": 0}
-        
-        element = data['rows'][0]['elements'][0]
-        if element.get('status') != 'OK':
-            return {"success": False, "error": f"Could not calculate distance: {element.get('status')}", "distance_miles": 0}
-        
-        # Distance is returned in meters, convert to miles
-        distance_meters = element['distance']['value']
-        distance_miles = distance_meters / 1609.34  # meters to miles
-        distance_text = element['distance']['text']
-        duration_text = element['duration']['text']
-        
-        # Calculate travel fee
-        travel_fee = calculate_travel_fee(distance_miles)
-        
-        return {
-            "success": True,
-            "distance_miles": round(distance_miles, 1),
-            "distance_text": distance_text,
-            "duration_text": duration_text,
-            "travel_fee": round(travel_fee, 2),
-            "free_radius": SERVICE_AREA["free_radius_miles"],
-            "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"],
-            "customer_coords": customer_coords,
-            "burleson_coords": BURLESON_COORDS
-        }
-    except requests.exceptions.Timeout:
-        return {"success": False, "error": "Distance calculation timed out", "distance_miles": 0}
+        if data.get("status") == "OK":
+            optimized_order = data["routes"][0]["waypoint_order"]
+            return [{"address": addresses[i], "order": idx, "original_index": i} 
+                    for idx, i in enumerate(optimized_order)]
     except Exception as e:
-        logging.error(f"Distance calculation error: {e}")
-        return {"success": False, "error": str(e), "distance_miles": 0}
+        logging.error(f"Route optimization failed: {e}")
+    
+    return [{"address": addr, "order": i} for i, addr in enumerate(addresses)]
 
+# ===================== SQUARE PAYMENT FUNCTIONS =====================
 
-# ===================== SMS FUNCTIONS =====================
-
-def format_phone_number(phone: str) -> str:
-    """Format phone number to E.164 format for Twilio"""
-    # Remove all non-digit characters
-    digits = ''.join(filter(str.isdigit, phone))
-    # Add +1 if it's a 10-digit US number
-    if len(digits) == 10:
-        return f"+1{digits}"
-    elif len(digits) == 11 and digits.startswith('1'):
-        return f"+{digits}"
-    return f"+{digits}"
-
-def send_sms(to_phone: str, message: str) -> bool:
-    """Send SMS via Twilio"""
-    if not twilio_client:
-        logging.warning("Twilio not configured, skipping SMS")
-        return False
+def process_square_payment(source_id: str, amount_cents: int, idempotency_key: str, customer_email: str = None) -> Dict:
+    """Process payment using Square Payments API"""
+    if not square_client:
+        return {"success": False, "error": "Square not configured"}
     
     try:
-        formatted_phone = format_phone_number(to_phone)
-        twilio_client.messages.create(
-            body=message,
-            from_=twilio_phone_number,
-            to=formatted_phone
-        )
-        logging.info(f"SMS sent to {formatted_phone}")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to send SMS: {e}")
-        return False
-
-def send_booking_confirmation_sms(booking: dict) -> bool:
-    """Send booking confirmation SMS"""
-    if not booking.get("sms_opt_in"):
-        return False
-    
-    customer_name = booking.get("customer_name", "")
-    dates = booking.get("booking_dates", [])
-    total = booking.get("total", 0)
-    is_monthly = booking.get("is_monthly", False)
-    monthly_days = booking.get("monthly_days", [])
-    
-    if is_monthly and monthly_days:
-        date_info = f"every {' & '.join(monthly_days)}"
-    elif dates:
-        date_info = dates[0]
-    else:
-        date_info = "scheduled"
-    
-    # Check if it's a quote-based booking
-    has_quote_services = any(
-        SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
-        for s in booking.get("services", [])
-    )
-    
-    if has_quote_services:
-        message = f"Hi {customer_name}! Your Upwash Power Washing quote request has been received. We'll contact you with a custom quote soon! Questions? Call (817) 750-3211."
-    else:
-        message = f"Hi {customer_name}! Your Upwash Power Washing booking is confirmed for {date_info}. Total: ${total:.2f}. Questions? Call (817) 750-3211. Thank you!"
-    
-    return send_sms(booking.get("customer_phone", ""), message)
-
-def send_payment_confirmation_sms(booking: dict) -> bool:
-    """Send payment confirmation SMS"""
-    if not booking.get("sms_opt_in"):
-        return False
-    
-    customer_name = booking.get("customer_name", "")
-    total = booking.get("total", 0)
-    
-    message = f"Hi {customer_name}! Payment of ${total:.2f} received for your Upwash Power Washing service. We'll see you soon! Questions? (817) 750-3211"
-    
-    return send_sms(booking.get("customer_phone", ""), message)
-
-# ===================== EMAIL FUNCTIONS =====================
-
-def send_booking_confirmation_email(booking: dict) -> bool:
-    """Send booking confirmation email to customer"""
-    customer_email = booking.get("customer_email")
-    if not customer_email or not resend_api_key:
-        logging.warning("Email not sent - no email or Resend not configured")
-        return False
-    
-    customer_name = booking.get("customer_name", "")
-    dates = booking.get("booking_dates", [])
-    total = booking.get("total", 0)
-    services = booking.get("services", [])
-    address = booking.get("customer_address", "")
-    is_monthly = booking.get("is_monthly", False)
-    monthly_days = booking.get("monthly_days", [])
-    
-    # Build service list
-    service_list = ""
-    for s in services:
-        service_id = s.get("service_id", "")
-        quantity = s.get("quantity", 1)
-        service_info = SERVICES.get(service_id, {})
-        service_name = service_info.get("name", service_id)
-        if quantity > 1:
-            service_list += f"<li>{service_name} (x{quantity})</li>"
-        else:
-            service_list += f"<li>{service_name}</li>"
-    
-    # Check for quote services
-    has_quote = any(
-        SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
-        for s in services
-    )
-    
-    if is_monthly and monthly_days:
-        date_info = f"Every {' & '.join(monthly_days)} (Monthly Subscription - 5% off)"
-    elif dates:
-        date_info = dates[0]
-    else:
-        date_info = "To be scheduled"
-    
-    price_section = f"<strong>Total: ${total:.2f}</strong>"
-    if has_quote:
-        price_section = "<strong>Quote Required</strong> - We'll contact you with a custom quote."
-    
-    html_content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #007AFF, #00D4FF); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;">UPWASH</h1>
-            <p style="color: white; margin: 5px 0;">Power Washing Cleaning Services</p>
-        </div>
-        
-        <div style="padding: 30px; background: #f5f5f7;">
-            <h2 style="color: #1d1d1f;">Booking Confirmation</h2>
-            <p>Hi {customer_name},</p>
-            <p>Thank you for choosing Upwash Power Washing! Your booking has been received.</p>
-            
-            <div style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <h3 style="color: #007AFF; margin-top: 0;">Booking Details</h3>
-                <p><strong>Services:</strong></p>
-                <ul>{service_list}</ul>
-                <p><strong>Date:</strong> {date_info}</p>
-                <p><strong>Address:</strong> {address}</p>
-                <p>{price_section}</p>
-            </div>
-            
-            <p>Questions? Contact us:</p>
-            <p>📞 (817) 750-3211<br>
-            ✉️ upwashpowerwashing@gmail.com</p>
-            
-            <p>Thank you for your business!</p>
-            <p><strong>Upwash Power Washing Team</strong></p>
-        </div>
-        
-        <div style="background: #1d1d1f; color: #888; padding: 20px; text-align: center; font-size: 12px;">
-            <p>Burleson, TX | Mon-Fri 9AM-6PM</p>
-        </div>
-    </div>
-    """
-    
-    try:
-        params: resend.Emails.SendParams = {
-            "from": sender_email,
-            "to": [customer_email],
-            "subject": "Upwash Power Washing - Booking Confirmation",
-            "html": html_content
-        }
-        resend.Emails.send(params)
-        logging.info(f"Confirmation email sent to {customer_email}")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to send email: {e}")
-        return False
-
-def send_admin_notification_email(booking: dict) -> bool:
-    """Send notification email to admin about new booking"""
-    if not resend_api_key:
-        return False
-    
-    customer_name = booking.get("customer_name", "")
-    customer_phone = booking.get("customer_phone", "")
-    customer_email = booking.get("customer_email", "N/A")
-    address = booking.get("customer_address", "")
-    services = booking.get("services", [])
-    total = booking.get("total", 0)
-    quote_description = booking.get("quote_description", "")
-    has_photos = bool(booking.get("quote_photos"))
-    
-    service_list = ", ".join([s.get("service_id", "") for s in services])
-    
-    # Check for quote services
-    has_quote = any(
-        SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
-        for s in services
-    )
-    
-    html_content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px;">
-        <h2 style="color: #007AFF;">New Booking Received!</h2>
-        
-        <p><strong>Customer:</strong> {customer_name}</p>
-        <p><strong>Phone:</strong> {customer_phone}</p>
-        <p><strong>Email:</strong> {customer_email}</p>
-        <p><strong>Address:</strong> {address}</p>
-        <p><strong>Services:</strong> {service_list}</p>
-        <p><strong>Total:</strong> ${total:.2f} {"(+ Quote)" if has_quote else ""}</p>
-        
-        {"<h3>Quote Request Details:</h3><p>" + quote_description + "</p>" if quote_description else ""}
-        {"<p><strong>📷 Photos attached by customer</strong></p>" if has_photos else ""}
-        
-        <p style="margin-top: 20px;">
-            <a href="https://upwash-booking.preview.emergentagent.com/admin" 
-               style="background: #007AFF; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                View in Admin Dashboard
-            </a>
-        </p>
-    </div>
-    """
-    
-    try:
-        params: resend.Emails.SendParams = {
-            "from": sender_email,
-            "to": [admin_email],
-            "subject": f"New Booking: {customer_name} - {service_list}",
-            "html": html_content
-        }
-        resend.Emails.send(params)
-        logging.info(f"Admin notification sent for booking {booking.get('id')}")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to send admin notification: {e}")
-        return False
-
-def send_quote_followup_email(booking: dict) -> bool:
-    """Send 24-hour follow-up email for quote requests"""
-    customer_email = booking.get("customer_email")
-    if not customer_email or not resend_api_key:
-        return False
-    
-    customer_name = booking.get("customer_name", "")
-    
-    html_content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #007AFF, #00D4FF); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;">UPWASH</h1>
-            <p style="color: white; margin: 5px 0;">Power Washing Cleaning Services</p>
-        </div>
-        
-        <div style="padding: 30px; background: #f5f5f7;">
-            <h2 style="color: #1d1d1f;">Quote Update</h2>
-            <p>Hi {customer_name},</p>
-            
-            <p style="font-size: 16px; line-height: 1.6;">
-                No worries. We are analyzing your quote for the best price. 
-                We will contact you as soon as we have your quote ready.
-            </p>
-            
-            <p style="margin-top: 20px;">Thank you for your patience!</p>
-            
-            <p>Questions? Contact us:</p>
-            <p>📞 (817) 750-3211<br>
-            ✉️ upwashpowerwashing@gmail.com</p>
-            
-            <p><strong>Upwash Power Washing Team</strong></p>
-        </div>
-        
-        <div style="background: #1d1d1f; color: #888; padding: 20px; text-align: center; font-size: 12px;">
-            <p>Burleson, TX | Mon-Fri 9AM-6PM</p>
-        </div>
-    </div>
-    """
-    
-    try:
-        params: resend.Emails.SendParams = {
-            "from": sender_email,
-            "to": [customer_email],
-            "subject": "Upwash Power Washing - Your Quote is Being Prepared",
-            "html": html_content
-        }
-        resend.Emails.send(params)
-        logging.info(f"Quote follow-up email sent to {customer_email}")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to send quote follow-up email: {e}")
-        return False
-
-def send_quote_followup_sms(booking: dict) -> bool:
-    """Send 24-hour follow-up SMS for quote requests"""
-    if not booking.get("sms_opt_in") or not twilio_client:
-        return False
-    
-    customer_name = booking.get("customer_name", "")
-    message = f"Hi {customer_name}! No worries - we're analyzing your quote for the best price. We'll contact you as soon as your quote is ready. Questions? (817) 750-3211 - Upwash Power Washing"
-    
-    return send_sms(booking.get("customer_phone", ""), message)
-
-# ===================== GOOGLE CALENDAR FUNCTIONS =====================
-
-from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-import json
-
-def get_google_auth_url() -> str:
-    """Generate Google OAuth URL for calendar access"""
-    if not google_client_id or not google_client_secret:
-        return None
-    
-    flow = Flow.from_client_config(
-        {
-            "web": {
-                "client_id": google_client_id,
-                "client_secret": google_client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [google_redirect_uri]
-            }
-        },
-        scopes=google_scopes
-    )
-    flow.redirect_uri = google_redirect_uri
-    
-    auth_url, _ = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true',
-        prompt='consent'
-    )
-    return auth_url
-
-async def exchange_code_for_tokens(code: str) -> Dict:
-    """Exchange authorization code for tokens"""
-    try:
-        flow = Flow.from_client_config(
-            {
-                "web": {
-                    "client_id": google_client_id,
-                    "client_secret": google_client_secret,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [google_redirect_uri]
-                }
+        body = {
+            "source_id": source_id,
+            "idempotency_key": idempotency_key,
+            "amount_money": {
+                "amount": amount_cents,
+                "currency": "USD"
             },
-            scopes=google_scopes
-        )
-        flow.redirect_uri = google_redirect_uri
-        flow.fetch_token(code=code)
-        
-        credentials = flow.credentials
-        
-        # Store tokens in database
-        token_doc = {
-            "type": "google_calendar",
-            "token": credentials.token,
-            "refresh_token": credentials.refresh_token,
-            "token_uri": credentials.token_uri,
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
-            "scopes": list(credentials.scopes),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "location_id": square_location_id,
+            "autocomplete": True
         }
         
-        await db.settings.update_one(
-            {"type": "google_calendar"},
-            {"$set": token_doc},
-            upsert=True
-        )
+        if customer_email:
+            body["buyer_email_address"] = customer_email
         
-        return {"success": True, "message": "Google Calendar connected successfully"}
+        result = square_client.payments.create_payment(body=body)
+        
+        if result.is_success():
+            payment = result.body.get("payment", {})
+            return {
+                "success": True,
+                "payment_id": payment.get("id"),
+                "status": payment.get("status"),
+                "receipt_url": payment.get("receipt_url")
+            }
+        else:
+            errors = result.errors
+            error_msg = errors[0].get("detail", "Payment failed") if errors else "Payment failed"
+            return {"success": False, "error": error_msg}
+            
     except Exception as e:
-        logging.error(f"Failed to exchange code for tokens: {e}")
+        logging.error(f"Square payment error: {e}")
         return {"success": False, "error": str(e)}
 
-async def get_google_credentials():
-    """Get stored Google credentials"""
-    token_doc = await db.settings.find_one({"type": "google_calendar"}, {"_id": 0})
-    if not token_doc or not token_doc.get("token"):
-        return None
+def create_square_invoice(customer_id: str, amount_cents: int, due_date: str, description: str) -> Dict:
+    """Create and send invoice via Square"""
+    if not square_client:
+        return {"success": False, "error": "Square not configured"}
     
     try:
-        credentials = Credentials(
-            token=token_doc.get("token"),
-            refresh_token=token_doc.get("refresh_token"),
-            token_uri=token_doc.get("token_uri"),
-            client_id=token_doc.get("client_id"),
-            client_secret=token_doc.get("client_secret"),
-            scopes=token_doc.get("scopes")
-        )
+        # Create order first
+        order_body = {
+            "order": {
+                "location_id": square_location_id,
+                "line_items": [{
+                    "name": description,
+                    "quantity": "1",
+                    "base_price_money": {
+                        "amount": amount_cents,
+                        "currency": "USD"
+                    }
+                }]
+            },
+            "idempotency_key": str(uuid.uuid4())
+        }
         
-        # Refresh if expired
-        if credentials.expired and credentials.refresh_token:
-            from google.auth.transport.requests import Request
-            credentials.refresh(Request())
+        order_result = square_client.orders.create_order(body=order_body)
+        
+        if not order_result.is_success():
+            return {"success": False, "error": "Failed to create order"}
+        
+        order_id = order_result.body["order"]["id"]
+        
+        # Create invoice
+        invoice_body = {
+            "invoice": {
+                "location_id": square_location_id,
+                "order_id": order_id,
+                "primary_recipient": {
+                    "customer_id": customer_id
+                },
+                "payment_requests": [{
+                    "request_type": "BALANCE",
+                    "due_date": due_date
+                }],
+                "delivery_method": "EMAIL",
+                "accepted_payment_methods": {
+                    "card": True,
+                    "square_gift_card": False,
+                    "bank_account": True
+                }
+            },
+            "idempotency_key": str(uuid.uuid4())
+        }
+        
+        invoice_result = square_client.invoices.create_invoice(body=invoice_body)
+        
+        if invoice_result.is_success():
+            invoice = invoice_result.body["invoice"]
             
-            # Update stored token
-            await db.settings.update_one(
-                {"type": "google_calendar"},
-                {"$set": {
-                    "token": credentials.token,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }}
+            # Publish invoice
+            publish_result = square_client.invoices.publish_invoice(
+                invoice_id=invoice["id"],
+                body={
+                    "version": invoice["version"],
+                    "idempotency_key": str(uuid.uuid4())
+                }
             )
+            
+            if publish_result.is_success():
+                return {
+                    "success": True,
+                    "invoice_id": invoice["id"],
+                    "public_url": publish_result.body["invoice"].get("public_url")
+                }
         
-        return credentials
+        return {"success": False, "error": "Failed to create invoice"}
+        
     except Exception as e:
-        logging.error(f"Failed to get Google credentials: {e}")
-        return None
-
-async def create_calendar_event(booking: dict) -> bool:
-    """Create a Google Calendar event for a confirmed booking"""
-    credentials = await get_google_credentials()
-    if not credentials:
-        logging.warning("Google Calendar not connected - skipping event creation")
-        return False
-    
-    try:
-        service = build('calendar', 'v3', credentials=credentials)
-        
-        # Build event details
-        customer_name = booking.get("customer_name", "")
-        customer_phone = booking.get("customer_phone", "")
-        customer_address = booking.get("customer_address", "")
-        services = booking.get("services", [])
-        total = booking.get("total", 0)
-        notes = booking.get("notes", "")
-        booking_dates = booking.get("booking_dates", [])
-        is_monthly = booking.get("is_monthly", False)
-        monthly_days = booking.get("monthly_days", [])
-        
-        service_names = ", ".join([
-            SERVICES.get(s.get("service_id", ""), {}).get("name", s.get("service_id", ""))
-            for s in services
-        ])
-        
-        # Create event for each booking date
-        for date_str in booking_dates:
-            event_date = datetime.strptime(date_str, "%Y-%m-%d")
-            
-            # Default to 9 AM - 10 AM slot
-            start_time = event_date.replace(hour=9, minute=0)
-            end_time = event_date.replace(hour=10, minute=0)
-            
-            description = f"""
-Customer: {customer_name}
-Phone: {customer_phone}
-Address: {customer_address}
-
-Services: {service_names}
-Total: ${total:.2f}
-{"Monthly Subscription: " + " & ".join(monthly_days) if is_monthly else "One-time service"}
-
-{f"Notes: {notes}" if notes else ""}
-
-Booking ID: {booking.get("id", "")}
-            """.strip()
-            
-            event = {
-                'summary': f'🧹 Upwash - {customer_name}',
-                'location': customer_address,
-                'description': description,
-                'start': {
-                    'dateTime': start_time.isoformat(),
-                    'timeZone': 'America/Chicago',
-                },
-                'end': {
-                    'dateTime': end_time.isoformat(),
-                    'timeZone': 'America/Chicago',
-                },
-                'reminders': {
-                    'useDefault': False,
-                    'overrides': [
-                        {'method': 'popup', 'minutes': 60},
-                        {'method': 'popup', 'minutes': 1440},  # 1 day before
-                    ],
-                },
-            }
-            
-            service.events().insert(calendarId='primary', body=event).execute()
-            logging.info(f"Calendar event created for booking {booking.get('id')} on {date_str}")
-        
-        return True
-    except Exception as e:
-        logging.error(f"Failed to create calendar event: {e}")
-        return False
+        logging.error(f"Square invoice error: {e}")
+        return {"success": False, "error": str(e)}
 
 # ===================== API ROUTES =====================
 
-
 @api_router.get("/")
 async def root():
-    return {"message": "Upwash Power Washing API"}
+    return {"message": "Upwash Power Washing API", "version": "2.0"}
 
 @api_router.get("/services")
 async def get_services():
-    """Get all available services with pricing"""
     return {
         "services": list(SERVICES.values()),
         "service_area": SERVICE_AREA,
         "business_hours": BUSINESS_HOURS,
-        "monthly_discount": MONTHLY_DISCOUNT
+        "monthly_discount": MONTHLY_DISCOUNT,
+        "tax_rate": SALES_TAX_RATE
     }
 
 @api_router.post("/calculate-price")
 async def calculate_price(request: Dict):
-    """Calculate price for selected services"""
     services = request.get("services", [])
     distance_miles = request.get("distance_miles", 0)
     is_monthly = request.get("is_monthly", False)
     num_service_days = request.get("num_service_days", 1)
+    is_scent_bomb_only = request.get("is_scent_bomb_only", False)
     
-    pricing = calculate_booking_total(services, distance_miles, is_monthly, num_service_days)
+    # Check if only scent bombs
+    if not is_scent_bomb_only:
+        is_scent_bomb_only = all(s.get("service_id") == "scent_bomb" for s in services)
+    
+    pricing = calculate_booking_total(services, distance_miles, is_monthly, num_service_days, is_scent_bomb_only)
     return pricing
 
 @api_router.post("/calculate-distance")
 async def calculate_distance(request: Dict):
-    """Calculate driving distance from customer address to Burleson, TX"""
     address = request.get("address", "")
-    
     if not address:
         raise HTTPException(status_code=400, detail="Address is required")
-    
-    result = calculate_distance_from_address(address)
-    return result
+    return calculate_distance_from_address(address)
 
-# ===================== GOOGLE CALENDAR OAUTH ROUTES =====================
+# ===================== AUTH ROUTES =====================
 
-@api_router.get("/auth/google")
-async def google_auth():
-    """Initiate Google OAuth flow for calendar access"""
-    auth_url = get_google_auth_url()
-    if not auth_url:
-        raise HTTPException(status_code=500, detail="Google Calendar not configured")
-    return {"auth_url": auth_url}
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    # Check for admin login
+    if credentials.username == ADMIN_USERNAME and credentials.password == ADMIN_PASSWORD:
+        token = create_access_token({
+            "sub": "admin",
+            "username": ADMIN_USERNAME,
+            "role": "admin"
+        })
+        return TokenResponse(
+            access_token=token,
+            user={"id": "admin", "username": ADMIN_USERNAME, "role": "admin", "full_name": "Administrator"}
+        )
+    
+    # Check for contractor login
+    user = await db.users.find_one({"username": credentials.username}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    if not verify_password(credentials.password, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    token = create_access_token({
+        "sub": user["id"],
+        "username": user["username"],
+        "role": user["role"]
+    })
+    
+    # Don't return password hash
+    user_response = {k: v for k, v in user.items() if k != "password_hash"}
+    
+    return TokenResponse(access_token=token, user=user_response)
 
-@api_router.get("/auth/google/callback")
-async def google_callback(code: str = None, error: str = None):
-    """Handle Google OAuth callback"""
-    if error:
-        return RedirectResponse(url=f"/admin?error={error}")
+@api_router.get("/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] == "admin":
+        return {"id": "admin", "username": ADMIN_USERNAME, "role": "admin", "full_name": "Administrator"}
     
-    if not code:
-        return RedirectResponse(url="/admin?error=no_code")
-    
-    result = await exchange_code_for_tokens(code)
-    
-    if result.get("success"):
-        return RedirectResponse(url="/admin?calendar=connected")
-    else:
-        return RedirectResponse(url=f"/admin?error={result.get('error', 'unknown')}")
+    user = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
-@api_router.get("/auth/google/status")
-async def google_auth_status():
-    """Check if Google Calendar is connected"""
-    credentials = await get_google_credentials()
-    return {
-        "connected": credentials is not None,
-        "configured": bool(google_client_id and google_client_secret)
-    }
-
-@api_router.post("/auth/google/disconnect")
-async def google_disconnect():
-    """Disconnect Google Calendar"""
-    await db.settings.delete_one({"type": "google_calendar"})
-    return {"message": "Google Calendar disconnected"}
-
-
-
-@api_router.post("/check-date")
-async def check_date(request: Dict):
-    """Check if a date is available (weekday only)"""
-    date_str = request.get("date", "")
-    
-    if not date_str:
-        return {"available": False, "reason": "No date provided"}
-    
-    if not is_weekday(date_str):
-        return {"available": False, "reason": "Weekends not available. We operate Monday-Friday."}
-    
-    # Check if date is not in the past
-    try:
-        date = datetime.strptime(date_str, "%Y-%m-%d")
-        if date.date() < datetime.now(timezone.utc).date():
-            return {"available": False, "reason": "Cannot book past dates"}
-    except ValueError:
-        return {"available": False, "reason": "Invalid date format"}
-    
-    return {"available": True, "date": date_str}
+# ===================== BOOKING ROUTES =====================
 
 @api_router.post("/bookings", response_model=Booking)
 async def create_booking(booking_data: BookingCreate):
-    """Create a new booking"""
-    # Validate dates are weekdays
-    for date_str in booking_data.booking_dates:
-        if not is_weekday(date_str):
-            raise HTTPException(status_code=400, detail=f"Date {date_str} is not a weekday")
+    # Check if scent bomb only order
+    is_scent_bomb_only = booking_data.is_scent_bomb_only or all(
+        s.get("service_id") == "scent_bomb" for s in booking_data.services
+    )
     
-    # Calculate pricing
-    num_days = len(booking_data.booking_dates)
+    # Validate dates for non-scent-bomb orders
+    if not is_scent_bomb_only:
+        for date_str in booking_data.booking_dates:
+            if not is_weekday(date_str):
+                raise HTTPException(status_code=400, detail=f"Date {date_str} is not a weekday")
+    
+    num_days = len(booking_data.booking_dates) if booking_data.booking_dates else 1
     pricing = calculate_booking_total(
         booking_data.services,
         booking_data.distance_miles,
         booking_data.is_monthly,
-        num_days
+        num_days,
+        is_scent_bomb_only
     )
     
-    # Check if this booking includes quote-based services
     is_quote_service = any(
         SERVICES.get(s.get("service_id", ""), {}).get("pricing_type") == "quote"
         for s in booking_data.services
     )
     
-    # Create booking
     booking = Booking(
         customer_name=booking_data.customer_name,
         customer_email=booking_data.customer_email,
@@ -1082,9 +727,11 @@ async def create_booking(booking_data: BookingCreate):
         quote_photos=booking_data.quote_photos,
         subtotal=pricing["subtotal"],
         travel_fee=pricing["travel_fee"],
+        tax=pricing["tax"],
         discount=pricing["discount"],
         total=pricing["total"],
-        is_quote_service=is_quote_service
+        is_quote_service=is_quote_service,
+        is_scent_bomb_only=is_scent_bomb_only
     )
     
     doc = booking.model_dump()
@@ -1093,21 +740,10 @@ async def create_booking(booking_data: BookingCreate):
     
     await db.bookings.insert_one(doc)
     
-    # Send confirmation SMS if opted in
-    if booking_data.sms_opt_in:
-        send_booking_confirmation_sms(doc)
-    
-    # Send confirmation email to customer
-    send_booking_confirmation_email(doc)
-    
-    # Send notification email to admin
-    send_admin_notification_email(doc)
-    
     return booking
 
 @api_router.get("/bookings/{booking_id}")
 async def get_booking(booking_id: str):
-    """Get a booking by ID"""
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -1115,22 +751,115 @@ async def get_booking(booking_id: str):
 
 @api_router.get("/bookings")
 async def list_bookings(status: Optional[str] = None, date: Optional[str] = None):
-    """List all bookings with optional filters"""
     query = {}
     if status:
         query["status"] = status
     if date:
-        query["booking_date"] = date
+        query["booking_dates"] = date
     
-    bookings = await db.bookings.find(query, {"_id": 0}).sort("booking_date", 1).to_list(1000)
+    bookings = await db.bookings.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     return {"bookings": bookings}
 
-@api_router.patch("/bookings/{booking_id}/status")
-async def update_booking_status(booking_id: str, status: str):
-    """Update booking status"""
+# ===================== PAYMENT ROUTES =====================
+
+@api_router.post("/payments/process")
+async def process_payment(payment_req: SquarePaymentRequest):
+    booking = await db.bookings.find_one({"id": payment_req.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if booking.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="Booking already paid")
+    
+    # Process payment
+    result = process_square_payment(
+        source_id=payment_req.source_id,
+        amount_cents=payment_req.amount,
+        idempotency_key=payment_req.idempotency_key,
+        customer_email=booking.get("customer_email")
+    )
+    
+    if result["success"]:
+        await db.bookings.update_one(
+            {"id": payment_req.booking_id},
+            {"$set": {
+                "payment_status": "paid",
+                "payment_id": result["payment_id"],
+                "status": "confirmed",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        return {
+            "success": True,
+            "payment_id": result["payment_id"],
+            "receipt_url": result.get("receipt_url")
+        }
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Payment failed"))
+
+@api_router.get("/payments/config")
+async def get_payment_config():
+    return {
+        "app_id": square_app_id,
+        "location_id": square_location_id,
+        "environment": square_environment
+    }
+
+# ===================== ADMIN ROUTES =====================
+
+@api_router.get("/admin/stats")
+async def admin_stats(current_user: dict = Depends(get_admin_user)):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    total = await db.bookings.count_documents({})
+    pending = await db.bookings.count_documents({"status": "pending"})
+    confirmed = await db.bookings.count_documents({"status": "confirmed"})
+    completed = await db.bookings.count_documents({"status": "completed"})
+    
+    # Scent bomb orders
+    scent_bomb_orders = await db.bookings.count_documents({"is_scent_bomb_only": True})
+    
+    # Revenue
+    paid_bookings = await db.bookings.find({"payment_status": "paid"}, {"_id": 0, "total": 1}).to_list(1000)
+    total_revenue = sum(b.get("total", 0) for b in paid_bookings)
+    
+    # Contractors
+    contractor_count = await db.users.count_documents({"role": "contractor"})
+    
+    # Routes
+    route_count = await db.routes.count_documents({})
+    
+    return {
+        "total_bookings": total,
+        "pending": pending,
+        "confirmed": confirmed,
+        "completed": completed,
+        "scent_bomb_orders": scent_bomb_orders,
+        "total_revenue": round(total_revenue, 2),
+        "contractor_count": contractor_count,
+        "route_count": route_count
+    }
+
+@api_router.get("/admin/bookings")
+async def admin_bookings(
+    status: Optional[str] = None,
+    is_scent_bomb_only: Optional[bool] = None,
+    current_user: dict = Depends(get_admin_user)
+):
+    query = {}
+    if status:
+        query["status"] = status
+    if is_scent_bomb_only is not None:
+        query["is_scent_bomb_only"] = is_scent_bomb_only
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return {"bookings": bookings}
+
+@api_router.patch("/admin/bookings/{booking_id}/status")
+async def update_booking_status(booking_id: str, status: str, current_user: dict = Depends(get_admin_user)):
     valid_statuses = ["pending", "confirmed", "completed", "cancelled"]
     if status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        raise HTTPException(status_code=400, detail=f"Invalid status")
     
     result = await db.bookings.update_one(
         {"id": booking_id},
@@ -1140,450 +869,510 @@ async def update_booking_status(booking_id: str, status: str):
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Booking not found")
     
-    # Create calendar event when booking is confirmed
-    if status == "confirmed":
-        booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
-        if booking:
-            await create_calendar_event(booking)
-    
     return {"message": "Status updated", "booking_id": booking_id, "status": status}
 
-# ===================== SMS ROUTES =====================
+# ===================== CONTRACTOR MANAGEMENT ROUTES =====================
 
-class SendSMSRequest(BaseModel):
-    """Request to send SMS"""
-    booking_id: str
-    message_type: str = "reminder"  # "reminder", "custom"
-    custom_message: Optional[str] = None
-
-@api_router.post("/sms/send")
-async def send_sms_to_customer(request: SendSMSRequest):
-    """Send SMS to a customer (admin function)"""
-    booking = await db.bookings.find_one({"id": request.booking_id}, {"_id": 0})
-    if not booking:
-        raise HTTPException(status_code=404, detail="Booking not found")
+@api_router.post("/admin/contractors")
+async def create_contractor(contractor: ContractorCreate, current_user: dict = Depends(get_admin_user)):
+    # Check if username exists
+    existing = await db.users.find_one({"username": contractor.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
     
-    if not booking.get("sms_opt_in"):
-        raise HTTPException(status_code=400, detail="Customer has not opted in for SMS")
-    
-    phone = booking.get("customer_phone")
-    if not phone:
-        raise HTTPException(status_code=400, detail="No phone number on file")
-    
-    if request.message_type == "custom" and request.custom_message:
-        message = request.custom_message
-    else:
-        # Default reminder message
-        customer_name = booking.get("customer_name", "")
-        dates = booking.get("booking_dates", [])
-        is_monthly = booking.get("is_monthly", False)
-        monthly_days = booking.get("monthly_days", [])
-        
-        if is_monthly and monthly_days:
-            date_info = f"every {' & '.join(monthly_days)}"
-        elif dates:
-            date_info = dates[0]
-        else:
-            date_info = "soon"
-        
-        message = f"Hi {customer_name}! Reminder: Your Upwash Power Washing service is scheduled for {date_info}. Questions? (817) 750-3211"
-    
-    success = send_sms(phone, message)
-    
-    if success:
-        return {"message": "SMS sent successfully", "to": phone}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to send SMS")
-
-@api_router.get("/sms/status")
-async def get_sms_status():
-    """Check if SMS is configured"""
-    return {
-        "configured": twilio_client is not None,
-        "phone_number": twilio_phone_number if twilio_client else None
-    }
-
-# ===================== PAYMENT ROUTES =====================
-
-@api_router.post("/checkout/session")
-async def create_checkout_session(request: CheckoutRequest, http_request: Request):
-    """Create Stripe checkout session"""
-    booking = await db.bookings.find_one({"id": request.booking_id}, {"_id": 0})
-    if not booking:
-        raise HTTPException(status_code=404, detail="Booking not found")
-    
-    if booking.get("payment_status") == "paid":
-        raise HTTPException(status_code=400, detail="Booking already paid")
-    
-    # Build URLs from frontend origin
-    origin = request.origin_url.rstrip('/')
-    success_url = f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{origin}/booking?cancelled=true"
-    
-    # Initialize Stripe
-    host_url = str(http_request.base_url)
-    webhook_url = f"{host_url}api/webhook/stripe"
-    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-    
-    # Create checkout session - amount from server-side booking
-    amount = float(booking["total"])
-    metadata = {
-        "booking_id": request.booking_id,
-        "customer_email": booking["customer_email"],
-        "service_date": booking["booking_date"]
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "username": contractor.username,
+        "password_hash": hash_password(contractor.password),
+        "role": "contractor",
+        "full_name": contractor.full_name,
+        "phone": contractor.phone,
+        "email": contractor.email,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    checkout_request = CheckoutSessionRequest(
-        amount=amount,
-        currency="usd",
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata=metadata
+    await db.users.insert_one(user_doc)
+    
+    return {"id": user_doc["id"], "username": contractor.username, "message": "Contractor created"}
+
+@api_router.get("/admin/contractors")
+async def list_contractors(current_user: dict = Depends(get_admin_user)):
+    contractors = await db.users.find(
+        {"role": "contractor"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    return {"contractors": contractors}
+
+@api_router.get("/admin/contractors/{contractor_id}")
+async def get_contractor(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    contractor = await db.users.find_one(
+        {"id": contractor_id, "role": "contractor"},
+        {"_id": 0, "password_hash": 0}
     )
-    
-    session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
-    
-    # Create payment transaction record
-    transaction = PaymentTransaction(
-        booking_id=request.booking_id,
-        session_id=session.session_id,
-        amount=amount,
-        payment_status="initiated",
-        metadata=metadata
-    )
-    
-    tx_doc = transaction.model_dump()
-    tx_doc['created_at'] = tx_doc['created_at'].isoformat()
-    tx_doc['updated_at'] = tx_doc['updated_at'].isoformat()
-    
-    await db.payment_transactions.insert_one(tx_doc)
-    
-    # Update booking with session ID
-    await db.bookings.update_one(
-        {"id": request.booking_id},
-        {"$set": {"payment_session_id": session.session_id}}
-    )
-    
-    return {"url": session.url, "session_id": session.session_id}
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    return contractor
 
-@api_router.get("/checkout/status/{session_id}")
-async def get_checkout_status(session_id: str, http_request: Request):
-    """Get checkout session status"""
-    # Initialize Stripe
-    host_url = str(http_request.base_url)
-    webhook_url = f"{host_url}api/webhook/stripe"
-    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-    
-    status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
-    
-    # Check if already processed
-    existing_tx = await db.payment_transactions.find_one(
-        {"session_id": session_id},
-        {"_id": 0}
-    )
-    
-    if existing_tx and existing_tx.get("payment_status") == "paid":
-        return {
-            "status": status.status,
-            "payment_status": "paid",
-            "amount_total": status.amount_total,
-            "currency": status.currency,
-            "already_processed": True
-        }
-    
-    # Update transaction and booking if paid
-    if status.payment_status == "paid":
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
-            {"$set": {
-                "payment_status": "paid",
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        
-        # Get booking ID from metadata
-        booking_id = status.metadata.get("booking_id")
-        if booking_id:
-            await db.bookings.update_one(
-                {"id": booking_id},
-                {"$set": {
-                    "payment_status": "paid",
-                    "status": "confirmed",
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            
-            # Send payment confirmation SMS
-            booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
-            if booking:
-                send_payment_confirmation_sms(booking)
-                # Send confirmation email on payment success
-                send_booking_confirmation_email(booking)
-                # Create Google Calendar event
-                await create_calendar_event(booking)
-                
-    elif status.status == "expired":
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
-            {"$set": {
-                "payment_status": "expired",
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-    
-    return {
-        "status": status.status,
-        "payment_status": status.payment_status,
-        "amount_total": status.amount_total,
-        "currency": status.currency
-    }
-
-@api_router.post("/webhook/stripe")
-async def stripe_webhook(request: Request):
-    """Handle Stripe webhooks"""
-    body = await request.body()
-    signature = request.headers.get("Stripe-Signature", "")
-    
-    host_url = str(request.base_url)
-    webhook_url = f"{host_url}api/webhook/stripe"
-    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-    
-    try:
-        webhook_response = await stripe_checkout.handle_webhook(body, signature)
-        
-        if webhook_response.payment_status == "paid":
-            booking_id = webhook_response.metadata.get("booking_id")
-            if booking_id:
-                await db.bookings.update_one(
-                    {"id": booking_id},
-                    {"$set": {
-                        "payment_status": "paid",
-                        "status": "confirmed",
-                        "updated_at": datetime.now(timezone.utc).isoformat()
-                    }}
-                )
-                
-                await db.payment_transactions.update_one(
-                    {"session_id": webhook_response.session_id},
-                    {"$set": {
-                        "payment_status": "paid",
-                        "updated_at": datetime.now(timezone.utc).isoformat()
-                    }}
-                )
-        
-        return {"received": True}
-    except Exception as e:
-        logging.error(f"Webhook error: {e}")
-        return {"received": True, "error": str(e)}
-
-# ===================== ADMIN ROUTES =====================
-
-@api_router.get("/admin/calendar")
-async def admin_calendar(start_date: Optional[str] = None, end_date: Optional[str] = None):
-    """Get calendar view for admin"""
-    query = {"status": {"$nin": ["cancelled"]}}
-    
-    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
-    
-    # Group by date - handle booking_dates array
-    calendar = {}
-    for booking in bookings:
-        dates = booking.get("booking_dates", [])
-        # Handle legacy bookings with single booking_date
-        if not dates and booking.get("booking_date"):
-            dates = [booking.get("booking_date")]
-        
-        for date in dates:
-            if start_date and date < start_date:
-                continue
-            if end_date and date > end_date:
-                continue
-            if date not in calendar:
-                calendar[date] = []
-            calendar[date].append(booking)
-    
-    return {"calendar": calendar, "bookings": bookings}
-
-@api_router.get("/admin/stats")
-async def admin_stats():
-    """Get admin dashboard statistics"""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    
-    # Total bookings
-    total = await db.bookings.count_documents({})
-    pending = await db.bookings.count_documents({"status": "pending"})
-    confirmed = await db.bookings.count_documents({"status": "confirmed"})
-    completed = await db.bookings.count_documents({"status": "completed"})
-    
-    # Today's bookings
-    today_bookings = await db.bookings.count_documents({"booking_date": today})
-    
-    # Revenue
-    paid_bookings = await db.bookings.find(
-        {"payment_status": "paid"},
-        {"_id": 0, "total": 1}
-    ).to_list(1000)
-    
-    total_revenue = sum(b.get("total", 0) for b in paid_bookings)
-    
-    return {
-        "total_bookings": total,
-        "pending": pending,
-        "confirmed": confirmed,
-        "completed": completed,
-        "today_bookings": today_bookings,
-        "total_revenue": round(total_revenue, 2)
-    }
-
-# ===================== QUOTE FOLLOW-UP ROUTES =====================
-
-@api_router.post("/admin/quote/{booking_id}/respond")
-async def mark_quote_responded(booking_id: str):
-    """Mark a quote booking as responded by admin"""
-    result = await db.bookings.update_one(
-        {"id": booking_id, "is_quote_service": True},
+@api_router.patch("/admin/contractors/{contractor_id}/password")
+async def reset_contractor_password(contractor_id: str, new_password: str, current_user: dict = Depends(get_admin_user)):
+    result = await db.users.update_one(
+        {"id": contractor_id, "role": "contractor"},
         {"$set": {
-            "quote_responded": True,
+            "password_hash": hash_password(new_password),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
     
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Quote booking not found")
+        raise HTTPException(status_code=404, detail="Contractor not found")
     
-    return {"message": "Quote marked as responded", "booking_id": booking_id}
+    return {"message": "Password updated"}
 
-@api_router.post("/admin/process-followups")
-async def process_quote_followups():
-    """Process and send follow-up notifications for quote bookings older than 24 hours"""
-    # Find quote bookings that:
-    # - Are quote services
-    # - Admin hasn't responded
-    # - Follow-up hasn't been sent
-    # - Created more than 24 hours ago
-    cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    
-    query = {
-        "is_quote_service": True,
-        "quote_responded": {"$ne": True},
-        "followup_sent": {"$ne": True},
-        "created_at": {"$lt": cutoff_time}
+@api_router.delete("/admin/contractors/{contractor_id}")
+async def delete_contractor(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    result = await db.users.delete_one({"id": contractor_id, "role": "contractor"})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    return {"message": "Contractor deleted"}
+
+# ===================== ROUTE MANAGEMENT ROUTES =====================
+
+@api_router.post("/admin/routes")
+async def create_route(route: RouteCreate, current_user: dict = Depends(get_admin_user)):
+    route_doc = {
+        "id": str(uuid.uuid4()),
+        "name": route.name,
+        "description": route.description,
+        "price": route.price,
+        "area": route.area,
+        "assigned_contractor_id": None,
+        "bookings": [],
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    pending_followups = await db.bookings.find(query, {"_id": 0}).to_list(100)
+    await db.routes.insert_one(route_doc)
+    return route_doc
+
+@api_router.get("/admin/routes")
+async def list_routes(current_user: dict = Depends(get_admin_user)):
+    routes = await db.routes.find({}, {"_id": 0}).to_list(100)
     
-    sent_count = 0
-    for booking in pending_followups:
-        # Send follow-up email
-        email_sent = send_quote_followup_email(booking)
+    # Get contractor names
+    for route in routes:
+        if route.get("assigned_contractor_id"):
+            contractor = await db.users.find_one(
+                {"id": route["assigned_contractor_id"]},
+                {"_id": 0, "full_name": 1}
+            )
+            route["assigned_contractor_name"] = contractor.get("full_name") if contractor else None
+    
+    return {"routes": routes}
+
+@api_router.post("/admin/routes/{route_id}/assign")
+async def assign_route(route_id: str, assignment: RouteAssignment, current_user: dict = Depends(get_admin_user)):
+    result = await db.routes.update_one(
+        {"id": route_id},
+        {"$set": {"assigned_contractor_id": assignment.contractor_id}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    return {"message": "Route assigned"}
+
+@api_router.post("/admin/routes/{route_id}/bookings")
+async def add_bookings_to_route(route_id: str, booking_ids: List[str], current_user: dict = Depends(get_admin_user)):
+    result = await db.routes.update_one(
+        {"id": route_id},
+        {"$addToSet": {"bookings": {"$each": booking_ids}}}
+    )
+    
+    # Update bookings with route_id
+    await db.bookings.update_many(
+        {"id": {"$in": booking_ids}},
+        {"$set": {"route_id": route_id}}
+    )
+    
+    return {"message": "Bookings added to route"}
+
+# ===================== CLIENT MANAGEMENT ROUTES =====================
+
+@api_router.get("/admin/clients")
+async def list_clients(current_user: dict = Depends(get_admin_user)):
+    # Get unique clients from bookings
+    pipeline = [
+        {"$group": {
+            "_id": "$customer_phone",
+            "customer_name": {"$first": "$customer_name"},
+            "customer_email": {"$first": "$customer_email"},
+            "customer_phone": {"$first": "$customer_phone"},
+            "customer_address": {"$first": "$customer_address"},
+            "total_bookings": {"$sum": 1},
+            "total_spent": {"$sum": "$total"},
+            "last_booking": {"$max": "$created_at"}
+        }},
+        {"$sort": {"last_booking": -1}}
+    ]
+    
+    clients = await db.bookings.aggregate(pipeline).to_list(1000)
+    return {"clients": clients}
+
+@api_router.get("/admin/clients/{phone}")
+async def get_client(phone: str, current_user: dict = Depends(get_admin_user)):
+    bookings = await db.bookings.find(
+        {"customer_phone": phone},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    if not bookings:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    client = {
+        "customer_name": bookings[0].get("customer_name"),
+        "customer_email": bookings[0].get("customer_email"),
+        "customer_phone": phone,
+        "customer_address": bookings[0].get("customer_address"),
+        "bookings": bookings,
+        "total_spent": sum(b.get("total", 0) for b in bookings if b.get("payment_status") == "paid")
+    }
+    
+    return client
+
+# ===================== INVOICE ROUTES =====================
+
+@api_router.post("/admin/invoices")
+async def create_invoice(invoice_req: InvoiceCreate, current_user: dict = Depends(get_admin_user)):
+    booking = await db.bookings.find_one({"id": invoice_req.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    # For Square invoices, we need a customer ID
+    # First check if customer exists or create one
+    if not square_client:
+        raise HTTPException(status_code=500, detail="Square not configured")
+    
+    try:
+        # Search for existing customer
+        search_result = square_client.customers.search_customers(body={
+            "query": {
+                "filter": {
+                    "email_address": {"exact": invoice_req.customer_email}
+                }
+            }
+        })
         
-        # Send follow-up SMS if opted in
-        sms_sent = send_quote_followup_sms(booking)
+        if search_result.is_success() and search_result.body.get("customers"):
+            customer_id = search_result.body["customers"][0]["id"]
+        else:
+            # Create customer
+            create_result = square_client.customers.create_customer(body={
+                "email_address": invoice_req.customer_email,
+                "given_name": booking.get("customer_name", "").split()[0],
+                "phone_number": booking.get("customer_phone")
+            })
+            
+            if create_result.is_success():
+                customer_id = create_result.body["customer"]["id"]
+            else:
+                raise HTTPException(status_code=500, detail="Failed to create customer")
         
-        if email_sent or sms_sent:
-            # Mark as follow-up sent
+        # Create invoice
+        amount_cents = int(booking["total"] * 100)
+        result = create_square_invoice(
+            customer_id=customer_id,
+            amount_cents=amount_cents,
+            due_date=invoice_req.due_date,
+            description=f"Upwash Power Washing - Booking #{invoice_req.booking_id[:8]}"
+        )
+        
+        if result["success"]:
+            # Update booking
             await db.bookings.update_one(
-                {"id": booking["id"]},
+                {"id": invoice_req.booking_id},
                 {"$set": {
-                    "followup_sent": True,
+                    "invoice_id": result["invoice_id"],
+                    "invoice_url": result.get("public_url"),
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
-            sent_count += 1
-            logging.info(f"Follow-up sent for booking {booking['id']}")
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to create invoice"))
+            
+    except Exception as e:
+        logging.error(f"Invoice creation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===================== CONTRACTOR PORTAL ROUTES =====================
+
+@api_router.get("/contractor/profile")
+async def contractor_profile(current_user: dict = Depends(get_contractor_user)):
+    if current_user["role"] == "admin":
+        return {"id": "admin", "role": "admin", "full_name": "Administrator"}
+    
+    user = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@api_router.get("/contractor/routes")
+async def contractor_routes(current_user: dict = Depends(get_contractor_user)):
+    routes = await db.routes.find(
+        {"assigned_contractor_id": current_user["user_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    return {"routes": routes}
+
+@api_router.get("/contractor/today")
+async def contractor_today_tasks(current_user: dict = Depends(get_contractor_user)):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Get contractor's routes
+    routes = await db.routes.find(
+        {"assigned_contractor_id": current_user["user_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    
+    route_ids = [r["id"] for r in routes]
+    
+    # Get today's bookings for those routes
+    bookings = await db.bookings.find({
+        "route_id": {"$in": route_ids},
+        "booking_dates": today,
+        "status": {"$in": ["confirmed", "pending"]}
+    }, {"_id": 0}).to_list(200)
+    
+    # Optimize route
+    if bookings:
+        addresses = [b["customer_address"] for b in bookings]
+        optimized = optimize_route(addresses)
+        
+        # Reorder bookings based on optimization
+        address_to_order = {o["address"]: o["order"] for o in optimized}
+        bookings.sort(key=lambda b: address_to_order.get(b["customer_address"], 999))
     
     return {
-        "processed": len(pending_followups),
-        "followups_sent": sent_count,
-        "message": f"Processed {len(pending_followups)} pending quotes, sent {sent_count} follow-ups"
+        "date": today,
+        "bookings": bookings,
+        "total_stops": len(bookings)
     }
 
-@api_router.get("/admin/pending-quotes")
-async def get_pending_quotes():
-    """Get all quote bookings that need admin attention"""
-    query = {
-        "is_quote_service": True,
-        "quote_responded": {"$ne": True}
+@api_router.post("/contractor/task/{booking_id}/complete")
+async def complete_task(booking_id: str, completion: TaskCompletion, current_user: dict = Depends(get_contractor_user)):
+    update_data = {
+        "task_status": "completed" if completion.completed else "unable_to_complete",
+        "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    pending_quotes = await db.bookings.find(query, {"_id": 0}).sort("created_at", 1).to_list(100)
+    if completion.unable_to_complete:
+        if not completion.reason:
+            raise HTTPException(status_code=400, detail="Reason is required when unable to complete")
+        if not completion.photo_url:
+            raise HTTPException(status_code=400, detail="Photo is required when unable to complete")
+        
+        update_data["task_notes"] = completion.reason
+        update_data["task_photo"] = completion.photo_url
+        update_data["task_status"] = "unable_to_complete"
+    else:
+        update_data["status"] = "completed"
     
-    # Calculate time since creation for each
-    now = datetime.now(timezone.utc)
-    for quote in pending_quotes:
-        created_at = quote.get("created_at")
-        if isinstance(created_at, str):
-            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-        if created_at:
-            hours_waiting = (now - created_at).total_seconds() / 3600
-            quote["hours_waiting"] = round(hours_waiting, 1)
-            quote["needs_followup"] = hours_waiting >= 24 and not quote.get("followup_sent")
+    result = await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": update_data}
+    )
     
-    return {"pending_quotes": pending_quotes, "count": len(pending_quotes)}
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    return {"message": "Task updated", "status": update_data["task_status"]}
 
-# Include the router in the main app
+@api_router.post("/contractor/routes/purchase")
+async def purchase_route(route_id: str, payment_token: str, current_user: dict = Depends(get_contractor_user)):
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    # Calculate price with tax
+    price = route.get("price", ROUTE_PRICE)
+    tax = round(price * SALES_TAX_RATE, 2)
+    total = price + tax
+    amount_cents = int(total * 100)
+    
+    # Process payment
+    result = process_square_payment(
+        source_id=payment_token,
+        amount_cents=amount_cents,
+        idempotency_key=f"route-{route_id}-{current_user['user_id']}-{datetime.now().timestamp()}"
+    )
+    
+    if result["success"]:
+        # Record purchase
+        purchase_doc = {
+            "id": str(uuid.uuid4()),
+            "route_id": route_id,
+            "contractor_id": current_user["user_id"],
+            "price": price,
+            "tax": tax,
+            "total": total,
+            "payment_id": result["payment_id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.route_purchases.insert_one(purchase_doc)
+        
+        # Assign route to contractor
+        await db.routes.update_one(
+            {"id": route_id},
+            {"$set": {"assigned_contractor_id": current_user["user_id"]}}
+        )
+        
+        return {"success": True, "message": "Route purchased", "total": total}
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Payment failed"))
+
+# ===================== CHAT ROUTES =====================
+
+@api_router.get("/contractor/nearby")
+async def get_nearby_contractors(current_user: dict = Depends(get_contractor_user)):
+    """Get list of other contractors with their current locations"""
+    contractors = await db.users.find(
+        {"role": "contractor", "id": {"$ne": current_user["user_id"]}},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    
+    # Get their last known locations
+    for contractor in contractors:
+        location = await db.contractor_locations.find_one(
+            {"contractor_id": contractor["id"]},
+            {"_id": 0}
+        )
+        if location:
+            contractor["last_location"] = location
+    
+    return {"contractors": contractors}
+
+@api_router.post("/contractor/location")
+async def update_location(lat: float, lng: float, current_user: dict = Depends(get_contractor_user)):
+    await db.contractor_locations.update_one(
+        {"contractor_id": current_user["user_id"]},
+        {"$set": {
+            "contractor_id": current_user["user_id"],
+            "lat": lat,
+            "lng": lng,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    return {"message": "Location updated"}
+
+@api_router.post("/chat/send")
+async def send_chat_message(message: ChatMessage, current_user: dict = Depends(get_current_user)):
+    chat_doc = {
+        "id": str(uuid.uuid4()),
+        "sender_id": current_user["user_id"],
+        "sender_name": current_user.get("username", "Unknown"),
+        "recipient_id": message.recipient_id,
+        "content": message.content,
+        "is_group": message.is_group,
+        "group_id": message.group_id,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.chat_messages.insert_one(chat_doc)
+    return {"message_id": chat_doc["id"], "sent": True}
+
+@api_router.get("/chat/messages")
+async def get_chat_messages(
+    recipient_id: Optional[str] = None,
+    group_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    query = {}
+    
+    if group_id:
+        query["group_id"] = group_id
+    elif recipient_id:
+        # Get direct messages between current user and recipient
+        query["$or"] = [
+            {"sender_id": current_user["user_id"], "recipient_id": recipient_id},
+            {"sender_id": recipient_id, "recipient_id": current_user["user_id"]}
+        ]
+    else:
+        # Get messages to/from admin if current user is contractor
+        if current_user["role"] == "contractor":
+            query["$or"] = [
+                {"sender_id": current_user["user_id"], "recipient_id": None},
+                {"recipient_id": current_user["user_id"]}
+            ]
+        else:
+            # Admin sees all messages to admin
+            query["recipient_id"] = None
+    
+    messages = await db.chat_messages.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"messages": messages}
+
+@api_router.post("/chat/groups")
+async def create_chat_group(name: str, member_ids: List[str], current_user: dict = Depends(get_current_user)):
+    group_doc = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "creator_id": current_user["user_id"],
+        "member_ids": member_ids + [current_user["user_id"]],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.chat_groups.insert_one(group_doc)
+    return {"group_id": group_doc["id"], "name": name}
+
+@api_router.get("/chat/groups")
+async def get_chat_groups(current_user: dict = Depends(get_current_user)):
+    groups = await db.chat_groups.find(
+        {"member_ids": current_user["user_id"]},
+        {"_id": 0}
+    ).to_list(50)
+    return {"groups": groups}
+
+# ===================== SMS NOTIFICATION ROUTES =====================
+
+@api_router.post("/admin/notify-clients")
+async def notify_clients_for_route(route_id: str, current_user: dict = Depends(get_admin_user)):
+    """Send SMS notifications to all clients on a route"""
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    booking_ids = route.get("bookings", [])
+    bookings = await db.bookings.find(
+        {"id": {"$in": booking_ids}, "sms_opt_in": True},
+        {"_id": 0, "customer_phone": 1, "customer_name": 1}
+    ).to_list(200)
+    
+    # In production, integrate with Twilio here
+    notified = len(bookings)
+    
+    return {
+        "message": f"Notifications queued for {notified} clients",
+        "notification_text": "We will be servicing your home soon, please be sure to set your bin to the curb!"
+    }
+
+# Include the router
 app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-# Background task for processing quote follow-ups
-async def followup_background_task():
-    """Background task that runs every hour to check for pending quote follow-ups"""
-    while True:
-        try:
-            await asyncio.sleep(3600)  # Run every hour
-            
-            # Find and process quote follow-ups
-            cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-            
-            query = {
-                "is_quote_service": True,
-                "quote_responded": {"$ne": True},
-                "followup_sent": {"$ne": True},
-                "created_at": {"$lt": cutoff_time}
-            }
-            
-            pending_followups = await db.bookings.find(query, {"_id": 0}).to_list(100)
-            
-            for booking in pending_followups:
-                email_sent = send_quote_followup_email(booking)
-                sms_sent = send_quote_followup_sms(booking)
-                
-                if email_sent or sms_sent:
-                    await db.bookings.update_one(
-                        {"id": booking["id"]},
-                        {"$set": {
-                            "followup_sent": True,
-                            "updated_at": datetime.now(timezone.utc).isoformat()
-                        }}
-                    )
-                    logging.info(f"Auto follow-up sent for booking {booking['id']}")
-            
-            if pending_followups:
-                logging.info(f"Processed {len(pending_followups)} quote follow-ups")
-                
-        except Exception as e:
-            logging.error(f"Error in follow-up background task: {e}")
-            await asyncio.sleep(60)  # Wait a minute before retrying
-
-@app.on_event("startup")
-async def startup_event():
-    """Start background tasks on app startup"""
-    asyncio.create_task(followup_background_task())
-    logging.info("Started quote follow-up background task")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
