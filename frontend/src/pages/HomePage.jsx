@@ -27,6 +27,15 @@ const services = [
     color: "bg-green-500"
   },
   {
+    id: "scent_bomb",
+    name: "Scent Bombs",
+    description: "Deodorizing scent treatment for your bins - No travel fee!",
+    price: "$3.50 each",
+    icon: Droplets,
+    color: "bg-pink-500",
+    link: "/scent-bombs"
+  },
+  {
     id: "patio",
     name: "Patio Cleaning",
     description: "Restore your outdoor living space",
