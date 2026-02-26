@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Star,
   Home,
-  HardHat
+  HardHat,
+  Building2
 } from "lucide-react";
 
 const ServicesPage = () => {
@@ -85,6 +86,18 @@ const ServicesPage = () => {
         { label: "Custom Quote", price: null, isQuote: true }
       ],
       features: ["Debris removal", "Surface cleaning", "Window washing", "Final walkthrough"],
+      isQuote: true
+    },
+    {
+      id: "commercial",
+      name: "Commercial Properties",
+      description: "Professional power washing for schools, apartments, office buildings, and commercial complexes. Customized solutions for large-scale properties.",
+      icon: Building2,
+      color: "bg-indigo-500",
+      pricing: [
+        { label: "Custom Quote", price: null, isQuote: true }
+      ],
+      features: ["Schools & universities", "Apartment complexes", "Office buildings", "Retail centers"],
       isQuote: true
     }
   ];
