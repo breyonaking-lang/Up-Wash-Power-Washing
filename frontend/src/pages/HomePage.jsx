@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "../components/ui/button";
+import DailyBibleVerse from "../components/shared/DailyBibleVerse";
 import { 
   Trash2, 
   Warehouse, 
