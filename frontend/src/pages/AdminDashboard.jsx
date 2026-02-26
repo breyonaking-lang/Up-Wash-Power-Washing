@@ -7,7 +7,8 @@ import {
   Clock, UserPlus, Key, FileText, Send, Route as RouteIcon,
   ChevronRight, Search, Filter, Eye, Edit, Trash2, Plus, Bell,
   Copy, ExternalLink, Phone, Mail, Navigation, Inbox, Building2,
-  Home, Car, Sparkles, Warehouse, HardHat, Calendar as CalendarIcon
+  Home, Car, Sparkles, Warehouse, HardHat, Calendar as CalendarIcon,
+  AlertCircle, ChevronLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DailyBibleVerse from '../components/shared/DailyBibleVerse';
