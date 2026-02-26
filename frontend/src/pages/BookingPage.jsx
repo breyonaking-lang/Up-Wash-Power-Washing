@@ -297,7 +297,7 @@ const BookingPage = () => {
   const canProceedToStep2 = hasSelectedServices;
   const canProceedToStep3 = bookingMode === "single" 
     ? selectedDate !== null 
-    : monthlyDays.length === 2 && monthlyStartDate !== null;
+    : monthlyServiceDays.length === serviceDaysPerMonth && monthlyStartDate !== null;
 
   const getBookingDates = () => {
     if (bookingMode === "single" && selectedDate) {
@@ -362,7 +362,8 @@ const BookingPage = () => {
         services,
         booking_dates: getBookingDates(),
         is_monthly: bookingMode === "monthly",
-        monthly_days: bookingMode === "monthly" ? monthlyDays : null,
+        monthly_service_days: bookingMode === "monthly" ? monthlyServiceDays : null,
+        service_days_per_month: bookingMode === "monthly" ? serviceDaysPerMonth : null,
         sms_opt_in: smsOptIn,
         recurring_payment: savePaymentMethod,
         notes: customerInfo.notes,
