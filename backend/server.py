@@ -1222,6 +1222,74 @@ async def complete_task(booking_id: str, completion: TaskCompletion, current_use
     
     return {"message": "Task updated", "status": update_data["task_status"]}
 
+# ===================== CONTRACTOR NOTIFICATIONS =====================
+
+@api_router.get("/contractor/notifications")
+async def get_contractor_notifications(current_user: dict = Depends(get_contractor_user)):
+    notifications = await db.notifications.find(
+        {"contractor_id": current_user["user_id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    unread_count = len([n for n in notifications if not n.get("read")])
+    
+    return {"notifications": notifications, "unread_count": unread_count}
+
+@api_router.patch("/contractor/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, current_user: dict = Depends(get_contractor_user)):
+    await db.notifications.update_one(
+        {"id": notification_id, "contractor_id": current_user["user_id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "Marked as read"}
+
+@api_router.patch("/contractor/notifications/read-all")
+async def mark_all_notifications_read(current_user: dict = Depends(get_contractor_user)):
+    await db.notifications.update_many(
+        {"contractor_id": current_user["user_id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "All marked as read"}
+
+# Admin can send custom notifications to contractors
+class NotificationCreate(BaseModel):
+    contractor_id: str
+    title: str
+    message: str
+
+@api_router.post("/admin/notifications/send")
+async def send_notification_to_contractor(notif: NotificationCreate, current_user: dict = Depends(get_admin_user)):
+    notification = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": notif.contractor_id,
+        "type": "admin_message",
+        "title": notif.title,
+        "message": notif.message,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    return {"message": "Notification sent", "id": notification["id"]}
+
+@api_router.post("/admin/notifications/broadcast")
+async def broadcast_notification(title: str, message: str, current_user: dict = Depends(get_admin_user)):
+    """Send notification to all contractors"""
+    contractors = await db.users.find({"role": "contractor"}, {"_id": 0, "id": 1}).to_list(100)
+    
+    for contractor in contractors:
+        notification = {
+            "id": str(uuid.uuid4()),
+            "contractor_id": contractor["id"],
+            "type": "broadcast",
+            "title": title,
+            "message": message,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(notification)
+    
+    return {"message": f"Notification sent to {len(contractors)} contractors"}
+
 @api_router.post("/contractor/routes/purchase")
 async def purchase_route(route_id: str, payment_token: str, current_user: dict = Depends(get_contractor_user)):
     route = await db.routes.find_one({"id": route_id}, {"_id": 0})
