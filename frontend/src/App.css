@@ -1,34 +1,79 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
-}
-
-.App-header {
-    background-color: #0f0f10;
+.App {
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
+}
+
+/* Hero section styles */
+.hero-gradient {
+    background: linear-gradient(135deg, #007AFF 0%, #00D4FF 100%);
+}
+
+/* Price tag styling */
+.price-tag {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+}
+
+/* Calendar day selected */
+.rdp-day_selected {
+    background-color: #007AFF !important;
+}
+
+/* Booking wizard step indicator */
+.step-indicator {
+    transition: all 0.3s ease;
+}
+
+.step-indicator.active {
+    background-color: #007AFF;
     color: white;
 }
 
-.App-link {
-    color: #61dafb;
+.step-indicator.completed {
+    background-color: #34C759;
+    color: white;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Service selection card */
+.service-select-card {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.service-select-card:hover {
+    border-color: #007AFF;
+}
+
+.service-select-card.selected {
+    border-color: #007AFF;
+    background-color: rgba(0, 122, 255, 0.05);
+}
+
+/* Time slot button */
+.time-slot {
+    transition: all 0.2s ease;
+}
+
+.time-slot:hover:not(:disabled) {
+    background-color: #007AFF;
+    color: white;
+}
+
+.time-slot.selected {
+    background-color: #007AFF;
+    color: white;
+}
+
+.time-slot:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Admin dashboard */
+.admin-card {
+    transition: all 0.2s ease;
+}
+
+.admin-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
