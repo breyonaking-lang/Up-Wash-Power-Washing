@@ -526,8 +526,10 @@ def create_square_invoice(customer_id: str, amount_cents: int, due_date: str, de
     
     try:
         # Create order first
-        order_body = {
-            "order": {
+        order_response = square_client.orders.create(
+            location_id=square_location_id,
+            idempotency_key=str(uuid.uuid4()),
+            order={
                 "location_id": square_location_id,
                 "line_items": [{
                     "name": description,
@@ -537,20 +539,18 @@ def create_square_invoice(customer_id: str, amount_cents: int, due_date: str, de
                         "currency": "USD"
                     }
                 }]
-            },
-            "idempotency_key": str(uuid.uuid4())
-        }
+            }
+        )
         
-        order_result = square_client.orders.create_order(body=order_body)
-        
-        if not order_result.is_success():
+        if not order_response.order:
             return {"success": False, "error": "Failed to create order"}
         
-        order_id = order_result.body["order"]["id"]
+        order_id = order_response.order.id
         
         # Create invoice
-        invoice_body = {
-            "invoice": {
+        invoice_response = square_client.invoices.create(
+            idempotency_key=str(uuid.uuid4()),
+            invoice={
                 "location_id": square_location_id,
                 "order_id": order_id,
                 "primary_recipient": {
@@ -566,29 +566,24 @@ def create_square_invoice(customer_id: str, amount_cents: int, due_date: str, de
                     "square_gift_card": False,
                     "bank_account": True
                 }
-            },
-            "idempotency_key": str(uuid.uuid4())
-        }
+            }
+        )
         
-        invoice_result = square_client.invoices.create_invoice(body=invoice_body)
-        
-        if invoice_result.is_success():
-            invoice = invoice_result.body["invoice"]
+        if invoice_response.invoice:
+            invoice = invoice_response.invoice
             
             # Publish invoice
-            publish_result = square_client.invoices.publish_invoice(
-                invoice_id=invoice["id"],
-                body={
-                    "version": invoice["version"],
-                    "idempotency_key": str(uuid.uuid4())
-                }
+            publish_response = square_client.invoices.publish(
+                invoice_id=invoice.id,
+                version=invoice.version,
+                idempotency_key=str(uuid.uuid4())
             )
             
-            if publish_result.is_success():
+            if publish_response.invoice:
                 return {
                     "success": True,
-                    "invoice_id": invoice["id"],
-                    "public_url": publish_result.body["invoice"].get("public_url")
+                    "invoice_id": invoice.id,
+                    "public_url": publish_response.invoice.public_url
                 }
         
         return {"success": False, "error": "Failed to create invoice"}
