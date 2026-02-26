@@ -37,7 +37,6 @@ square_client = None
 if square_access_token:
     square_client = SquareClient(
         access_token=square_access_token,
-        environment=square_environment
     )
 
 # Google Maps setup
