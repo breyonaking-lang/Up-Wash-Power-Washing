@@ -490,33 +490,29 @@ def process_square_payment(source_id: str, amount_cents: int, idempotency_key: s
         return {"success": False, "error": "Square not configured"}
     
     try:
-        body = {
-            "source_id": source_id,
-            "idempotency_key": idempotency_key,
-            "amount_money": {
+        response = square_client.payments.create(
+            source_id=source_id,
+            idempotency_key=idempotency_key,
+            amount_money={
                 "amount": amount_cents,
                 "currency": "USD"
             },
-            "location_id": square_location_id,
-            "autocomplete": True
-        }
+            location_id=square_location_id,
+            autocomplete=True
+        )
         
-        if customer_email:
-            body["buyer_email_address"] = customer_email
-        
-        result = square_client.payments.create_payment(body=body)
-        
-        if result.is_success():
-            payment = result.body.get("payment", {})
+        if response.payment:
+            payment = response.payment
             return {
                 "success": True,
-                "payment_id": payment.get("id"),
-                "status": payment.get("status"),
-                "receipt_url": payment.get("receipt_url")
+                "payment_id": payment.id,
+                "status": payment.status,
+                "receipt_url": payment.receipt_url
             }
         else:
-            errors = result.errors
-            error_msg = errors[0].get("detail", "Payment failed") if errors else "Payment failed"
+            error_msg = "Payment failed"
+            if hasattr(response, 'errors') and response.errors:
+                error_msg = response.errors[0].detail if hasattr(response.errors[0], 'detail') else str(response.errors[0])
             return {"success": False, "error": error_msg}
             
     except Exception as e:
