@@ -902,6 +902,204 @@ async def update_booking_status(booking_id: str, status: str, current_user: dict
     
     return {"message": "Status updated", "booking_id": booking_id, "status": status}
 
+# ===================== ADMIN CALENDAR & SUBSCRIPTION ROUTES =====================
+
+@api_router.get("/admin/calendar")
+async def get_admin_calendar(month: Optional[int] = None, year: Optional[int] = None, current_user: dict = Depends(get_admin_user)):
+    """Get all bookings for calendar view"""
+    today = datetime.now(timezone.utc)
+    target_month = month if month else today.month
+    target_year = year if year else today.year
+    
+    # Get all bookings
+    bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
+    
+    # Organize by date
+    calendar_data = {}
+    for booking in bookings:
+        for date_str in booking.get("booking_dates", []):
+            if date_str not in calendar_data:
+                calendar_data[date_str] = []
+            calendar_data[date_str].append({
+                "id": booking.get("id"),
+                "customer_name": booking.get("customer_name"),
+                "services": booking.get("services"),
+                "status": booking.get("status"),
+                "payment_status": booking.get("payment_status"),
+                "is_monthly": booking.get("is_monthly", False),
+                "address": booking.get("customer_address"),
+                "route_id": booking.get("route_id"),
+                "assigned_contractor_id": booking.get("assigned_contractor_id")
+            })
+    
+    # Get routes for today
+    today_str = today.strftime("%Y-%m-%d")
+    routes = await db.routes.find({}, {"_id": 0}).to_list(100)
+    
+    # Get contractors
+    contractors = await db.users.find({"role": "contractor"}, {"_id": 0, "password_hash": 0}).to_list(100)
+    contractor_map = {c["id"]: c.get("full_name", c.get("username")) for c in contractors}
+    
+    # Add contractor names to routes
+    for route in routes:
+        if route.get("assigned_contractor_id"):
+            route["contractor_name"] = contractor_map.get(route["assigned_contractor_id"], "Unassigned")
+    
+    return {
+        "calendar": calendar_data,
+        "today": today_str,
+        "routes": routes,
+        "month": target_month,
+        "year": target_year
+    }
+
+@api_router.get("/admin/unpaid-subscriptions")
+async def get_unpaid_subscriptions(current_user: dict = Depends(get_admin_user)):
+    """Get subscriptions with failed payments"""
+    unpaid = await db.bookings.find({
+        "is_monthly": True,
+        "subscription_status": "payment_failed"
+    }, {"_id": 0}).sort("updated_at", -1).to_list(100)
+    
+    return {"unpaid_subscriptions": unpaid}
+
+@api_router.patch("/admin/subscriptions/{booking_id}/status")
+async def update_subscription_status(booking_id: str, status: str, current_user: dict = Depends(get_admin_user)):
+    """Update subscription status (active, payment_failed, cancelled)"""
+    valid_statuses = ["active", "payment_failed", "cancelled"]
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail="Invalid subscription status")
+    
+    update_data = {
+        "subscription_status": status,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # If cancelling, also remove from routes
+    if status == "cancelled":
+        update_data["route_id"] = None
+    
+    result = await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    return {"message": f"Subscription status updated to {status}"}
+
+@api_router.post("/admin/process-subscription-payments")
+async def process_subscription_payments(current_user: dict = Depends(get_admin_user)):
+    """Process payments for subscriptions due in 3 days (manual trigger)"""
+    today = datetime.now(timezone.utc)
+    three_days_ahead = (today + timedelta(days=3)).strftime("%Y-%m-%d")
+    
+    # Find subscriptions due for payment
+    subscriptions = await db.bookings.find({
+        "is_monthly": True,
+        "subscription_status": "active",
+        "next_payment_date": three_days_ahead
+    }, {"_id": 0}).to_list(100)
+    
+    results = {
+        "processed": 0,
+        "failed": 0,
+        "notifications_sent": 0
+    }
+    
+    for sub in subscriptions:
+        # In production, process payment here using stored card
+        # For now, mark as needing notification
+        
+        # Create notification for customer about upcoming charge
+        notification = {
+            "id": str(uuid.uuid4()),
+            "booking_id": sub["id"],
+            "customer_phone": sub.get("customer_phone"),
+            "customer_email": sub.get("customer_email"),
+            "type": "payment_reminder",
+            "message": f"Your subscription service is scheduled in 3 days. Payment of ${sub.get('total', 0):.2f} will be processed.",
+            "sent": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.customer_notifications.insert_one(notification)
+        results["notifications_sent"] += 1
+    
+    return results
+
+@api_router.post("/admin/mark-payment-failed/{booking_id}")
+async def mark_subscription_payment_failed(booking_id: str, current_user: dict = Depends(get_admin_user)):
+    """Mark a subscription payment as failed and notify customer"""
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    # Update subscription status
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {
+            "subscription_status": "payment_failed",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Create notification for customer
+    notification = {
+        "id": str(uuid.uuid4()),
+        "booking_id": booking_id,
+        "customer_phone": booking.get("customer_phone"),
+        "customer_email": booking.get("customer_email"),
+        "type": "payment_failed",
+        "message": f"Your subscription payment failed. Please update your payment method to avoid service interruption.",
+        "sent": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.customer_notifications.insert_one(notification)
+    
+    return {"message": "Payment marked as failed and customer notified"}
+
+# ===================== IN-HOUSE MESSAGING SYSTEM =====================
+
+class ClientMessage(BaseModel):
+    recipient_type: str  # "client" or "contractor"
+    recipient_id: str  # booking_id for clients, contractor_id for contractors
+    subject: str
+    message: str
+
+@api_router.post("/admin/messages/send")
+async def send_admin_message(msg: ClientMessage, current_user: dict = Depends(get_admin_user)):
+    """Send in-house message to client or contractor"""
+    message_doc = {
+        "id": str(uuid.uuid4()),
+        "sender": "admin",
+        "recipient_type": msg.recipient_type,
+        "recipient_id": msg.recipient_id,
+        "subject": msg.subject,
+        "message": msg.message,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.admin_messages.insert_one(message_doc)
+    
+    return {"message_id": message_doc["id"], "sent": True}
+
+@api_router.get("/admin/messages")
+async def get_admin_messages(current_user: dict = Depends(get_admin_user)):
+    """Get all admin messages sent and received"""
+    messages = await db.admin_messages.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return {"messages": messages}
+
+@api_router.get("/client/messages/{booking_id}")
+async def get_client_messages(booking_id: str):
+    """Get messages for a client (by booking ID)"""
+    messages = await db.admin_messages.find({
+        "recipient_type": "client",
+        "recipient_id": booking_id
+    }, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return {"messages": messages}
+
 # ===================== CONTRACTOR MANAGEMENT ROUTES =====================
 
 @api_router.post("/admin/contractors")
