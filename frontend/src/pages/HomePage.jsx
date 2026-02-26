@@ -14,7 +14,8 @@ import {
   Star,
   Home,
   HardHat,
-  Droplets
+  Droplets,
+  Building2
 } from "lucide-react";
 
 const services = [
