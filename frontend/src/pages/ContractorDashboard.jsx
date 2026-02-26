@@ -734,6 +734,126 @@ function TeamPage() {
   );
 }
 
+// Notifications Page
+function NotificationsPage() {
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/notifications`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setNotifications(data.notifications || []);
+    } catch (err) {
+      console.error('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAsRead = async (id) => {
+    try {
+      await fetch(`${API_URL}/api/contractor/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark as read');
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await fetch(`${API_URL}/api/contractor/notifications/read-all`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      fetchNotifications();
+      toast.success('All notifications marked as read');
+    } catch (err) {
+      toast.error('Failed to mark all as read');
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <Bell className="text-yellow-400" />
+          Notifications
+        </h1>
+        {unreadCount > 0 && (
+          <button
+            onClick={markAllAsRead}
+            className="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-xl hover:bg-yellow-500/30"
+          >
+            Mark All as Read
+          </button>
+        )}
+      </div>
+
+      {notifications.length === 0 ? (
+        <div className="bg-white/10 rounded-2xl p-8 text-center">
+          <Bell className="w-12 h-12 text-white/40 mx-auto mb-4" />
+          <p className="text-white/60">No notifications yet</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {notifications.map((notif) => (
+            <motion.div
+              key={notif.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className={`bg-white/10 backdrop-blur rounded-xl p-4 border ${
+                notif.read ? 'border-white/10' : 'border-yellow-500/50'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    notif.type === 'route_assigned' ? 'bg-green-500' :
+                    notif.type === 'bookings_added' ? 'bg-blue-500' :
+                    notif.type === 'broadcast' ? 'bg-purple-500' : 'bg-teal-500'
+                  }`}>
+                    {notif.type === 'route_assigned' ? <RouteIcon className="w-5 h-5 text-white" /> :
+                     notif.type === 'bookings_added' ? <MapPin className="w-5 h-5 text-white" /> :
+                     <BellRing className="w-5 h-5 text-white" />}
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold">{notif.title}</h3>
+                    <p className="text-white/70">{notif.message}</p>
+                    <p className="text-white/40 text-sm mt-1">
+                      {new Date(notif.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                {!notif.read && (
+                  <button
+                    onClick={() => markAsRead(notif.id)}
+                    className="px-3 py-1 bg-yellow-500 text-white rounded-lg text-sm hover:bg-yellow-600"
+                  >
+                    Mark Read
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Loading Spinner
 function LoadingSpinner() {
   return (
