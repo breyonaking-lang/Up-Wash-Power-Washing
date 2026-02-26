@@ -5,14 +5,29 @@ import {
   LayoutDashboard, ClipboardList, CheckCircle, DollarSign, 
   Droplets, Users, MapPin, MessageSquare, LogOut, Menu, X,
   Clock, UserPlus, Key, FileText, Send, Route as RouteIcon,
-  ChevronRight, Search, Filter, Eye, Edit, Trash2, Plus, Bell
+  ChevronRight, Search, Filter, Eye, Edit, Trash2, Plus, Bell,
+  Copy, ExternalLink, Phone, Mail, Navigation, Inbox, Building2,
+  Home, Car, Sparkles, Warehouse, HardHat, Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const CONTRACTOR_PORTAL_URL = `${window.location.origin}/contractor/login`;
 
-// Notification sound (base64 encoded short beep)
+// Notification sound
 const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6Xj4F1cXV9iJSgn5aLfnJucX2IlZ6dloyAc29weoeSm5uUjYF2c3V8hpGZmZSNg3d0dXuFj5eXko2Bd3R2fIaQl5aRjIF3dHZ9hpCWlZCLgHZ0dn6Hj5WUj4qAdnR3foeOk5KNiYB2dHd+ho2SkIuIf3Z0d36GjJCOioZ+dnR4fYaLjo2IhX12dHh+hYqMi4aDfHZ0eH6EiYqJhIJ7dnV4foSIiYeEgXp2dXl+g4eHhoOAeXZ1eX6Ch4aFgn94dnV5fYKGhYOBfnd2dXl9gYSEgoB9d3V2eX2BhIOBf3x3dXZ5fYCDgYB+e3d1dnl9gIKAgH17d3V2enmAgIB/fHp3dXZ6eX9/f357eXd2dnp5fn5+fXx6eHd3d3p5fX19fHt5eHd3d3p5fHx8e3p5eHd4eHp5fHt7enl4eHh4eXl7e3t6eXl4eHh4eXp6enp5eXh4eHl5enp5eXl5eHh4eXl5eXl5eXl4eHh5eXl5eXl5eHh4eHl5eXl5eXh4eHh4eXl5eXl5eHh4eHh5eXl5eXl4eHh4eHh4eXl5eXl4eHh4eHh4eHl5eXh4eHh4eHh4eHh5eXh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eA==";
+
+// Service categories
+const SERVICE_CATEGORIES = {
+  recycling_bin: { name: 'Recycling Bin', icon: Trash2, color: 'bg-green-500' },
+  scent_bomb: { name: 'Scent Bombs', icon: Droplets, color: 'bg-pink-500' },
+  patio: { name: 'Patio', icon: Sparkles, color: 'bg-blue-500' },
+  driveway: { name: 'Driveway', icon: Car, color: 'bg-orange-500' },
+  dumpster: { name: 'Dumpster', icon: Warehouse, color: 'bg-purple-500' },
+  home_powerwash: { name: 'Home Power Wash', icon: Home, color: 'bg-cyan-500' },
+  construction_cleanup: { name: 'Construction', icon: HardHat, color: 'bg-amber-500' },
+  commercial: { name: 'Commercial', icon: Building2, color: 'bg-indigo-500' }
+};
 
 // Auth helper
 const getAuthHeaders = () => ({
@@ -31,7 +46,11 @@ const navItems = [
   { path: 'contractors', icon: UserPlus, label: 'Contractors' },
   { path: 'routes', icon: RouteIcon, label: 'Routes' },
   { path: 'messages', icon: MessageSquare, label: 'Messages' },
+  { path: 'inquiries', icon: Inbox, label: 'Inquiry Messages' },
 ];
+
+// Trash2 icon for recycling
+const Trash2Icon = Trash2;
 
 // Dashboard Overview
 function DashboardOverview() {
@@ -55,6 +74,11 @@ function DashboardOverview() {
     }
   };
 
+  const copyContractorLink = () => {
+    navigator.clipboard.writeText(CONTRACTOR_PORTAL_URL);
+    toast.success('Contractor portal link copied!');
+  };
+
   if (loading) return <LoadingSpinner />;
 
   const statCards = [
@@ -69,6 +93,37 @@ function DashboardOverview() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">Dashboard Overview</h1>
+      
+      {/* Contractor Portal Link Card */}
+      <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 backdrop-blur rounded-2xl p-6 border border-indigo-500/30">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-white mb-1">Contractor Portal Link</h3>
+            <p className="text-white/60 text-sm mb-2">Share this link with new contractors</p>
+            <code className="bg-black/30 px-3 py-1 rounded text-indigo-300 text-sm">{CONTRACTOR_PORTAL_URL}</code>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={copyContractorLink}
+              className="px-4 py-2 bg-indigo-500 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-600"
+              data-testid="copy-contractor-link"
+            >
+              <Copy className="w-4 h-4" />
+              Copy Link
+            </button>
+            <a
+              href={CONTRACTOR_PORTAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-white/10 text-white rounded-xl flex items-center gap-2 hover:bg-white/20"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open
+            </a>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {statCards.map((stat, i) => (
           <motion.div
@@ -90,10 +145,27 @@ function DashboardOverview() {
   );
 }
 
-// Bookings List Component
+// Group bookings by service category
+function groupByCategory(bookings) {
+  const grouped = {};
+  bookings.forEach(booking => {
+    const services = booking.services || [];
+    services.forEach(s => {
+      const category = s.service_id || 'other';
+      if (!grouped[category]) grouped[category] = [];
+      if (!grouped[category].find(b => b.id === booking.id)) {
+        grouped[category].push(booking);
+      }
+    });
+  });
+  return grouped;
+}
+
+// Bookings List Component with Categories
 function BookingsList({ status, title }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedCategory, setExpandedCategory] = useState(null);
 
   useEffect(() => {
     fetchBookings();
@@ -129,32 +201,90 @@ function BookingsList({ status, title }) {
 
   if (loading) return <LoadingSpinner />;
 
+  const grouped = groupByCategory(bookings);
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">{title}</h1>
+      
       {bookings.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
           <p className="text-white/60">No bookings found</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} onUpdateStatus={updateStatus} />
-          ))}
+          {Object.entries(grouped).map(([category, categoryBookings]) => {
+            const catInfo = SERVICE_CATEGORIES[category] || { name: category, icon: ClipboardList, color: 'bg-gray-500' };
+            const CatIcon = catInfo.icon;
+            
+            return (
+              <div key={category} className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 overflow-hidden">
+                <button
+                  onClick={() => setExpandedCategory(expandedCategory === category ? null : category)}
+                  className="w-full p-4 flex items-center justify-between hover:bg-white/5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 ${catInfo.color} rounded-xl flex items-center justify-center`}>
+                      <CatIcon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg font-bold text-white">{catInfo.name}</h3>
+                      <p className="text-white/60 text-sm">{categoryBookings.length} orders</p>
+                    </div>
+                  </div>
+                  <ChevronRight className={`w-5 h-5 text-white/60 transition-transform ${expandedCategory === category ? 'rotate-90' : ''}`} />
+                </button>
+                
+                {expandedCategory === category && (
+                  <div className="border-t border-white/10 p-4 space-y-3">
+                    {categoryBookings.map((booking) => (
+                      <BookingCard key={booking.id} booking={booking} onUpdateStatus={updateStatus} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-// Booking Card
+// Booking Card with Quote Management
 function BookingCard({ booking, onUpdateStatus }) {
   const [expanded, setExpanded] = useState(false);
+  const [editingQuote, setEditingQuote] = useState(false);
+  const [quoteData, setQuoteData] = useState({
+    date: booking.booking_dates?.[0] || '',
+    time: '09:00',
+    price: booking.total || 0
+  });
+
+  const sendQuoteInvoice = async () => {
+    if (!booking.customer_email) {
+      toast.error('Customer email required to send invoice');
+      return;
+    }
+    
+    try {
+      const res = await fetch(`${API_URL}/api/admin/quotes/${booking.id}/send-invoice`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(quoteData)
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      toast.success('Quote invoice sent!');
+      setEditingQuote(false);
+    } catch (err) {
+      toast.error('Failed to send invoice');
+    }
+  };
 
   return (
     <motion.div
       layout
-      className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 overflow-hidden"
+      className="bg-white/5 rounded-xl border border-white/10 overflow-hidden"
     >
       <div 
         className="p-4 cursor-pointer flex items-center justify-between"
@@ -190,7 +320,70 @@ function BookingCard({ booking, onUpdateStatus }) {
             <p className="text-white/80"><strong>Status:</strong> {booking.status}</p>
             <p className="text-white/80"><strong>Payment:</strong> {booking.payment_status}</p>
             
-            <div className="flex gap-2 pt-2">
+            {/* Quote Editing for quote services */}
+            {booking.is_quote_service && (
+              <div className="bg-amber-500/20 rounded-xl p-4 mt-4">
+                <h4 className="text-amber-300 font-semibold mb-3">Quote Management</h4>
+                {editingQuote ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-white/60 text-xs">Date</label>
+                        <input
+                          type="date"
+                          value={quoteData.date}
+                          onChange={(e) => setQuoteData(prev => ({ ...prev, date: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-white/60 text-xs">Time</label>
+                        <input
+                          type="time"
+                          value={quoteData.time}
+                          onChange={(e) => setQuoteData(prev => ({ ...prev, time: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-white/60 text-xs">Price ($)</label>
+                        <input
+                          type="number"
+                          value={quoteData.price}
+                          onChange={(e) => setQuoteData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingQuote(false)}
+                        className="px-4 py-2 bg-white/10 text-white rounded-lg"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={sendQuoteInvoice}
+                        className="px-4 py-2 bg-amber-500 text-white rounded-lg flex items-center gap-2"
+                      >
+                        <Mail className="w-4 h-4" />
+                        Send Invoice
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setEditingQuote(true)}
+                    className="px-4 py-2 bg-amber-500 text-white rounded-lg flex items-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Set Quote Details & Send Invoice
+                  </button>
+                )}
+              </div>
+            )}
+            
+            <div className="flex gap-2 pt-2 flex-wrap">
               {booking.status !== 'completed' && (
                 <button
                   onClick={() => onUpdateStatus(booking.id, 'completed')}
@@ -207,9 +400,6 @@ function BookingCard({ booking, onUpdateStatus }) {
                   Confirm
                 </button>
               )}
-              <button className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm hover:bg-purple-600">
-                Send Invoice
-              </button>
             </div>
           </div>
         </motion.div>
@@ -265,7 +455,7 @@ function ScentBombOrders() {
   );
 }
 
-// Revenue Page
+// Revenue Page with Categories
 function RevenuePage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -289,6 +479,7 @@ function RevenuePage() {
   };
 
   const totalRevenue = bookings.reduce((sum, b) => sum + (b.total || 0), 0);
+  const grouped = groupByCategory(bookings);
 
   if (loading) return <LoadingSpinner />;
 
@@ -305,16 +496,26 @@ function RevenuePage() {
         <p className="text-green-200 mt-2">{bookings.length} paid bookings</p>
       </div>
 
-      <div className="space-y-4">
-        {bookings.map((booking) => (
-          <div key={booking.id} className="bg-white/10 rounded-xl p-4 flex justify-between items-center">
-            <div>
-              <p className="text-white font-semibold">{booking.customer_name}</p>
-              <p className="text-white/60 text-sm">{booking.booking_dates?.[0]}</p>
+      {/* Revenue by Category */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Object.entries(grouped).map(([category, categoryBookings]) => {
+          const catInfo = SERVICE_CATEGORIES[category] || { name: category, icon: ClipboardList, color: 'bg-gray-500' };
+          const CatIcon = catInfo.icon;
+          const catRevenue = categoryBookings.reduce((sum, b) => sum + (b.total || 0), 0);
+          
+          return (
+            <div key={category} className="bg-white/10 rounded-xl p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`w-8 h-8 ${catInfo.color} rounded-lg flex items-center justify-center`}>
+                  <CatIcon className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-white font-semibold">{catInfo.name}</span>
+              </div>
+              <p className="text-2xl font-bold text-green-400">${catRevenue.toFixed(2)}</p>
+              <p className="text-white/60 text-sm">{categoryBookings.length} orders</p>
             </div>
-            <p className="text-green-400 font-bold text-xl">${booking.total?.toFixed(2)}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -340,31 +541,6 @@ function ClientPortal() {
       toast.error('Failed to load clients');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const sendInvoice = async (booking) => {
-    const email = prompt('Enter email address for invoice:');
-    if (!email) return;
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 7);
-    const dueDateStr = dueDate.toISOString().split('T')[0];
-
-    try {
-      const res = await fetch(`${API_URL}/api/admin/invoices`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          booking_id: booking.id,
-          customer_email: email,
-          due_date: dueDateStr
-        })
-      });
-      if (!res.ok) throw new Error('Failed to send');
-      toast.success('Invoice sent!');
-    } catch (err) {
-      toast.error('Failed to send invoice');
     }
   };
 
@@ -397,7 +573,6 @@ function ClientPortal() {
         ))}
       </div>
 
-      {/* Client Detail Modal */}
       {selectedClient && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setSelectedClient(null)}>
           <motion.div
@@ -416,18 +591,6 @@ function ClientPortal() {
                 <X className="w-6 h-6" />
               </button>
             </div>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Booking History</h3>
-              {/* Client bookings would be loaded here */}
-              <button
-                onClick={() => sendInvoice(selectedClient)}
-                className="px-4 py-2 bg-purple-500 text-white rounded-lg flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                Send Invoice
-              </button>
-            </div>
           </motion.div>
         </div>
       )}
@@ -435,17 +598,20 @@ function ClientPortal() {
   );
 }
 
-// Contractors Management
+// Contractors Management with Enhanced Details
 function ContractorsPage() {
   const [contractors, setContractors] = useState([]);
+  const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedContractor, setSelectedContractor] = useState(null);
   const [newContractor, setNewContractor] = useState({
     username: '', password: '', full_name: '', phone: '', email: ''
   });
 
   useEffect(() => {
     fetchContractors();
+    fetchRoutes();
   }, []);
 
   const fetchContractors = async () => {
@@ -458,6 +624,17 @@ function ContractorsPage() {
       toast.error('Failed to load contractors');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRoutes = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setRoutes(data.routes || []);
+    } catch (err) {
+      console.error('Failed to load routes');
     }
   };
 
@@ -488,7 +665,7 @@ function ContractorsPage() {
     if (!newPassword) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/password?new_password=${newPassword}`, {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/password?new_password=${encodeURIComponent(newPassword)}`, {
         method: 'PATCH',
         headers: getAuthHeaders()
       });
@@ -497,6 +674,15 @@ function ContractorsPage() {
     } catch (err) {
       toast.error('Failed to reset password');
     }
+  };
+
+  const sendSMS = (contractor) => {
+    const message = prompt('Enter SMS message:');
+    if (!message) return;
+    
+    // Open SMS app with pre-filled message
+    window.open(`sms:${contractor.phone}?body=${encodeURIComponent(message)}`);
+    toast.success('Opening SMS app...');
   };
 
   const deleteContractor = async (contractorId) => {
@@ -513,6 +699,10 @@ function ContractorsPage() {
     } catch (err) {
       toast.error('Failed to delete contractor');
     }
+  };
+
+  const getContractorRoutes = (contractorId) => {
+    return routes.filter(r => r.assigned_contractor_id === contractorId);
   };
 
   if (loading) return <LoadingSpinner />;
@@ -534,40 +724,156 @@ function ContractorsPage() {
         </button>
       </div>
 
+      {/* Contractor Portal Link */}
+      <div className="bg-indigo-500/20 rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <p className="text-indigo-200 text-sm">Share this link with new contractors:</p>
+          <code className="text-indigo-300">{CONTRACTOR_PORTAL_URL}</code>
+        </div>
+        <button
+          onClick={() => { navigator.clipboard.writeText(CONTRACTOR_PORTAL_URL); toast.success('Link copied!'); }}
+          className="px-3 py-1 bg-indigo-500 text-white rounded-lg text-sm"
+        >
+          <Copy className="w-4 h-4" />
+        </button>
+      </div>
+
       {contractors.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
           <p className="text-white/60">No contractors yet</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {contractors.map((contractor) => (
-            <div key={contractor.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-xl font-bold text-white">{contractor.full_name}</h3>
-                  <p className="text-white/60">@{contractor.username}</p>
-                  <p className="text-white/60">{contractor.phone}</p>
-                  <p className="text-white/60">{contractor.email || 'No email'}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => resetPassword(contractor.id)}
-                    className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30"
-                    title="Reset Password"
-                  >
-                    <Key className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => deleteContractor(contractor.id)}
-                    className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+          {contractors.map((contractor) => {
+            const contractorRoutes = getContractorRoutes(contractor.id);
+            
+            return (
+              <div key={contractor.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-white">{contractor.full_name}</h3>
+                    <p className="text-white/60">@{contractor.username}</p>
+                    <p className="text-white/60">{contractor.phone}</p>
+                    <p className="text-white/60">{contractor.email || 'No email'}</p>
+                    
+                    {/* Routes assigned */}
+                    <div className="mt-4">
+                      <p className="text-white/60 text-sm mb-2">Assigned Routes:</p>
+                      {contractorRoutes.length === 0 ? (
+                        <p className="text-yellow-400 text-sm">No routes assigned</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {contractorRoutes.map(route => (
+                            <span key={route.id} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
+                              {route.name} ({route.bookings?.length || 0} stops)
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setSelectedContractor(contractor)}
+                      className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
+                      title="View Details"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => sendSMS(contractor)}
+                      className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
+                      title="Send SMS"
+                    >
+                      <Phone className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => resetPassword(contractor.id)}
+                      className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30"
+                      title="Reset Password"
+                    >
+                      <Key className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => deleteContractor(contractor.id)}
+                      className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Contractor Detail Modal */}
+      {selectedContractor && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setSelectedContractor(null)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{selectedContractor.full_name}</h2>
+                <p className="text-white/60">@{selectedContractor.username}</p>
+              </div>
+              <button onClick={() => setSelectedContractor(null)} className="text-white/60 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
             </div>
-          ))}
+
+            <div className="space-y-6">
+              {/* Contact Info */}
+              <div className="bg-white/10 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-3">Contact Information</h3>
+                <p className="text-white/80"><Phone className="w-4 h-4 inline mr-2" />{selectedContractor.phone}</p>
+                <p className="text-white/80"><Mail className="w-4 h-4 inline mr-2" />{selectedContractor.email || 'No email'}</p>
+              </div>
+
+              {/* Routes */}
+              <div className="bg-white/10 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-3">Assigned Routes</h3>
+                {getContractorRoutes(selectedContractor.id).length === 0 ? (
+                  <p className="text-white/60">No routes assigned</p>
+                ) : (
+                  <div className="space-y-2">
+                    {getContractorRoutes(selectedContractor.id).map(route => (
+                      <div key={route.id} className="bg-white/5 rounded-lg p-3">
+                        <p className="text-white font-semibold">{route.name}</p>
+                        <p className="text-white/60 text-sm">{route.area}</p>
+                        <p className="text-green-400 text-sm">{route.bookings?.length || 0} stops</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => sendSMS(selectedContractor)}
+                  className="flex-1 py-3 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2"
+                >
+                  <Phone className="w-5 h-5" />
+                  Send SMS
+                </button>
+                <button
+                  onClick={() => resetPassword(selectedContractor.id)}
+                  className="flex-1 py-3 bg-yellow-500 text-white rounded-xl flex items-center justify-center gap-2"
+                >
+                  <Key className="w-5 h-5" />
+                  Reset Password
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
 
@@ -751,6 +1057,7 @@ function RoutesPage() {
                   <p className="text-white/60">{route.description || 'No description'}</p>
                   <p className="text-white/60">Area: {route.area || 'Not specified'}</p>
                   <p className="text-green-400 font-bold mt-2">${route.price?.toFixed(2) || '350.00'}</p>
+                  <p className="text-blue-400 text-sm mt-1">{route.bookings?.length || 0} stops assigned</p>
                 </div>
                 <div>
                   <p className="text-white/60 text-sm mb-2">Assigned to:</p>
@@ -788,7 +1095,6 @@ function RoutesPage() {
                 value={newRoute.name}
                 onChange={(e) => setNewRoute(prev => ({ ...prev, name: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="route-name"
               />
               <input
                 type="text"
@@ -804,13 +1110,6 @@ function RoutesPage() {
                 onChange={(e) => setNewRoute(prev => ({ ...prev, area: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
               />
-              <input
-                type="number"
-                placeholder="Price ($350 default)"
-                value={newRoute.price}
-                onChange={(e) => setNewRoute(prev => ({ ...prev, price: parseFloat(e.target.value) || 350 }))}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-              />
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={() => setShowCreateModal(false)}
@@ -821,7 +1120,6 @@ function RoutesPage() {
                 <button
                   onClick={createRoute}
                   className="flex-1 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600"
-                  data-testid="save-route-btn"
                 >
                   Create Route
                 </button>
@@ -903,7 +1201,6 @@ function MessagesPage() {
       </h1>
 
       <div className="grid md:grid-cols-3 gap-6">
-        {/* Contractor List */}
         <div className="bg-white/10 rounded-2xl p-4">
           <h3 className="text-white font-semibold mb-4">Contractors</h3>
           <div className="space-y-2">
@@ -925,7 +1222,6 @@ function MessagesPage() {
           </div>
         </div>
 
-        {/* Messages */}
         <div className="md:col-span-2 bg-white/10 rounded-2xl p-4 flex flex-col h-[500px]">
           <div className="flex-1 overflow-y-auto space-y-3 mb-4">
             {messages.length === 0 ? (
@@ -962,6 +1258,112 @@ function MessagesPage() {
   );
 }
 
+// Inquiry Messages Page (from Contact Form)
+function InquiryMessagesPage() {
+  const [inquiries, setInquiries] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchInquiries();
+  }, []);
+
+  const fetchInquiries = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/inquiries`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setInquiries(data.inquiries || []);
+    } catch (err) {
+      console.error('Failed to load inquiries');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAsRead = async (id) => {
+    try {
+      await fetch(`${API_URL}/api/admin/inquiries/${id}/read`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      fetchInquiries();
+    } catch (err) {
+      console.error('Failed to mark as read');
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+        <Inbox className="text-cyan-400" />
+        Inquiry Messages
+      </h1>
+
+      {inquiries.length === 0 ? (
+        <div className="bg-white/10 rounded-2xl p-8 text-center">
+          <Inbox className="w-12 h-12 text-white/40 mx-auto mb-4" />
+          <p className="text-white/60">No inquiry messages yet</p>
+          <p className="text-white/40 text-sm">Messages from the contact form will appear here</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {inquiries.map((inquiry) => (
+            <div 
+              key={inquiry.id} 
+              className={`bg-white/10 backdrop-blur rounded-2xl p-6 border ${inquiry.read ? 'border-white/10' : 'border-cyan-500/50'}`}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-white">{inquiry.name}</h3>
+                  <p className="text-white/60">{inquiry.email}</p>
+                  <p className="text-white/60">{inquiry.phone}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-white/40 text-sm">{new Date(inquiry.created_at).toLocaleDateString()}</p>
+                  {!inquiry.read && (
+                    <span className="inline-block px-2 py-1 bg-cyan-500 text-white text-xs rounded-full mt-1">New</span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="bg-white/5 rounded-xl p-4 mb-4">
+                <p className="text-white/80">{inquiry.message}</p>
+              </div>
+              
+              <div className="flex gap-2">
+                {!inquiry.read && (
+                  <button
+                    onClick={() => markAsRead(inquiry.id)}
+                    className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm hover:bg-cyan-600"
+                  >
+                    Mark as Read
+                  </button>
+                )}
+                <a
+                  href={`mailto:${inquiry.email}`}
+                  className="px-4 py-2 bg-white/10 text-white rounded-lg text-sm hover:bg-white/20 flex items-center gap-2"
+                >
+                  <Mail className="w-4 h-4" />
+                  Reply via Email
+                </a>
+                <a
+                  href={`tel:${inquiry.phone}`}
+                  className="px-4 py-2 bg-white/10 text-white rounded-lg text-sm hover:bg-white/20 flex items-center gap-2"
+                >
+                  <Phone className="w-4 h-4" />
+                  Call
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Loading Spinner
 function LoadingSpinner() {
   return (
@@ -978,19 +1380,18 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadInquiries, setUnreadInquiries] = useState(0);
   const [showNotification, setShowNotification] = useState(false);
   const [latestMessage, setLatestMessage] = useState(null);
   const lastMessageIdRef = useRef(null);
   const audioRef = useRef(null);
 
-  // Request notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
 
-  // Check for new messages every 10 seconds
   useEffect(() => {
     const checkMessages = async () => {
       try {
@@ -999,26 +1400,17 @@ export default function AdminDashboard() {
         const data = await res.json();
         const messages = data.messages || [];
         
-        // Count unread messages from contractors
         const unread = messages.filter(m => m.sender_id !== 'admin' && !m.read).length;
         setUnreadCount(unread);
         
-        // Check for new messages
         if (messages.length > 0) {
           const latestMsg = messages[0];
           if (latestMsg.sender_id !== 'admin' && latestMsg.id !== lastMessageIdRef.current) {
-            // New message from contractor!
             lastMessageIdRef.current = latestMsg.id;
             setLatestMessage(latestMsg);
             setShowNotification(true);
-            
-            // Play sound
             playNotificationSound();
-            
-            // Show browser notification
             showBrowserNotification(latestMsg);
-            
-            // Auto-hide after 5 seconds
             setTimeout(() => setShowNotification(false), 5000);
           }
         }
@@ -1027,8 +1419,24 @@ export default function AdminDashboard() {
       }
     };
 
+    const checkInquiries = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/admin/inquiries`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const unread = (data.inquiries || []).filter(i => !i.read).length;
+        setUnreadInquiries(unread);
+      } catch (err) {
+        console.error('Failed to check inquiries:', err);
+      }
+    };
+
     checkMessages();
-    const interval = setInterval(checkMessages, 10000); // Check every 10 seconds
+    checkInquiries();
+    const interval = setInterval(() => {
+      checkMessages();
+      checkInquiries();
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1129,35 +1537,38 @@ export default function AdminDashboard() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={`/admin/dashboard/${item.path}`}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition relative ${
-                currentPath === item.path 
-                  ? 'bg-blue-500 text-white' 
-                  : 'text-white/60 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <div className="relative">
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {/* Message badge */}
-                {item.path === 'messages' && unreadCount > 0 && (
-                  <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+          {navItems.map((item) => {
+            const badge = item.path === 'messages' ? unreadCount : item.path === 'inquiries' ? unreadInquiries : 0;
+            
+            return (
+              <Link
+                key={item.path}
+                to={`/admin/dashboard/${item.path}`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition relative ${
+                  currentPath === item.path 
+                    ? 'bg-blue-500 text-white' 
+                    : 'text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <div className="relative">
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  {badge > 0 && (
+                    <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                </div>
+                {sidebarOpen && (
+                  <span className="flex-1">{item.label}</span>
+                )}
+                {sidebarOpen && badge > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+                    {badge} new
                   </span>
                 )}
-              </div>
-              {sidebarOpen && (
-                <span className="flex-1">{item.label}</span>
-              )}
-              {sidebarOpen && item.path === 'messages' && unreadCount > 0 && (
-                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
-                  {unreadCount} new
-                </span>
-              )}
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-white/10">
@@ -1184,6 +1595,7 @@ export default function AdminDashboard() {
           <Route path="contractors" element={<ContractorsPage />} />
           <Route path="routes" element={<RoutesPage />} />
           <Route path="messages" element={<MessagesPage />} />
+          <Route path="inquiries" element={<InquiryMessagesPage />} />
         </Routes>
       </main>
     </div>
