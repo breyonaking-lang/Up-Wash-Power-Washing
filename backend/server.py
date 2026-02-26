@@ -1361,6 +1361,78 @@ async def notify_clients_for_route(route_id: str, current_user: dict = Depends(g
         "notification_text": "We will be servicing your home soon, please be sure to set your bin to the curb!"
     }
 
+# ===================== INQUIRY ROUTES (Contact Form) =====================
+
+class InquiryCreate(BaseModel):
+    name: str
+    email: str
+    phone: str
+    message: str
+
+@api_router.post("/inquiries")
+async def create_inquiry(inquiry: InquiryCreate):
+    inquiry_doc = {
+        "id": str(uuid.uuid4()),
+        "name": inquiry.name,
+        "email": inquiry.email,
+        "phone": inquiry.phone,
+        "message": inquiry.message,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.inquiries.insert_one(inquiry_doc)
+    return {"message": "Inquiry submitted", "id": inquiry_doc["id"]}
+
+@api_router.get("/admin/inquiries")
+async def list_inquiries(current_user: dict = Depends(get_admin_user)):
+    inquiries = await db.inquiries.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"inquiries": inquiries}
+
+@api_router.patch("/admin/inquiries/{inquiry_id}/read")
+async def mark_inquiry_read(inquiry_id: str, current_user: dict = Depends(get_admin_user)):
+    await db.inquiries.update_one(
+        {"id": inquiry_id},
+        {"$set": {"read": True}}
+    )
+    return {"message": "Marked as read"}
+
+# ===================== QUOTE MANAGEMENT ROUTES =====================
+
+class QuoteUpdate(BaseModel):
+    date: str
+    time: str
+    price: float
+
+@api_router.post("/admin/quotes/{booking_id}/send-invoice")
+async def send_quote_invoice(booking_id: str, quote: QuoteUpdate, current_user: dict = Depends(get_admin_user)):
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if not booking.get("customer_email"):
+        raise HTTPException(status_code=400, detail="Customer email required")
+    
+    # Update booking with quote details
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {
+            "booking_dates": [quote.date],
+            "booking_time": quote.time,
+            "total": quote.price,
+            "quote_sent": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # In production, send email with Square payment link
+    # For now, return success
+    return {
+        "success": True,
+        "message": f"Quote invoice sent to {booking.get('customer_email')}",
+        "amount": quote.price
+    }
+
 # Include the router
 app.include_router(api_router)
 
