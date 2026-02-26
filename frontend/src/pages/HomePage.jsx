@@ -112,6 +112,9 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen">
+      {/* Daily Bible Verse Banner */}
+      <DailyBibleVerse variant="banner" />
+      
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 hero-gradient opacity-95" />
