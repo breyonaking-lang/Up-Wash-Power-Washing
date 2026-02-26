@@ -475,7 +475,7 @@ def optimize_route(addresses: List[str]) -> List[Dict]:
         origin = burleson_address
         waypoints = "|".join(addresses)
         
-        url = f"https://maps.googleapis.com/maps/api/directions/json"
+        url = "https://maps.googleapis.com/maps/api/directions/json"
         params = {
             "origin": origin,
             "destination": origin,  # Return to start
@@ -888,7 +888,7 @@ async def admin_bookings(
 async def update_booking_status(booking_id: str, status: str, current_user: dict = Depends(get_admin_user)):
     valid_statuses = ["pending", "confirmed", "completed", "cancelled"]
     if status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status")
+        raise HTTPException(status_code=400, detail="Invalid status")
     
     result = await db.bookings.update_one(
         {"id": booking_id},
@@ -1049,7 +1049,7 @@ async def mark_subscription_payment_failed(booking_id: str, current_user: dict =
         "customer_phone": booking.get("customer_phone"),
         "customer_email": booking.get("customer_email"),
         "type": "payment_failed",
-        "message": f"Your subscription payment failed. Please update your payment method to avoid service interruption.",
+        "message": "Your subscription payment failed. Please update your payment method to avoid service interruption.",
         "sent": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
