@@ -8,6 +8,11 @@ import BookingPage from "./pages/BookingPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import AdminPage from "./pages/AdminPage";
 import ContactPage from "./pages/ContactPage";
+import ScentBombPage from "./pages/ScentBombPage";
+import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminDashboard from "./pages/AdminDashboard";
+import ContractorLoginPage from "./pages/ContractorLoginPage";
+import ContractorDashboard from "./pages/ContractorDashboard";
 
 function App() {
   return (
@@ -18,10 +23,17 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="services" element={<ServicesPage />} />
             <Route path="booking" element={<BookingPage />} />
+            <Route path="scent-bombs" element={<ScentBombPage />} />
             <Route path="payment/success" element={<PaymentSuccessPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="admin" element={<AdminPage />} />
           </Route>
+          {/* Admin Portal - Owner only */}
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin/dashboard/*" element={<AdminDashboard />} />
+          {/* Contractor Portal */}
+          <Route path="/contractor/login" element={<ContractorLoginPage />} />
+          <Route path="/contractor/dashboard/*" element={<ContractorDashboard />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" />
