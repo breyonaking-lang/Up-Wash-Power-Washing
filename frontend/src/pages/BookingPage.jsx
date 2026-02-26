@@ -1270,10 +1270,10 @@ const BookingPage = () => {
                           <span>Per Day</span>
                           <span>${getLocalSubtotalPerDay().toFixed(2)}</span>
                         </div>
-                        {bookingMode === "monthly" && monthlyDays.length > 0 && (
+                        {bookingMode === "monthly" && serviceDaysPerMonth > 0 && (
                           <div className="flex justify-between text-slate-500">
-                            <span>× {monthlyDays.length} days/month</span>
-                            <span>${(getLocalSubtotalPerDay() * monthlyDays.length).toFixed(2)}</span>
+                            <span>× {serviceDaysPerMonth} days/month</span>
+                            <span>${(getLocalSubtotalPerDay() * serviceDaysPerMonth).toFixed(2)}</span>
                           </div>
                         )}
                         {bookingMode === "monthly" && (
@@ -1322,10 +1322,15 @@ const BookingPage = () => {
                     </div>
                   )}
 
-                  {bookingMode === "monthly" && monthlyDays.length > 0 && (
+                  {bookingMode === "monthly" && monthlyServiceDays.length > 0 && (
                     <div className="mt-4 p-3 bg-green-50 rounded-xl text-sm">
                       <p className="font-medium text-green-900">
-                        Every {monthlyDays.join(" & ")}
+                        {serviceDaysPerMonth} day{serviceDaysPerMonth > 1 ? 's' : ''}/month on the {monthlyServiceDays.map((d, i) => {
+                          const suffix = d === 1 || d === 21 || d === 31 ? 'st' : 
+                                        d === 2 || d === 22 ? 'nd' : 
+                                        d === 3 || d === 23 ? 'rd' : 'th';
+                          return `${d}${suffix}${i < monthlyServiceDays.length - 1 ? ', ' : ''}`;
+                        })}
                       </p>
                     </div>
                   )}
