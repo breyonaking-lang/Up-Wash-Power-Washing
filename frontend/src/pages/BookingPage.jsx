@@ -738,19 +738,47 @@ const BookingPage = () => {
                   {/* Monthly Subscription */}
                   {bookingMode === "monthly" && (
                     <div>
+                      {/* How many days per month */}
                       <div className="mb-6">
-                        <Label className="mb-2 block text-lg font-semibold">Select 2 Days of the Week</Label>
-                        <p className="text-sm text-slate-500 mb-4">Choose which 2 days you'd like service each month</p>
+                        <Label className="mb-2 block text-lg font-semibold">How Many Days Per Month?</Label>
+                        <p className="text-sm text-slate-500 mb-4">Select how many times per month you'd like service</p>
                         <div className="flex flex-wrap gap-2">
-                          {WEEKDAYS.map((day) => (
+                          {[1, 2, 3, 4, 5, 6].map((num) => (
+                            <button
+                              key={num}
+                              onClick={() => setServiceDaysPerMonth(num)}
+                              className={`px-6 py-3 rounded-xl font-bold transition-all ${
+                                serviceDaysPerMonth === num
+                                  ? "bg-green-500 text-white"
+                                  : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                              }`}
+                              data-testid={`service-days-${num}`}
+                            >
+                              {num} {num === 1 ? 'day' : 'days'}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-green-600 font-medium">
+                          {serviceDaysPerMonth} service {serviceDaysPerMonth === 1 ? 'day' : 'days'} per month selected
+                        </p>
+                      </div>
+
+                      {/* Select specific days of the month */}
+                      <div className="mb-6">
+                        <Label className="mb-2 block text-lg font-semibold">Select Days of the Month</Label>
+                        <p className="text-sm text-slate-500 mb-4">
+                          Choose {serviceDaysPerMonth} day{serviceDaysPerMonth > 1 ? 's' : ''} when you'd like service each month
+                        </p>
+                        <div className="grid grid-cols-7 gap-2 max-w-md">
+                          {MONTH_DAYS.map((day) => (
                             <button
                               key={day}
-                              onClick={() => toggleMonthlyDay(day)}
-                              disabled={!monthlyDays.includes(day) && monthlyDays.length >= 2}
-                              className={`px-4 py-3 rounded-xl font-medium transition-all ${
-                                monthlyDays.includes(day)
+                              onClick={() => toggleMonthlyServiceDay(day)}
+                              disabled={!monthlyServiceDays.includes(day) && monthlyServiceDays.length >= serviceDaysPerMonth}
+                              className={`w-10 h-10 rounded-lg font-medium transition-all text-sm ${
+                                monthlyServiceDays.includes(day)
                                   ? "bg-green-500 text-white"
-                                  : monthlyDays.length >= 2
+                                  : monthlyServiceDays.length >= serviceDaysPerMonth
                                     ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                                     : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                               }`}
@@ -760,9 +788,16 @@ const BookingPage = () => {
                             </button>
                           ))}
                         </div>
-                        {monthlyDays.length > 0 && (
-                          <p className="mt-2 text-green-600 font-medium">
-                            Selected: {monthlyDays.join(" & ")}
+                        {monthlyServiceDays.length > 0 && (
+                          <p className="mt-3 text-green-600 font-medium">
+                            Service on the {monthlyServiceDays.map((d, i) => {
+                              const suffix = d === 1 || d === 21 || d === 31 ? 'st' : 
+                                            d === 2 || d === 22 ? 'nd' : 
+                                            d === 3 || d === 23 ? 'rd' : 'th';
+                              return (i === monthlyServiceDays.length - 1 && monthlyServiceDays.length > 1) 
+                                ? `and ${d}${suffix}` 
+                                : `${d}${suffix}${i < monthlyServiceDays.length - 2 ? ', ' : ' '}`;
+                            })} of each month
                           </p>
                         )}
                       </div>
@@ -782,6 +817,16 @@ const BookingPage = () => {
                             data-testid="monthly-start-calendar"
                           />
                         </div>
+                      </div>
+
+                      {/* Payment Info */}
+                      <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                        <h4 className="font-bold text-blue-900 mb-2">Billing Information</h4>
+                        <ul className="text-sm text-blue-800 space-y-1">
+                          <li>• You'll pay for your first service today</li>
+                          <li>• Future services are charged 3 days in advance</li>
+                          <li>• If payment fails, you'll receive a notification to update your payment method</li>
+                        </ul>
                       </div>
                     </div>
                   )}
