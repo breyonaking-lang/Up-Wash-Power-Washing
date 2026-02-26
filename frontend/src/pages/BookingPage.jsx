@@ -463,7 +463,7 @@ const BookingPage = () => {
   };
 
   const getNumServiceDays = () => {
-    return bookingMode === "monthly" ? monthlyDays.length : 1;
+    return bookingMode === "monthly" ? serviceDaysPerMonth : 1;
   };
 
   const getLocalTotal = () => {
