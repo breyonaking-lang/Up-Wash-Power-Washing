@@ -1,129 +1,146 @@
 # Upwash Power Washing - Product Requirements Document
 
-## Latest Update (Feb 24, 2026)
-- **Pricing Fix**: Updated Patio and Driveway cleaning to $85 on homepage
-- **Quote Requirements**: Made description and photo uploads REQUIRED for quote-based services (Home Power Washing, Construction Cleanup)
+## Project Overview
+Professional power washing service application for Upwash Power Washing in Burleson, TX. Full-stack application with customer booking, admin portal, and contractor management.
 
-## Original Problem Statement
-Build a power washing cleaning services website for "Upwash Power Washing Cleaning Services" in Burleson, TX with:
-- Recycling Bin Cleaning: $15 (1), $25 (2), $8 each additional
-- Patio Cleaning: $85
-- Driveway Cleaning: $85
-- Restaurant Dumpster Cleaning: $85 first, $45 each additional
-- **Home Power Washing: Quote-based**
-- **Construction Site Cleanup: Quote-based**
-- Scent Bomb Add-on: $3.50 each (standalone, any service)
-- Monthly Subscription: 5% discount, choose 2 days per month
-- Service Area: 15-mile radius free, $1/mile beyond (AUTO-CALCULATED)
-- Scheduling: Mon-Fri (weekdays only, no time slots)
-- Payment: Stripe + Cash App
-- SMS Reminders: Twilio integration
-- Email Confirmations: Resend integration (bookings@upwashpowerwashing.com)
-- Auto Follow-ups: 24-hour follow-up for quote requests
-- Google Calendar: Auto-sync appointments
+## Tech Stack
+- **Frontend**: React, TailwindCSS, Shadcn/UI, Framer Motion
+- **Backend**: FastAPI (Python), MongoDB
+- **Payments**: Square SDK (Apple Pay, Google Pay)
+- **Authentication**: JWT-based for Admin and Contractor portals
 
-## Architecture
+## URLs
+- **Preview**: https://admin-control-138.preview.emergentagent.com
+- **Admin Portal**: /admin/login → /admin/dashboard
+- **Contractor Portal**: /contractor/login → /contractor/dashboard
 
-### Backend (FastAPI + MongoDB)
-- `/app/backend/server.py` - Main API server
-- Collections: `bookings`, `payment_transactions`, `settings`
-- Stripe integration via `emergentintegrations` library
-- Twilio SMS for notifications
-- Resend for email confirmations
-- Google Maps Routes API for distance calculation
-- Google Calendar API for appointment sync
+## Credentials
+- **Admin**: Hughes0108 / Godfirst7!
+- **Contractor**: ajb123 / upwash_test_123
 
-### Frontend (React + Tailwind + Shadcn UI)
-- `/app/frontend/src/pages/` - Page components
-- `/app/frontend/src/components/` - Shared components
-- Routing: react-router-dom
-
-## Services List
-| Service | Pricing |
-|---------|---------|
-| Recycling Bin | $15 (1), $25 (2), +$8 each |
-| Patio Cleaning | $85 |
-| Driveway Cleaning | $85 |
-| Dumpster Cleaning | $85 first, +$45 each |
-| Home Power Washing | Quote |
-| Construction Cleanup | Quote |
-| Scent Bomb Add-on | $3.50 each |
+---
 
 ## Core Features Implemented
-- [x] Service listing with pricing (fixed + quote-based)
-- [x] Multi-step booking wizard
-- [x] Calendar with weekday-only scheduling (Mon-Fri)
-- [x] Dynamic pricing calculator
-- [x] Tiered pricing for recycling bins & dumpsters
-- [x] Quote-based services with description & photo uploads
-- [x] **Automatic distance calculation** from customer address
-- [x] **Map visual** showing service location and route to Burleson
-- [x] **Travel fee auto-calculated** ($1/mile beyond 15 miles)
-- [x] Monthly subscription: 2 days/month, 5% discount
-- [x] SMS opt-in with Twilio integration
-- [x] Email confirmations via Resend
-- [x] **24-hour auto follow-up** for quote requests
-- [x] **Google Calendar integration** - auto-sync appointments
-- [x] Admin dashboard with calendar view
-- [x] Admin SMS reminder sending
-- [x] Admin quote management (pending quotes, mark responded)
-- [x] Admin Integrations panel (SMS + Calendar status)
-- [x] Booking management (confirm/complete/cancel)
 
-## Integrations
-| Integration | Status | Notes |
-|-------------|--------|-------|
-| Stripe | Active | Using test key |
-| Twilio | Active | User credentials |
-| Resend | Active | bookings@upwashpowerwashing.com |
-| Google Maps | Active | Routes API + Static Maps |
-| Google Calendar | Ready | OAuth flow configured |
+### 1. Services Available
+- Recycling Bin Cleaning ($15/bin)
+- Patio Cleaning ($85)
+- Driveway Cleaning ($85)
+- Restaurant Dumpster Cleaning ($85 first, $45 each additional)
+- Home Power Washing (Quote)
+- Construction Site Cleanup (Quote)
+- **Commercial Properties** (Quote) - Schools, apartments, office buildings
+
+### 2. Booking System
+- **Single Service**: Pick a specific date
+- **Monthly Subscription** (5% discount):
+  - Choose how many days per month (1-6 days)
+  - Select specific days of the month (1st-31st)
+  - First service charged at booking
+  - Future services charged 3 days in advance
+- Scent Bombs available as add-on ($10 each) or standalone
+
+### 3. Admin Portal Features
+- **Dashboard Overview**: Total bookings, pending, completed, revenue stats
+- **Calendar View**: All bookings by date, color-coded (Subscription/Paid/Unpaid)
+- **Unpaid Subscriptions Tab**: Failed payment tracking with reactivate/cancel options
+- **Client Portal**: Customer list with booking history
+- **Contractor Management**: Create/edit contractors, reset passwords
+- **Route Management**: Assign bookings to routes and contractors
+- **Messages**: Real-time chat with contractors (with audio notifications)
+- **Inquiry Messages**: Contact form submissions from website
+- **Daily Bible Verse**: Rotating verse on dashboard
+
+### 4. Contractor Portal Features
+- View assigned routes and stops
+- Mark tasks complete or "unable to complete" (with photo/notes)
+- Real-time chat with admin
+- In-app notifications for new assignments
+
+### 5. Payment Processing
+- Square integration for secure payments
+- Apple Pay / Google Pay support
+- 8.25% sales tax on all purchases
+- Recurring payment processing for subscriptions
+
+---
+
+## Recently Completed (Dec 2025)
+
+### Session Updates:
+1. **Commercial Properties Service** - Added to services page with quote pricing
+2. **Subscription Logic Overhaul**:
+   - Changed from "days of week" to "days of month" (1-31)
+   - Added "How many days per month" selector (1-6)
+   - Billing info: First service charged at booking, then 3 days before each service
+3. **Admin Calendar Page** - Full calendar view with booking data, month navigation
+4. **Unpaid Subscriptions Page** - Track failed subscription payments, reactivate/cancel options
+5. **Failed Payment Handling** - Auto-notification to clients, removal from routes
+
+---
+
+## Database Schema
+
+### Key Collections:
+- `users` - Admin and contractor accounts
+- `bookings` - All bookings with subscription fields:
+  - `monthly_service_days`: [1, 15] (array of days 1-31)
+  - `service_days_per_month`: 2 (number 1-6)
+  - `subscription_status`: active/payment_failed/cancelled
+  - `next_payment_date`: "2026-03-12"
+- `routes` - Daily route assignments
+- `messages` - Admin-contractor chat
+- `inquiries` - Contact form submissions
+- `customer_notifications` - Payment reminders and alerts
+
+---
 
 ## API Endpoints
-### Distance & Pricing
-- `POST /api/calculate-distance` - Calculate distance from address to Burleson
-- `POST /api/calculate-price` - Calculate service pricing with travel fee
 
-### Google Calendar
-- `GET /api/auth/google` - Get OAuth authorization URL
-- `GET /api/auth/google/callback` - Handle OAuth callback
-- `GET /api/auth/google/status` - Check if calendar is connected
-- `POST /api/auth/google/disconnect` - Disconnect calendar
+### Public
+- `POST /api/bookings` - Create booking
+- `POST /api/calculate-price` - Get pricing
+- `POST /api/create-payment` - Square payment
+- `GET /api/services` - List services
+- `POST /api/inquiries` - Submit contact form
 
-### Quote Management
-- `GET /api/admin/pending-quotes` - Get quotes awaiting admin response
-- `POST /api/admin/quote/{id}/respond` - Mark quote as responded
-- `POST /api/admin/process-followups` - Manually trigger 24hr follow-ups
+### Admin (JWT Protected)
+- `GET /api/admin/stats` - Dashboard statistics
+- `GET /api/admin/bookings` - All bookings
+- `GET /api/admin/calendar` - Calendar data
+- `GET /api/admin/unpaid-subscriptions` - Failed payments
+- `PATCH /api/admin/subscriptions/{id}/status` - Update subscription
+- `POST /api/admin/messages/send` - In-house messaging
+- `GET/POST /api/contractors` - Contractor CRUD
+- `GET/POST /api/routes` - Route management
 
-### Background Tasks
-- Auto follow-up task runs hourly, sends email/SMS for quotes >24hrs old
+### Contractor (JWT Protected)
+- `GET /api/contractors/routes` - My routes
+- `POST /api/contractors/tasks/{id}/complete` - Mark complete
+- `POST /api/contractors/tasks/{id}/unable` - Unable to complete
 
-## What's Been Implemented
-**Date: Feb 24, 2026**
-- Complete booking website with 4-step wizard
-- 6 services: 4 fixed-price + 2 quote-based
-- Automatic distance calculation using Google Maps Routes API
-- **Map visual** showing route from customer to Burleson with markers
-- Travel fee automatically calculated and added to invoices
-- Email confirmations from verified domain
-- 24-hour auto follow-up system for quote requests
-- Google Calendar integration (OAuth flow + auto event creation)
-- Admin dashboard with Integrations panel
+---
 
-## How to Connect Google Calendar
-1. Go to Admin Dashboard (/admin)
-2. Find the "Integrations" section
-3. Click "Connect" next to Google Calendar
-4. Sign in with your Google account (upwashpressurewashing@gmail.com)
-5. Grant calendar access permissions
-6. You'll be redirected back - calendar will show as "Connected"
+## Backlog / Future Tasks
 
-Once connected, booking confirmations automatically create calendar events.
+### P0 (High Priority)
+- [ ] Email integration for invoices/quotes (in-house feature requested)
+- [ ] Automated subscription payment processing (currently manual trigger)
+- [ ] Auto-assign paid bookings to routes
 
-## Next Tasks (P1)
-1. HoneyBook CRM sync (requires API key)
+### P1 (Medium Priority)
+- [ ] Contractor-to-contractor chat
+- [ ] Contractor location/proximity tracking
+- [ ] GPS route optimization (Google Maps integration available)
+- [ ] Advanced scheduling rules (Recycling Mon-Thurs, Home Cleaning Wed/Thurs)
 
-## Future Tasks (P2)
-1. Customer portal for booking history
-2. Advanced analytics dashboard
-3. Recurring payment automation for monthly subscriptions
+### P2 (Low Priority)
+- [ ] Contractor route purchasing ($350 + tax)
+- [ ] Multiple time slot options for services
+- [ ] Customer self-service portal
+
+---
+
+## Testing
+- **Test Reports**: /app/test_reports/iteration_2.json
+- **Last Test**: All features passing (100% backend, 100% frontend)
