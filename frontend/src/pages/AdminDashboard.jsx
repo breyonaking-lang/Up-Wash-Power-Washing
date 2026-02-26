@@ -2032,8 +2032,10 @@ export default function AdminDashboard() {
       <main className="flex-1 p-6 overflow-y-auto">
         <Routes>
           <Route path="/" element={<DashboardOverview />} />
+          <Route path="calendar" element={<CalendarPage />} />
           <Route path="pending" element={<BookingsList status="pending" title="Pending Services" />} />
           <Route path="completed" element={<BookingsList status="completed" title="Completed Services" />} />
+          <Route path="unpaid-subscriptions" element={<UnpaidSubscriptionsPage />} />
           <Route path="revenue" element={<RevenuePage />} />
           <Route path="scent-bombs" element={<ScentBombOrders />} />
           <Route path="clients" element={<ClientPortal />} />
