@@ -42,7 +42,10 @@ const SERVICES = [
     description: "Power wash recycling bins inside and out",
     icon: Trash2,
     color: "bg-green-500",
-    pricingType: "tiered"
+    pricingType: "tiered",
+    bookingDays: [0, 1, 2, 3], // Mon-Thu
+    needsTime: false,
+    popupMessage: "Please set your recycling bins out the night before your scheduled service!"
   },
   {
     id: "patio",
@@ -51,7 +54,10 @@ const SERVICES = [
     icon: Sparkles,
     color: "bg-blue-500",
     price: 85,
-    pricingType: "fixed"
+    pricingType: "fixed",
+    bookingDays: [2, 3], // Wed-Thu only
+    needsTime: true,
+    timeSlots: ["09:00", "13:00"] // 4-hour blocks: 9am-1pm, 1pm-5pm
   },
   {
     id: "driveway",
@@ -60,7 +66,10 @@ const SERVICES = [
     icon: Car,
     color: "bg-orange-500",
     price: 85,
-    pricingType: "fixed"
+    pricingType: "fixed",
+    bookingDays: [2, 3], // Wed-Thu only
+    needsTime: true,
+    timeSlots: ["09:00", "13:00"]
   },
   {
     id: "dumpster",
@@ -68,7 +77,9 @@ const SERVICES = [
     description: "Commercial dumpster & surrounding area",
     icon: Warehouse,
     color: "bg-purple-500",
-    pricingType: "tiered"
+    pricingType: "tiered",
+    bookingDays: [0, 1, 2, 3, 4], // Mon-Fri
+    needsTime: false
   },
   {
     id: "home_powerwash",
@@ -76,7 +87,10 @@ const SERVICES = [
     description: "Complete home exterior - siding, deck, porch & more",
     icon: Home,
     color: "bg-cyan-500",
-    pricingType: "quote"
+    pricingType: "quote",
+    bookingDays: [2, 3], // Wed-Thu only
+    needsTime: true,
+    timeSlots: ["09:00", "13:00"]
   },
   {
     id: "construction_cleanup",
@@ -84,7 +98,19 @@ const SERVICES = [
     description: "Post-construction cleaning and debris removal",
     icon: HardHat,
     color: "bg-amber-500",
-    pricingType: "quote"
+    pricingType: "quote",
+    bookingDays: [0, 1, 2, 3, 4], // Any weekday
+    needsTime: false // Day only, no time
+  },
+  {
+    id: "commercial",
+    name: "Commercial Properties",
+    description: "Schools, apartments & commercial buildings",
+    icon: Building2,
+    color: "bg-indigo-500",
+    pricingType: "quote",
+    bookingDays: [0, 1, 2, 3, 4], // Any weekday
+    needsTime: false // Day only, no time
   }
 ];
 
