@@ -55,6 +55,7 @@ const Trash2Icon = Trash2;
 
 // Dashboard Overview
 function DashboardOverview() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -83,25 +84,28 @@ function DashboardOverview() {
   if (loading) return <LoadingSpinner />;
 
   const statCards = [
-    { label: 'Total Bookings', value: stats?.total_bookings || 0, icon: ClipboardList, color: 'bg-blue-500' },
-    { label: 'Pending', value: stats?.pending || 0, icon: Clock, color: 'bg-yellow-500' },
-    { label: 'Completed', value: stats?.completed || 0, icon: CheckCircle, color: 'bg-green-500' },
-    { label: 'Revenue', value: `$${(stats?.total_revenue || 0).toFixed(2)}`, icon: DollarSign, color: 'bg-emerald-500' },
-    { label: 'Scent Bomb Orders', value: stats?.scent_bomb_orders || 0, icon: Droplets, color: 'bg-purple-500' },
-    { label: 'Contractors', value: stats?.contractor_count || 0, icon: Users, color: 'bg-indigo-500' },
+    { label: 'Total Bookings', value: stats?.total_bookings || 0, icon: ClipboardList, color: 'bg-blue-500', link: '/admin/dashboard/pending' },
+    { label: 'Pending', value: stats?.pending || 0, icon: Clock, color: 'bg-yellow-500', link: '/admin/dashboard/pending' },
+    { label: 'Completed', value: stats?.completed || 0, icon: CheckCircle, color: 'bg-green-500', link: '/admin/dashboard/completed' },
+    { label: 'Revenue', value: `$${(stats?.total_revenue || 0).toFixed(2)}`, icon: DollarSign, color: 'bg-emerald-500', link: '/admin/dashboard/revenue' },
+    { label: 'Scent Bomb Orders', value: stats?.scent_bomb_orders || 0, icon: Droplets, color: 'bg-purple-500', link: '/admin/dashboard/scent-bombs' },
+    { label: 'Contractors', value: stats?.contractor_count || 0, icon: Users, color: 'bg-indigo-500', link: '/admin/dashboard/contractors' },
   ];
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">Dashboard Overview</h1>
       
+      {/* Daily Bible Verse */}
+      <DailyBibleVerse />
+      
       {/* Contractor Portal Link Card */}
       <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 backdrop-blur rounded-2xl p-6 border border-indigo-500/30">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 className="text-lg font-bold text-white mb-1">Contractor Portal Link</h3>
             <p className="text-white/60 text-sm mb-2">Share this link with new contractors</p>
-            <code className="bg-black/30 px-3 py-1 rounded text-indigo-300 text-sm">{CONTRACTOR_PORTAL_URL}</code>
+            <code className="bg-black/30 px-3 py-1 rounded text-indigo-300 text-sm break-all">{CONTRACTOR_PORTAL_URL}</code>
           </div>
           <div className="flex gap-2">
             <button
@@ -132,13 +136,15 @@ function DashboardOverview() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20"
+            onClick={() => navigate(stat.link)}
+            className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20 cursor-pointer hover:bg-white/15 hover:scale-105 transition-all"
           >
             <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center mb-4`}>
               <stat.icon className="w-6 h-6 text-white" />
             </div>
             <p className="text-white/60 text-sm">{stat.label}</p>
             <p className="text-2xl font-bold text-white">{stat.value}</p>
+            <p className="text-white/40 text-xs mt-1">Click to view →</p>
           </motion.div>
         ))}
       </div>
