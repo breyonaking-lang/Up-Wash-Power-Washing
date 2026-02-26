@@ -35,8 +35,12 @@ square_environment = os.environ.get('SQUARE_ENVIRONMENT', 'sandbox')
 # Initialize Square client
 square_client = None
 if square_access_token:
-    square_client = SquareClient(
-        access_token=square_access_token,
+    from square import Square
+    from square.environment import SquareEnvironment
+    env = SquareEnvironment.SANDBOX if square_environment == 'sandbox' else SquareEnvironment.PRODUCTION
+    square_client = Square(
+        token=square_access_token,
+        environment=env
     )
 
 # Google Maps setup
