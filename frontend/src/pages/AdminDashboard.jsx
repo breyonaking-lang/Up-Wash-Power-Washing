@@ -1431,6 +1431,384 @@ function InquiryMessagesPage() {
   );
 }
 
+// Admin Calendar Page
+function CalendarPage() {
+  const [calendarData, setCalendarData] = useState({});
+  const [routes, setRoutes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  useEffect(() => {
+    fetchCalendarData();
+  }, [currentMonth, currentYear]);
+
+  const fetchCalendarData = async () => {
+    try {
+      const res = await fetch(
+        `${API_URL}/api/admin/calendar?month=${currentMonth + 1}&year=${currentYear}`,
+        { headers: getAuthHeaders() }
+      );
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setCalendarData(data.calendar || {});
+      setRoutes(data.routes || []);
+    } catch (err) {
+      toast.error('Failed to load calendar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getDaysInMonth = (month, year) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (month, year) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const goToPrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+    const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
+    const days = [];
+    
+    // Empty cells for days before the first of month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="p-2 h-24"></div>);
+    }
+    
+    // Calendar days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const bookings = calendarData[dateStr] || [];
+      const isToday = dateStr === new Date().toISOString().split('T')[0];
+      
+      days.push(
+        <div 
+          key={day}
+          onClick={() => setSelectedDate({ date: dateStr, bookings })}
+          className={`p-2 h-24 border border-white/10 rounded-lg cursor-pointer hover:bg-white/10 transition ${
+            isToday ? 'bg-blue-500/20 border-blue-500' : ''
+          }`}
+        >
+          <div className={`text-sm font-bold ${isToday ? 'text-blue-400' : 'text-white'}`}>{day}</div>
+          {bookings.length > 0 && (
+            <div className="mt-1 space-y-1">
+              {bookings.slice(0, 2).map((b, i) => (
+                <div 
+                  key={i} 
+                  className={`text-xs px-1 py-0.5 rounded truncate ${
+                    b.is_monthly 
+                      ? 'bg-green-500/30 text-green-300' 
+                      : b.payment_status === 'paid'
+                        ? 'bg-blue-500/30 text-blue-300'
+                        : 'bg-yellow-500/30 text-yellow-300'
+                  }`}
+                >
+                  {b.customer_name?.split(' ')[0]}
+                </div>
+              ))}
+              {bookings.length > 2 && (
+                <div className="text-xs text-white/60">+{bookings.length - 2} more</div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return days;
+  };
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+        <CalendarIcon className="text-blue-400" />
+        Booking Calendar
+      </h1>
+
+      {/* Month Navigation */}
+      <div className="flex items-center justify-between bg-white/10 rounded-xl p-4">
+        <button onClick={goToPrevMonth} className="p-2 hover:bg-white/10 rounded-lg">
+          <ChevronLeft className="w-6 h-6 text-white" />
+        </button>
+        <h2 className="text-xl font-bold text-white">
+          {monthNames[currentMonth]} {currentYear}
+        </h2>
+        <button onClick={goToNextMonth} className="p-2 hover:bg-white/10 rounded-lg">
+          <ChevronRight className="w-6 h-6 text-white" />
+        </button>
+      </div>
+
+      {/* Calendar Legend */}
+      <div className="flex gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-green-500/50 rounded"></div>
+          <span className="text-white/60 text-sm">Subscription</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-blue-500/50 rounded"></div>
+          <span className="text-white/60 text-sm">Paid</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-yellow-500/50 rounded"></div>
+          <span className="text-white/60 text-sm">Unpaid</span>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="bg-white/10 rounded-2xl p-4">
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="text-center text-white/60 text-sm font-medium py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {renderCalendar()}
+        </div>
+      </div>
+
+      {/* Today's Routes */}
+      <div className="bg-white/10 rounded-2xl p-6">
+        <h3 className="text-lg font-bold text-white mb-4">Today's Routes</h3>
+        {routes.length === 0 ? (
+          <p className="text-white/60">No routes scheduled</p>
+        ) : (
+          <div className="space-y-3">
+            {routes.map(route => (
+              <div key={route.id} className="bg-white/5 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-semibold">{route.name}</p>
+                  <p className="text-white/60 text-sm">{route.area}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-blue-400 text-sm">{route.contractor_name || 'Unassigned'}</p>
+                  <p className="text-white/60 text-sm">{route.bookings?.length || 0} stops</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Selected Date Modal */}
+      {selectedDate && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setSelectedDate(null)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{selectedDate.date}</h2>
+                <p className="text-white/60">{selectedDate.bookings.length} booking(s)</p>
+              </div>
+              <button onClick={() => setSelectedDate(null)} className="text-white/60 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {selectedDate.bookings.length === 0 ? (
+              <p className="text-white/60 text-center py-8">No bookings for this date</p>
+            ) : (
+              <div className="space-y-3">
+                {selectedDate.bookings.map((booking, i) => (
+                  <div key={i} className={`p-4 rounded-xl ${
+                    booking.is_monthly 
+                      ? 'bg-green-500/20 border border-green-500/30' 
+                      : 'bg-white/10'
+                  }`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-white font-semibold">{booking.customer_name}</p>
+                        <p className="text-white/60 text-sm">{booking.address}</p>
+                        <div className="flex gap-2 mt-2">
+                          {booking.is_monthly && (
+                            <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">Subscription</span>
+                          )}
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            booking.payment_status === 'paid' 
+                              ? 'bg-blue-500 text-white' 
+                              : 'bg-yellow-500 text-white'
+                          }`}>
+                            {booking.payment_status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          booking.status === 'confirmed' ? 'bg-green-500/20 text-green-400' :
+                          booking.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                          'bg-yellow-500/20 text-yellow-400'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Unpaid Subscriptions Page
+function UnpaidSubscriptionsPage() {
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUnpaidSubscriptions();
+  }, []);
+
+  const fetchUnpaidSubscriptions = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/unpaid-subscriptions`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setSubscriptions(data.unpaid_subscriptions || []);
+    } catch (err) {
+      toast.error('Failed to load unpaid subscriptions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reactivateSubscription = async (bookingId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/subscriptions/${bookingId}/status?status=active`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      toast.success('Subscription reactivated');
+      fetchUnpaidSubscriptions();
+    } catch (err) {
+      toast.error('Failed to reactivate subscription');
+    }
+  };
+
+  const cancelSubscription = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to cancel this subscription? This will remove them from routes.')) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/admin/subscriptions/${bookingId}/status?status=cancelled`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      toast.success('Subscription cancelled');
+      fetchUnpaidSubscriptions();
+    } catch (err) {
+      toast.error('Failed to cancel subscription');
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+        <AlertCircle className="text-red-400" />
+        Unpaid Subscriptions
+      </h1>
+
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+        <p className="text-red-300">
+          These subscription clients have failed payments. They have been automatically removed from routes until payment is updated.
+        </p>
+      </div>
+
+      {subscriptions.length === 0 ? (
+        <div className="bg-white/10 rounded-2xl p-8 text-center">
+          <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
+          <p className="text-white/60">No unpaid subscriptions</p>
+          <p className="text-white/40 text-sm">All subscription payments are up to date</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {subscriptions.map((sub) => (
+            <div key={sub.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-red-500/30">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-white">{sub.customer_name}</h3>
+                  <p className="text-white/60">{sub.customer_phone}</p>
+                  <p className="text-white/60">{sub.customer_email}</p>
+                  <p className="text-white/60 text-sm mt-2">{sub.customer_address}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-red-400 font-bold">${sub.total?.toFixed(2)}/month</p>
+                  <p className="text-white/60 text-sm">{sub.service_days_per_month} days/month</p>
+                  <p className="text-red-300 text-sm mt-2">Payment Failed</p>
+                </div>
+              </div>
+              
+              <div className="bg-white/5 rounded-xl p-3 mb-4">
+                <p className="text-white/60 text-sm">
+                  <strong>Service Days:</strong> {sub.monthly_service_days?.map(d => {
+                    const suffix = d === 1 || d === 21 || d === 31 ? 'st' : 
+                                  d === 2 || d === 22 ? 'nd' : 
+                                  d === 3 || d === 23 ? 'rd' : 'th';
+                    return `${d}${suffix}`;
+                  }).join(', ')} of each month
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => reactivateSubscription(sub.id)}
+                  className="flex-1 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600"
+                >
+                  Reactivate (Payment Updated)
+                </button>
+                <button
+                  onClick={() => cancelSubscription(sub.id)}
+                  className="flex-1 py-2 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30"
+                >
+                  Cancel Subscription
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Loading Spinner
 function LoadingSpinner() {
   return (
