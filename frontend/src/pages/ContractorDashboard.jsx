@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, MapPin, CheckCircle, MessageSquare, 
   LogOut, Menu, X, Navigation, Camera, AlertTriangle,
   Phone, Clock, DollarSign, Users, ShoppingCart, ChevronRight,
-  Send, Route as RouteIcon
+  Send, Route as RouteIcon, Bell, BellRing
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const GOOGLE_MAPS_API_KEY = 'AIzaSyB2vTg8-1CZ28q-bpxk9oOh48rCG2mLKEg';
 const TAX_RATE = 0.0825;
+
+// Notification sound
+const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6Xj4F1cXV9iJSgn5aLfnJucX2IlZ6dloyAc29weoeSm5uUjYF2c3V8hpGZmZSNg3d0dXuFj5eXko2Bd3R2fIaQl5aRjIF3dHZ9hpCWlZCLgHZ0dn6Hj5WUj4qAdnR3foeOk5KNiYB2dHd+ho2SkIuIf3Z0d36GjJCOioZ+dnR4fYaLjo2IhX12dHh+hYqMi4aDfHZ0eH6EiYqJhIJ7dnV4foSIiYeEgXp2dXl+g4eHhoOAeXZ1eX6Ch4aFgn94dnV5fYKGhYOBfnd2dXl9gYSEgoB9d3V2eX2BhIOBf3x3dXZ5fYCDgYB+e3d1dnl9gIKAgH17d3V2enmAgIB/fHp3dXZ6eX9/f357eXd2dnp5fn5+fXx6eHd3d3p5fX19fHt5eHd3d3p5fHx8e3p5eHd4eHp5fHt7enl4eHh4eXl7e3t6eXl4eHh4eXp6enp5eXh4eHl5enp5eXl5eHh4eXl5eXl5eXl4eHh5eXl5eXl5eHh4eHl5eXl5eXh4eHh4eXl5eXl5eHh4eHh5eXl5eXl4eHh4eHh4eXl5eXl4eHh4eHh4eHl5eXh4eHh4eHh4eHh5eXh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eA==";
 
 // Auth helper
 const getAuthHeaders = () => ({
@@ -24,6 +27,7 @@ const navItems = [
   { path: '', icon: LayoutDashboard, label: "Today's Route" },
   { path: 'routes', icon: RouteIcon, label: 'My Routes' },
   { path: 'purchase', icon: ShoppingCart, label: 'Purchase Routes' },
+  { path: 'notifications', icon: Bell, label: 'Notifications' },
   { path: 'chat', icon: MessageSquare, label: 'Messages' },
   { path: 'team', icon: Users, label: 'Team' },
 ];
