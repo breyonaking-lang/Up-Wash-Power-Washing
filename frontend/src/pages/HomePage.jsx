@@ -60,6 +60,15 @@ const services = [
     color: "bg-purple-500"
   },
   {
+    id: "commercial",
+    name: "Commercial Properties",
+    description: "Schools, apartments & commercial buildings",
+    price: "Get Quote",
+    icon: Building2,
+    color: "bg-indigo-500",
+    isQuote: true
+  },
+  {
     id: "home_powerwash",
     name: "Home Power Washing",
     description: "Complete home exterior cleaning",
