@@ -127,7 +127,8 @@ class BookingCreate(BaseModel):
     services: List[Dict]
     booking_dates: List[str]
     is_monthly: bool = False
-    monthly_days: Optional[List[str]] = None
+    monthly_service_days: Optional[List[int]] = None  # Days of month (1-31)
+    service_days_per_month: Optional[int] = None  # How many days per month
     sms_opt_in: bool = False
     recurring_payment: bool = False
     notes: Optional[str] = None
@@ -147,7 +148,8 @@ class Booking(BaseModel):
     services: List[Dict]
     booking_dates: List[str]
     is_monthly: bool
-    monthly_days: Optional[List[str]] = None
+    monthly_service_days: Optional[List[int]] = None  # Days of month (1-31)
+    service_days_per_month: Optional[int] = None  # How many days per month
     sms_opt_in: bool = False
     recurring_payment: bool = False
     notes: Optional[str] = None
@@ -163,6 +165,8 @@ class Booking(BaseModel):
     payment_id: Optional[str] = None
     is_quote_service: bool = False
     is_scent_bomb_only: bool = False
+    subscription_status: str = "active"  # active, payment_failed, cancelled
+    next_payment_date: Optional[str] = None
     assigned_contractor_id: Optional[str] = None
     route_id: Optional[str] = None
     task_status: str = "pending"  # pending, in_progress, completed, unable_to_complete
