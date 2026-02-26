@@ -977,6 +977,81 @@ export default function AdminDashboard() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotification, setShowNotification] = useState(false);
+  const [latestMessage, setLatestMessage] = useState(null);
+  const lastMessageIdRef = useRef(null);
+  const audioRef = useRef(null);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Check for new messages every 10 seconds
+  useEffect(() => {
+    const checkMessages = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/chat/messages`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const messages = data.messages || [];
+        
+        // Count unread messages from contractors
+        const unread = messages.filter(m => m.sender_id !== 'admin' && !m.read).length;
+        setUnreadCount(unread);
+        
+        // Check for new messages
+        if (messages.length > 0) {
+          const latestMsg = messages[0];
+          if (latestMsg.sender_id !== 'admin' && latestMsg.id !== lastMessageIdRef.current) {
+            // New message from contractor!
+            lastMessageIdRef.current = latestMsg.id;
+            setLatestMessage(latestMsg);
+            setShowNotification(true);
+            
+            // Play sound
+            playNotificationSound();
+            
+            // Show browser notification
+            showBrowserNotification(latestMsg);
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => setShowNotification(false), 5000);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check messages:', err);
+      }
+    };
+
+    checkMessages();
+    const interval = setInterval(checkMessages, 10000); // Check every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const playNotificationSound = () => {
+    try {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(NOTIFICATION_SOUND);
+      }
+      audioRef.current.play().catch(console.error);
+    } catch (err) {
+      console.error('Failed to play sound:', err);
+    }
+  };
+
+  const showBrowserNotification = (message) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('New Message - Upwash Admin', {
+        body: `${message.sender_name}: ${message.content}`,
+        icon: '/favicon.ico',
+        tag: 'upwash-message'
+      });
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -1008,6 +1083,36 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex">
+      {/* Floating Notification */}
+      <AnimatePresence>
+        {showNotification && latestMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -100, x: '-50%' }}
+            animate={{ opacity: 1, y: 20, x: '-50%' }}
+            exit={{ opacity: 0, y: -100 }}
+            className="fixed top-0 left-1/2 z-50 bg-teal-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 cursor-pointer"
+            onClick={() => {
+              setShowNotification(false);
+              navigate('/admin/dashboard/messages');
+            }}
+          >
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+              <MessageSquare className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="font-bold">New Message from {latestMessage.sender_name}</p>
+              <p className="text-white/80 text-sm truncate max-w-xs">{latestMessage.content}</p>
+            </div>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowNotification(false); }}
+              className="ml-4 text-white/60 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <motion.aside
         initial={false}
@@ -1028,14 +1133,29 @@ export default function AdminDashboard() {
             <Link
               key={item.path}
               to={`/admin/dashboard/${item.path}`}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition relative ${
                 currentPath === item.path 
                   ? 'bg-blue-500 text-white' 
                   : 'text-white/60 hover:bg-white/10 hover:text-white'
               }`}
             >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {sidebarOpen && <span>{item.label}</span>}
+              <div className="relative">
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {/* Message badge */}
+                {item.path === 'messages' && unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </div>
+              {sidebarOpen && (
+                <span className="flex-1">{item.label}</span>
+              )}
+              {sidebarOpen && item.path === 'messages' && unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+                  {unreadCount} new
+                </span>
+              )}
             </Link>
           ))}
         </nav>
