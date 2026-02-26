@@ -48,36 +48,42 @@ export default function ContractorLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/20 rounded-2xl mb-4">
-              <Truck className="w-10 h-10 text-emerald-400" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex flex-col">
+      {/* Bible Verse */}
+      <div className="p-4">
+        <DailyBibleVerse variant="compact" />
+      </div>
+      
+      <div className="flex-1 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md"
+        >
+          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+            {/* Logo */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/20 rounded-2xl mb-4">
+                <Truck className="w-10 h-10 text-emerald-400" />
+              </div>
+              <h1 className="text-3xl font-bold text-white">Contractor Portal</h1>
+              <p className="text-emerald-200 mt-2">Upwash Power Washing</p>
             </div>
-            <h1 className="text-3xl font-bold text-white">Contractor Portal</h1>
-            <p className="text-emerald-200 mt-2">Upwash Power Washing</p>
-          </div>
 
-          {/* Error Message */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6 flex items-center gap-3"
-            >
-              <AlertCircle className="w-5 h-5 text-red-400" />
-              <span className="text-red-200">{error}</span>
-            </motion.div>
-          )}
+            {/* Error Message */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6 flex items-center gap-3"
+              >
+                <AlertCircle className="w-5 h-5 text-red-400" />
+                <span className="text-red-200">{error}</span>
+              </motion.div>
+            )}
 
-          {/* Login Form */}
-          <form onSubmit={handleLogin} className="space-y-6">
+            {/* Login Form */}
+            <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label className="block text-emerald-200 mb-2 font-medium">Username</label>
               <div className="relative">
