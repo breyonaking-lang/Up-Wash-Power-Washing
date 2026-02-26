@@ -840,8 +840,6 @@ async def get_payment_config():
 
 @api_router.get("/admin/stats")
 async def admin_stats(current_user: dict = Depends(get_admin_user)):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    
     total = await db.bookings.count_documents({})
     pending = await db.bookings.count_documents({"status": "pending"})
     confirmed = await db.bookings.count_documents({"status": "confirmed"})
