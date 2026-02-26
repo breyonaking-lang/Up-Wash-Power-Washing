@@ -983,6 +983,21 @@ async def assign_route(route_id: str, assignment: RouteAssignment, current_user:
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Route not found")
     
+    # Create notification for contractor
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if route and assignment.contractor_id:
+        notification = {
+            "id": str(uuid.uuid4()),
+            "contractor_id": assignment.contractor_id,
+            "type": "route_assigned",
+            "title": "New Route Assigned!",
+            "message": f"You have been assigned to route: {route.get('name', 'Unknown')}",
+            "route_id": route_id,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(notification)
+    
     return {"message": "Route assigned"}
 
 @api_router.post("/admin/routes/{route_id}/bookings")
@@ -997,6 +1012,21 @@ async def add_bookings_to_route(route_id: str, booking_ids: List[str], current_u
         {"id": {"$in": booking_ids}},
         {"$set": {"route_id": route_id}}
     )
+    
+    # Notify contractor if route is assigned
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if route and route.get("assigned_contractor_id"):
+        notification = {
+            "id": str(uuid.uuid4()),
+            "contractor_id": route["assigned_contractor_id"],
+            "type": "bookings_added",
+            "title": "New Stops Added!",
+            "message": f"{len(booking_ids)} new stop(s) added to your route: {route.get('name', 'Unknown')}",
+            "route_id": route_id,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(notification)
     
     return {"message": "Bookings added to route"}
 
