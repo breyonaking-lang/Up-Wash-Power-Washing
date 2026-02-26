@@ -251,6 +251,15 @@ SERVICES = {
         "pricing_type": "quote",
         "is_addon": False,
         "bookable_from_home": True
+    },
+    "commercial": {
+        "service_id": "commercial",
+        "name": "Commercial Properties",
+        "description": "Power washing for schools, apartments, and commercial buildings",
+        "base_price": 0.0,
+        "pricing_type": "quote",
+        "is_addon": False,
+        "bookable_from_home": True
     }
 }
 
