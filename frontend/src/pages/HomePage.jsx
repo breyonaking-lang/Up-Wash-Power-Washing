@@ -191,19 +191,21 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h3>
                 <p className="text-slate-500 mb-4">{service.description}</p>
-                <p className={`text-2xl font-extrabold price-tag mb-4 ${service.isQuote ? 'text-amber-600' : 'text-blue-600'}`}>
+                <p className={`text-2xl font-extrabold price-tag mb-4 ${service.isQuote ? 'text-amber-600' : service.id === 'scent_bomb' ? 'text-pink-600' : 'text-blue-600'}`}>
                   {service.price}
                 </p>
                 <button
-                  onClick={() => handleBookService(service.id)}
+                  onClick={() => handleBookService(service)}
                   className={`w-full py-3 rounded-xl font-bold transition-colors ${
                     service.isQuote 
                       ? 'bg-amber-500 hover:bg-amber-600 text-white' 
+                      : service.id === 'scent_bomb'
+                      ? 'bg-pink-500 hover:bg-pink-600 text-white'
                       : 'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}
                   data-testid={`book-${service.id}-btn`}
                 >
-                  {service.isQuote ? 'Get Quote' : 'Book Now'}
+                  {service.isQuote ? 'Get Quote' : service.id === 'scent_bomb' ? 'Shop Now' : 'Book Now'}
                 </button>
               </motion.div>
             ))}
