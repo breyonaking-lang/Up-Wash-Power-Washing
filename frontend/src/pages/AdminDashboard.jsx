@@ -750,19 +750,28 @@ function ContractorsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
           <UserPlus className="text-indigo-400" />
           Contractors
         </h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-indigo-500 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-600"
-          data-testid="create-contractor-btn"
-        >
-          <Plus className="w-5 h-5" />
-          Add Contractor
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={broadcastNotification}
+            className="px-4 py-2 bg-yellow-500 text-white rounded-xl flex items-center gap-2 hover:bg-yellow-600"
+          >
+            <Bell className="w-5 h-5" />
+            Broadcast to All
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-indigo-500 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-600"
+            data-testid="create-contractor-btn"
+          >
+            <Plus className="w-5 h-5" />
+            Add Contractor
+          </button>
+        </div>
       </div>
 
       {/* Contractor Portal Link */}
