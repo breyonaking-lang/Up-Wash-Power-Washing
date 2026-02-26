@@ -80,6 +80,12 @@ const features = [
 ];
 
 const HomePage = () => {
+  const navigate = useNavigate();
+  
+  const handleBookService = (serviceId) => {
+    navigate('/booking', { state: { preselectedService: serviceId } });
+  };
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -120,13 +126,13 @@ const HomePage = () => {
                   Book Now <ArrowRight className="ml-2" size={20} />
                 </Button>
               </Link>
-              <Link to="/services">
+              <Link to="/scent-bombs">
                 <Button 
-                  data-testid="hero-view-services-btn"
-                  variant="outline"
-                  className="border-2 border-white text-white hover:bg-white/10 font-bold py-6 px-8 rounded-full text-lg"
+                  data-testid="hero-scent-bombs-btn"
+                  className="bg-purple-500 text-white hover:bg-purple-600 font-bold py-6 px-8 rounded-full text-lg shadow-xl hover:shadow-2xl transition-all flex items-center"
                 >
-                  View Services
+                  <Droplets className="mr-2" size={20} />
+                  Shop Scent Bombs
                 </Button>
               </Link>
             </div>
@@ -138,6 +144,31 @@ const HomePage = () => {
           <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="#F5F5F7"/>
           </svg>
+        </div>
+      </section>
+
+      {/* Scent Bombs Promo Section */}
+      <section className="py-12 bg-gradient-to-r from-purple-600 to-pink-500">
+        <div className="container mx-auto max-w-7xl px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-center md:text-left">
+              <h2 className="text-3xl font-bold text-white mb-2">
+                <Droplets className="inline-block mr-2" size={32} />
+                Scent Bombs - Just $3.50 each!
+              </h2>
+              <p className="text-white/90">
+                Deodorize your bins with our premium scent treatments. No travel fee - we ship direct!
+              </p>
+            </div>
+            <Link to="/scent-bombs">
+              <Button 
+                data-testid="promo-scent-bombs-btn"
+                className="bg-white text-purple-600 hover:bg-slate-100 font-bold py-4 px-8 rounded-full shadow-lg"
+              >
+                Shop Now <ArrowRight className="ml-2" size={18} />
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
