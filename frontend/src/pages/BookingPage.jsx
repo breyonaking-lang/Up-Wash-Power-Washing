@@ -187,7 +187,7 @@ const BookingPage = () => {
   // Calculate pricing whenever selections change
   useEffect(() => {
     calculatePrice();
-  }, [selectedServices, binQuantity, dumpsterQuantity, scentBombs, bookingMode, monthlyDays, distance]);
+  }, [selectedServices, binQuantity, dumpsterQuantity, scentBombs, bookingMode, monthlyServiceDays, serviceDaysPerMonth, distance]);
 
   const calculatePrice = async () => {
     const services = [];
@@ -213,7 +213,7 @@ const BookingPage = () => {
       return;
     }
 
-    const numDays = bookingMode === "monthly" ? monthlyDays.length : 1;
+    const numDays = bookingMode === "monthly" ? serviceDaysPerMonth : 1;
 
     try {
       const response = await axios.post(`${API}/calculate-price`, {
@@ -235,13 +235,20 @@ const BookingPage = () => {
     }));
   };
 
-  const toggleMonthlyDay = (day) => {
-    if (monthlyDays.includes(day)) {
-      setMonthlyDays(monthlyDays.filter(d => d !== day));
-    } else if (monthlyDays.length < 2) {
-      setMonthlyDays([...monthlyDays, day]);
+  const toggleMonthlyServiceDay = (day) => {
+    if (monthlyServiceDays.includes(day)) {
+      setMonthlyServiceDays(monthlyServiceDays.filter(d => d !== day));
+    } else if (monthlyServiceDays.length < serviceDaysPerMonth) {
+      setMonthlyServiceDays([...monthlyServiceDays, day].sort((a, b) => a - b));
     }
   };
+
+  // Update selected days when serviceDaysPerMonth changes
+  useEffect(() => {
+    if (monthlyServiceDays.length > serviceDaysPerMonth) {
+      setMonthlyServiceDays(monthlyServiceDays.slice(0, serviceDaysPerMonth));
+    }
+  }, [serviceDaysPerMonth]);
 
   // Calculate distance when address changes
   const calculateDistanceFromAddress = async (address) => {
