@@ -39,8 +39,10 @@ const getAuthHeaders = () => ({
 // Sidebar Navigation
 const navItems = [
   { path: '', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: 'calendar', icon: CalendarIcon, label: 'Calendar' },
   { path: 'pending', icon: Clock, label: 'Pending Services' },
   { path: 'completed', icon: CheckCircle, label: 'Completed Services' },
+  { path: 'unpaid-subscriptions', icon: AlertCircle, label: 'Unpaid Subscriptions' },
   { path: 'revenue', icon: DollarSign, label: 'Revenue' },
   { path: 'scent-bombs', icon: Droplets, label: 'Scent Bomb Orders' },
   { path: 'clients', icon: Users, label: 'Client Portal' },
