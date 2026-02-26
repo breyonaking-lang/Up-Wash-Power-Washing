@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "../components/ui/button";
 import { 
@@ -13,7 +13,8 @@ import {
   Phone,
   Star,
   Home,
-  HardHat
+  HardHat,
+  Droplets
 } from "lucide-react";
 
 const services = [
@@ -45,7 +46,7 @@ const services = [
     id: "dumpster",
     name: "Dumpster Cleaning",
     description: "Commercial dumpster & area cleaning",
-    price: "From $70",
+    price: "From $85",
     icon: Warehouse,
     color: "bg-purple-500"
   },
