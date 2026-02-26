@@ -118,6 +118,9 @@ const SERVICES = [
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
+// Generate days 1-31 for month selection
+const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+
 const BookingPage = () => {
   const [searchParams] = useSearchParams();
   const cancelled = searchParams.get("cancelled");
@@ -129,8 +132,9 @@ const BookingPage = () => {
   // Single booking date
   const [selectedDate, setSelectedDate] = useState(null);
   
-  // Monthly subscription - 2 days per month
-  const [monthlyDays, setMonthlyDays] = useState([]);
+  // Monthly subscription - days of the month (1-31)
+  const [monthlyServiceDays, setMonthlyServiceDays] = useState([]); // e.g., [1, 15] for 1st and 15th
+  const [serviceDaysPerMonth, setServiceDaysPerMonth] = useState(2); // How many days per month
   const [monthlyStartDate, setMonthlyStartDate] = useState(null);
 
   // Service selections
