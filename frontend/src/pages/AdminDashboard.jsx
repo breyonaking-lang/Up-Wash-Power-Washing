@@ -685,6 +685,47 @@ function ContractorsPage() {
     toast.success('Opening SMS app...');
   };
 
+  const sendNotification = async (contractor) => {
+    const title = prompt('Notification Title:');
+    if (!title) return;
+    const message = prompt('Notification Message:');
+    if (!message) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/admin/notifications/send`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          contractor_id: contractor.id,
+          title: title,
+          message: message
+        })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      toast.success(`Notification sent to ${contractor.full_name}!`);
+    } catch (err) {
+      toast.error('Failed to send notification');
+    }
+  };
+
+  const broadcastNotification = async () => {
+    const title = prompt('Broadcast Title:');
+    if (!title) return;
+    const message = prompt('Broadcast Message:');
+    if (!message) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/admin/notifications/broadcast?title=${encodeURIComponent(title)}&message=${encodeURIComponent(message)}`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      toast.success('Notification sent to all contractors!');
+    } catch (err) {
+      toast.error('Failed to broadcast notification');
+    }
+  };
+
   const deleteContractor = async (contractorId) => {
     if (!window.confirm('Are you sure you want to delete this contractor?')) return;
 
