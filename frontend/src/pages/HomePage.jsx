@@ -195,7 +195,7 @@ const HomePage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="service-card group bg-white p-8 rounded-3xl border border-slate-100 shadow-sm"
+                className="service-card group bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-shadow"
                 data-testid={`service-card-${service.id}`}
               >
                 <div className={`w-14 h-14 ${service.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
@@ -203,9 +203,20 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h3>
                 <p className="text-slate-500 mb-4">{service.description}</p>
-                <p className={`text-2xl font-extrabold price-tag ${service.isQuote ? 'text-amber-600' : 'text-blue-600'}`}>
+                <p className={`text-2xl font-extrabold price-tag mb-4 ${service.isQuote ? 'text-amber-600' : 'text-blue-600'}`}>
                   {service.price}
                 </p>
+                <button
+                  onClick={() => handleBookService(service.id)}
+                  className={`w-full py-3 rounded-xl font-bold transition-colors ${
+                    service.isQuote 
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                  data-testid={`book-${service.id}-btn`}
+                >
+                  {service.isQuote ? 'Get Quote' : 'Book Now'}
+                </button>
               </motion.div>
             ))}
           </div>
