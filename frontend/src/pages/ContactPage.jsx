@@ -8,10 +8,13 @@ import {
   Mail, 
   MapPin, 
   Clock,
-  Send
+  Send,
+  CheckCircle
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -21,17 +24,29 @@ const ContactPage = () => {
     message: ""
   });
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast.success("Message sent! We'll get back to you soon.");
-    setFormData({ name: "", email: "", phone: "", message: "" });
-    setSubmitting(false);
+    try {
+      const response = await fetch(`${API_URL}/api/inquiries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      if (!response.ok) throw new Error('Failed to send');
+      
+      toast.success("Message sent! We'll get back to you soon.");
+      setFormData({ name: "", email: "", phone: "", message: "" });
+      setSubmitted(true);
+    } catch (error) {
+      toast.error("Failed to send message. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
