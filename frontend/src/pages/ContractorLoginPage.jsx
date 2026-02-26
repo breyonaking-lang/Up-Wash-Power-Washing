@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Truck, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import DailyBibleVerse from '../components/shared/DailyBibleVerse';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
