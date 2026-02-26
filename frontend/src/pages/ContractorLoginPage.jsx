@@ -147,6 +147,7 @@ export default function ContractorLoginPage() {
           </div>
         </div>
       </motion.div>
+      </div>
     </div>
   );
 }
