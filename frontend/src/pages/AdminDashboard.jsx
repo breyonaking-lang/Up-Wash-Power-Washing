@@ -832,6 +832,13 @@ function ContractorsPage() {
                       <Eye className="w-5 h-5" />
                     </button>
                     <button
+                      onClick={() => sendNotification(contractor)}
+                      className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30"
+                      title="Send Notification"
+                    >
+                      <Bell className="w-5 h-5" />
+                    </button>
+                    <button
                       onClick={() => sendSMS(contractor)}
                       className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
                       title="Send SMS"
@@ -840,7 +847,7 @@ function ContractorsPage() {
                     </button>
                     <button
                       onClick={() => resetPassword(contractor.id)}
-                      className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30"
+                      className="p-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30"
                       title="Reset Password"
                     >
                       <Key className="w-5 h-5" />
