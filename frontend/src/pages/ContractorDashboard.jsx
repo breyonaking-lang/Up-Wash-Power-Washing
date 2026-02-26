@@ -869,6 +869,67 @@ export default function ContractorDashboard() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showNotificationPopup, setShowNotificationPopup] = useState(false);
+  const [latestNotification, setLatestNotification] = useState(null);
+  const lastNotificationIdRef = useRef(null);
+  const audioRef = useRef(null);
+
+  // Check for new notifications
+  useEffect(() => {
+    const checkNotifications = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/contractor/notifications`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const notifications = data.notifications || [];
+        
+        setUnreadNotifications(data.unread_count || 0);
+        
+        // Check for new notification
+        if (notifications.length > 0) {
+          const latest = notifications[0];
+          if (!latest.read && latest.id !== lastNotificationIdRef.current) {
+            lastNotificationIdRef.current = latest.id;
+            setLatestNotification(latest);
+            setShowNotificationPopup(true);
+            playNotificationSound();
+            showBrowserNotification(latest);
+            setTimeout(() => setShowNotificationPopup(false), 6000);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check notifications:', err);
+      }
+    };
+
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 10000); // Check every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const playNotificationSound = () => {
+    try {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(NOTIFICATION_SOUND);
+      }
+      audioRef.current.play().catch(console.error);
+    } catch (err) {
+      console.error('Failed to play sound:', err);
+    }
+  };
+
+  const showBrowserNotification = (notif) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(notif.title, {
+        body: notif.message,
+        icon: '/favicon.ico',
+        tag: 'upwash-contractor'
+      });
+    } else if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -886,6 +947,11 @@ export default function ContractorDashboard() {
     }
 
     setUser(parsed);
+    
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
   }, [navigate]);
 
   const handleLogout = () => {
@@ -900,6 +966,36 @@ export default function ContractorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex">
+      {/* Notification Popup */}
+      <AnimatePresence>
+        {showNotificationPopup && latestNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -100, x: '-50%' }}
+            animate={{ opacity: 1, y: 20, x: '-50%' }}
+            exit={{ opacity: 0, y: -100 }}
+            className="fixed top-0 left-1/2 z-50 bg-yellow-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 cursor-pointer max-w-md"
+            onClick={() => {
+              setShowNotificationPopup(false);
+              navigate('/contractor/dashboard/notifications');
+            }}
+          >
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+              <BellRing className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold">{latestNotification.title}</p>
+              <p className="text-white/90 text-sm">{latestNotification.message}</p>
+            </div>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowNotificationPopup(false); }}
+              className="text-white/60 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <motion.aside
         initial={false}
@@ -919,20 +1015,36 @@ export default function ContractorDashboard() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={`/contractor/dashboard/${item.path}`}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-                currentPath === item.path 
-                  ? 'bg-emerald-500 text-white' 
-                  : 'text-white/60 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {sidebarOpen && <span>{item.label}</span>}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isNotifications = item.path === 'notifications';
+            
+            return (
+              <Link
+                key={item.path}
+                to={`/contractor/dashboard/${item.path}`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition relative ${
+                  currentPath === item.path 
+                    ? 'bg-emerald-500 text-white' 
+                    : 'text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <div className="relative">
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  {isNotifications && unreadNotifications > 0 && (
+                    <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </span>
+                  )}
+                </div>
+                {sidebarOpen && <span>{item.label}</span>}
+                {sidebarOpen && isNotifications && unreadNotifications > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+                    {unreadNotifications}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-white/10">
@@ -953,6 +1065,7 @@ export default function ContractorDashboard() {
           <Route path="/" element={<TodayRoute />} />
           <Route path="routes" element={<MyRoutes />} />
           <Route path="purchase" element={<PurchaseRoutes />} />
+          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="chat" element={<ChatPage />} />
           <Route path="team" element={<TeamPage />} />
         </Routes>
