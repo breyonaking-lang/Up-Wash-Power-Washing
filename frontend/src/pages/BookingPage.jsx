@@ -29,7 +29,9 @@ import {
   HardHat,
   Camera,
   FileText,
-  Mail
+  Mail,
+  Building2,
+  AlertCircle
 } from "lucide-react";
 import { format, addDays, isWeekend, isBefore, startOfToday } from "date-fns";
 
