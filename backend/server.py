@@ -703,7 +703,7 @@ async def create_booking(booking_data: BookingCreate):
             if not is_weekday(date_str):
                 raise HTTPException(status_code=400, detail=f"Date {date_str} is not a weekday")
     
-    num_days = len(booking_data.booking_dates) if booking_data.booking_dates else 1
+    num_days = booking_data.service_days_per_month if booking_data.is_monthly and booking_data.service_days_per_month else (len(booking_data.booking_dates) if booking_data.booking_dates else 1)
     pricing = calculate_booking_total(
         booking_data.services,
         booking_data.distance_miles,
@@ -717,6 +717,28 @@ async def create_booking(booking_data: BookingCreate):
         for s in booking_data.services
     )
     
+    # Calculate next payment date for subscriptions (3 days before next service)
+    next_payment_date = None
+    if booking_data.is_monthly and booking_data.monthly_service_days:
+        # Find the next service day
+        today = datetime.now(timezone.utc)
+        for day in sorted(booking_data.monthly_service_days):
+            # Try this month
+            try:
+                next_service = today.replace(day=day)
+                if next_service > today:
+                    next_payment_date = (next_service - timedelta(days=3)).strftime("%Y-%m-%d")
+                    break
+            except ValueError:
+                continue
+        
+        # If no day found this month, use first day next month
+        if not next_payment_date and booking_data.monthly_service_days:
+            first_day = min(booking_data.monthly_service_days)
+            next_month = today.replace(day=1) + timedelta(days=32)
+            next_month = next_month.replace(day=first_day)
+            next_payment_date = (next_month - timedelta(days=3)).strftime("%Y-%m-%d")
+    
     booking = Booking(
         customer_name=booking_data.customer_name,
         customer_email=booking_data.customer_email,
@@ -726,7 +748,8 @@ async def create_booking(booking_data: BookingCreate):
         services=booking_data.services,
         booking_dates=booking_data.booking_dates,
         is_monthly=booking_data.is_monthly,
-        monthly_days=booking_data.monthly_days,
+        monthly_service_days=booking_data.monthly_service_days,
+        service_days_per_month=booking_data.service_days_per_month,
         sms_opt_in=booking_data.sms_opt_in,
         recurring_payment=booking_data.recurring_payment,
         notes=booking_data.notes,
@@ -738,7 +761,8 @@ async def create_booking(booking_data: BookingCreate):
         discount=pricing["discount"],
         total=pricing["total"],
         is_quote_service=is_quote_service,
-        is_scent_bomb_only=is_scent_bomb_only
+        is_scent_bomb_only=is_scent_bomb_only,
+        next_payment_date=next_payment_date
     )
     
     doc = booking.model_dump()
