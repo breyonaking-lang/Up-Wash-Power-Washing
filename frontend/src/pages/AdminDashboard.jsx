@@ -1331,6 +1331,13 @@ function ContractorsPage() {
   const [newContractor, setNewContractor] = useState({
     username: '', password: '', full_name: '', phone: '', email: ''
   });
+  // SMS States
+  const [showSMSModal, setShowSMSModal] = useState(false);
+  const [smsContractor, setSmsContractor] = useState(null);
+  const [smsMessage, setSmsMessage] = useState('');
+  const [smsHistory, setSmsHistory] = useState([]);
+  const [sendingSMS, setSendingSMS] = useState(false);
+  const [sendCredentials, setSendCredentials] = useState(false);
 
   useEffect(() => {
     fetchContractors();
