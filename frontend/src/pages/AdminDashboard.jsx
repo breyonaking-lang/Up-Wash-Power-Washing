@@ -3472,6 +3472,7 @@ function SMSLogsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedLogs, setSelectedLogs] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   useEffect(() => {
     fetchLogs();
@@ -3487,6 +3488,26 @@ function SMSLogsPage() {
       toast.error('Failed to load SMS logs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendPaymentReminders = async () => {
+    if (!window.confirm('Send payment reminders to all customers with services in 3 days?')) return;
+    
+    setSendingReminders(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/send-payment-reminders`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      toast.success(`Payment reminders: ${data.sent} sent, ${data.skipped} skipped`);
+      fetchLogs();
+    } catch (err) {
+      toast.error('Failed to send reminders');
+    } finally {
+      setSendingReminders(false);
     }
   };
 
