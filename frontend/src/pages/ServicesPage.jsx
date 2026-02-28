@@ -33,7 +33,35 @@ const ServicesPage = () => {
         { label: "2 Bins", price: 25, qty: 2 },
         { label: "Each Additional", price: 8, qty: 3 }
       ],
-      features: ["Interior & exterior deep clean", "Hospital-grade sanitization", "Odor elimination treatment", "Environmentally safe products"]
+      features: ["Interior & exterior deep clean", "Hospital-grade sanitization", "Odor elimination treatment", "Environmentally safe products"],
+      availableDays: "Monday & Tuesday"
+    },
+    {
+      id: "trash_bin_cleaning",
+      name: "Trash Bin Cleaning",
+      description: "Keep your trash bins fresh and sanitary with our professional cleaning service. We eliminate foul odors, bacteria, and residue buildup that attracts pests. A clean trash bin means a healthier home environment.",
+      icon: Trash2,
+      color: "bg-slate-600",
+      pricing: [
+        { label: "1 Bin", price: 15, qty: 1 },
+        { label: "2 Bins", price: 25, qty: 2 },
+        { label: "Each Additional", price: 8, qty: 3 }
+      ],
+      features: ["Interior & exterior deep clean", "Hospital-grade sanitization", "Odor elimination treatment", "Pest prevention"],
+      availableDays: "Monday & Tuesday"
+    },
+    {
+      id: "scent_bomb",
+      name: "Scent Bomb",
+      description: "Add a fresh, long-lasting fragrance to your freshly cleaned bins! Our scent bombs keep your bins smelling amazing for weeks. Perfect add-on for any bin cleaning service.",
+      icon: Sparkles,
+      color: "bg-pink-500",
+      pricing: [
+        { label: "Each", price: 5, qty: 1 }
+      ],
+      features: ["Long-lasting freshness", "Multiple scent options", "Eco-friendly formula", "Works with any bin"],
+      isAddon: true,
+      availableDays: "Any day"
     },
     {
       id: "patio",
@@ -44,7 +72,8 @@ const ServicesPage = () => {
       pricing: [
         { label: "Standard Patio", price: 85, qty: 1 }
       ],
-      features: ["Deep pressure washing", "Mold & mildew removal", "Surface protection treatment", "Enhances property value"]
+      features: ["Deep pressure washing", "Mold & mildew removal", "Surface protection treatment", "Enhances property value"],
+      availableDays: "Wednesday - Friday"
     },
     {
       id: "driveway",
@@ -55,7 +84,8 @@ const ServicesPage = () => {
       pricing: [
         { label: "Standard Driveway", price: 85, qty: 1 }
       ],
-      features: ["Oil & grease stain removal", "Tire mark elimination", "Concrete brightening", "Extends driveway lifespan"]
+      features: ["Oil & grease stain removal", "Tire mark elimination", "Concrete brightening", "Extends driveway lifespan"],
+      availableDays: "Wednesday - Friday"
     },
     {
       id: "dumpster",
@@ -67,7 +97,8 @@ const ServicesPage = () => {
         { label: "First Dumpster", price: 85, qty: 1 },
         { label: "Each Additional", price: 45, qty: 2 }
       ],
-      features: ["Health code compliant", "Pest prevention", "Grease trap area cleaning", "Scheduled maintenance available"]
+      features: ["Health code compliant", "Pest prevention", "Grease trap area cleaning", "Scheduled maintenance available"],
+      availableDays: "Wednesday - Friday"
     },
     {
       id: "home_powerwash",
@@ -79,7 +110,8 @@ const ServicesPage = () => {
         { label: "Custom Quote", price: null, isQuote: true }
       ],
       features: ["Siding & gutter cleaning", "Deck & fence restoration", "Soft wash for delicate surfaces", "Free on-site assessment"],
-      isQuote: true
+      isQuote: true,
+      availableDays: "Thursday & Friday"
     },
     {
       id: "construction_cleanup",
@@ -91,7 +123,8 @@ const ServicesPage = () => {
         { label: "Custom Quote", price: null, isQuote: true }
       ],
       features: ["Debris & dust removal", "Window & glass cleaning", "Surface detailing", "Final inspection ready"],
-      isQuote: true
+      isQuote: true,
+      availableDays: "Thursday & Friday"
     },
     {
       id: "commercial",
@@ -103,7 +136,8 @@ const ServicesPage = () => {
         { label: "Custom Quote", price: null, isQuote: true }
       ],
       features: ["Schools & universities", "Apartment complexes", "Office buildings", "Flexible scheduling"],
-      isQuote: true
+      isQuote: true,
+      availableDays: "Thursday & Friday"
     }
   ];
 
