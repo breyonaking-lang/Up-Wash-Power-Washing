@@ -3703,17 +3703,6 @@ function DocumentsPage() {
     }
   };
 
-  const fetchDocuments = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/documents/documents`, { headers: getAuthHeaders() });
-      if (!res.ok) return;
-      const data = await res.json();
-      setDocuments(data.documents || []);
-    } catch (err) {
-      console.error('Failed to load documents');
-    }
-  };
-
   const fetchBookings = async () => {
     try {
       const res = await fetch(`${API_URL}/api/bookings?status=completed&payment_type=quote`, { headers: getAuthHeaders() });
