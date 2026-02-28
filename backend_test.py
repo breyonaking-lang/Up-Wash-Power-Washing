@@ -16,7 +16,7 @@ class ETANotificationAPITester:
         self.contractor_token = None
         self.admin_username = "Hughes0108"
         self.admin_password = "Godfirst7!"
-        self.contractor_username = "testcontractor"
+        self.contractor_username = "ajb123"
         self.contractor_password = "upwash_test_123"
         self.tests_run = 0
         self.tests_passed = 0
