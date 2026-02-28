@@ -29,8 +29,17 @@ class ETANotificationAPITester:
         if success:
             self.tests_passed += 1
             print(f"✅ {name} - PASSED {details}")
+            status = "PASS"
         else:
             print(f"❌ {name} - FAILED {details}")
+            status = "FAIL"
+        
+        self.test_results.append({
+            "test": name,
+            "status": status,
+            "details": details,
+            "timestamp": datetime.now().isoformat()
+        })
 
     def login_admin(self):
         """Login as admin to get token"""
