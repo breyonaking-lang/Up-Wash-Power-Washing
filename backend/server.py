@@ -4125,6 +4125,142 @@ async def get_sms_logs(current_user: dict = Depends(get_admin_user)):
     logs = await db.sms_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return {"logs": logs}
 
+# ===================== AUTOMATED PAYMENT REMINDERS =====================
+
+@api_router.post("/admin/send-payment-reminders")
+async def send_payment_reminders(current_user: dict = Depends(get_admin_user)):
+    """Send payment reminder SMS to customers with upcoming services in 3 days"""
+    from datetime import timedelta
+    
+    # Calculate the target date (3 days from now)
+    target_date = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y-%m-%d")
+    
+    # Find all bookings with services on the target date that haven't been reminded
+    bookings = await db.bookings.find({
+        "booking_dates": target_date,
+        "payment_status": {"$ne": "paid"},
+        "subscription_status": {"$ne": "cancelled"},
+        f"reminder_sent_{target_date}": {"$ne": True}
+    }, {"_id": 0}).to_list(100)
+    
+    # Also check monthly subscriptions
+    all_monthly = await db.bookings.find({
+        "is_monthly": True,
+        "subscription_status": "active",
+        "payment_status": {"$ne": "paid"}
+    }, {"_id": 0}).to_list(100)
+    
+    # Filter monthly bookings that have service on target date
+    day_of_month = int(target_date.split("-")[2])
+    for booking in all_monthly:
+        if day_of_month in booking.get("monthly_service_days", []):
+            if not booking.get(f"reminder_sent_{target_date}"):
+                bookings.append(booking)
+    
+    sent_count = 0
+    failed_count = 0
+    skipped_count = 0
+    
+    for booking in bookings:
+        phone = booking.get("customer_phone")
+        if not phone:
+            skipped_count += 1
+            continue
+        
+        # Check opt-out status
+        optout = await db.sms_optouts.find_one({"phone": phone, "opted_out": True})
+        if optout:
+            skipped_count += 1
+            continue
+        
+        customer_name = booking.get("customer_name", "Valued Customer")
+        amount = booking.get("total", 0)
+        
+        message = f"Hi {customer_name}! This is a friendly reminder that your Up-Wash service is scheduled for {target_date}. Amount due: ${amount:.2f}. Please ensure payment is completed to avoid service interruption. Thank you! Reply STOP to opt out."
+        
+        result = await send_sms(phone, message)
+        
+        if result["status"] == "sent":
+            sent_count += 1
+            # Mark as reminded
+            await db.bookings.update_one(
+                {"id": booking["id"]},
+                {"$set": {f"reminder_sent_{target_date}": True}}
+            )
+        else:
+            failed_count += 1
+    
+    return {
+        "message": f"Payment reminders processed",
+        "target_date": target_date,
+        "sent": sent_count,
+        "failed": failed_count,
+        "skipped": skipped_count
+    }
+
+@api_router.get("/admin/upcoming-reminders")
+async def get_upcoming_reminders(current_user: dict = Depends(get_admin_user)):
+    """Preview customers who will receive payment reminders"""
+    from datetime import timedelta
+    
+    target_date = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y-%m-%d")
+    
+    # Find bookings needing reminders
+    bookings = await db.bookings.find({
+        "booking_dates": target_date,
+        "payment_status": {"$ne": "paid"},
+        "subscription_status": {"$ne": "cancelled"}
+    }, {"_id": 0, "customer_name": 1, "customer_phone": 1, "total": 1, "id": 1}).to_list(100)
+    
+    return {
+        "target_date": target_date,
+        "customers": bookings,
+        "count": len(bookings)
+    }
+
+# Cron job endpoint - can be called by external scheduler
+@api_router.post("/cron/payment-reminders")
+async def cron_payment_reminders():
+    """Automated endpoint for scheduled payment reminders (no auth required for cron)"""
+    from datetime import timedelta
+    
+    target_date = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y-%m-%d")
+    
+    bookings = await db.bookings.find({
+        "booking_dates": target_date,
+        "payment_status": {"$ne": "paid"},
+        "subscription_status": {"$ne": "cancelled"},
+        f"reminder_sent_{target_date}": {"$ne": True}
+    }, {"_id": 0}).to_list(100)
+    
+    sent_count = 0
+    
+    for booking in bookings:
+        phone = booking.get("customer_phone")
+        if not phone:
+            continue
+        
+        optout = await db.sms_optouts.find_one({"phone": phone, "opted_out": True})
+        if optout:
+            continue
+        
+        customer_name = booking.get("customer_name", "Valued Customer")
+        amount = booking.get("total", 0)
+        
+        message = f"Hi {customer_name}! Reminder: Your Up-Wash service is in 3 days ({target_date}). Amount: ${amount:.2f}. Thank you! Reply STOP to opt out."
+        
+        result = await send_sms(phone, message)
+        
+        if result["status"] == "sent":
+            sent_count += 1
+            await db.bookings.update_one(
+                {"id": booking["id"]},
+                {"$set": {f"reminder_sent_{target_date}": True}}
+            )
+    
+    logging.info(f"Payment reminders sent: {sent_count}")
+    return {"sent": sent_count, "target_date": target_date}
+
 # ===================== SMS TEMPLATES FOR CONTRACTORS =====================
 
 @api_router.get("/contractor/sms/templates")
