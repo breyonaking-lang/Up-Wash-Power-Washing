@@ -1632,6 +1632,39 @@ function ContractorsPage() {
     return routes.filter(r => r.assigned_contractor_id === contractorId);
   };
 
+  const toggleRouteExpanded = (routeId) => {
+    setExpandedRoutes(prev => ({...prev, [routeId]: !prev[routeId]}));
+  };
+
+  const openReassignModal = (route) => {
+    setReassignRoute(route);
+    setReassignToContractor('');
+    setShowReassignModal(true);
+  };
+
+  const reassignRouteToContractor = async () => {
+    if (!reassignRoute || !reassignToContractor) {
+      toast.error('Please select a contractor');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes/${reassignRoute.id}/reassign`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ new_contractor_id: reassignToContractor })
+      });
+      if (!res.ok) throw new Error('Failed to reassign');
+      const data = await res.json();
+      toast.success(`Route reassigned to ${data.new_contractor_name}!`);
+      setShowReassignModal(false);
+      setReassignRoute(null);
+      fetchRoutes();
+    } catch (err) {
+      toast.error('Failed to reassign route');
+    }
+  };
+
   if (loading) return <LoadingSpinner />;
 
   return (
