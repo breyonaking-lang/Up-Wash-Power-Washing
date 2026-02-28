@@ -306,6 +306,12 @@ export default function ClientPortal() {
   const [isDrawing, setIsDrawing] = useState(false);
   const navigate = useNavigate();
   const currentVerse = BIBLE_VERSES[Math.floor(Date.now() / (15 * 60 * 1000)) % BIBLE_VERSES.length];
+  // New states for booking history and upcoming services
+  const [bookingHistory, setBookingHistory] = useState([]);
+  const [upcomingServices, setUpcomingServices] = useState([]);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('client_token');
@@ -322,11 +328,14 @@ export default function ClientPortal() {
 
   const fetchClientData = async () => {
     try {
-      const [subRes, contractRes, pendingRes, notifRes] = await Promise.all([
+      const [subRes, contractRes, pendingRes, notifRes, historyRes, upcomingRes] = await Promise.all([
         fetch(`${API_URL}/api/client/subscription`, { headers: getAuthHeaders() }),
         fetch(`${API_URL}/api/client/contracts`, { headers: getAuthHeaders() }),
         fetch(`${API_URL}/api/client/contracts/pending`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/api/client/notifications`, { headers: getAuthHeaders() })
+        fetch(`${API_URL}/api/client/notifications`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/api/client/booking-history`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/api/client/upcoming-services`, { headers: getAuthHeaders() })
+      ]);
       ]);
 
       if (subRes.ok) {
