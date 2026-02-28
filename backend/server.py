@@ -4190,9 +4190,59 @@ async def handle_incoming_sms(request: Request):
         to_phone = form_data.get("To", "")
         message_body = form_data.get("Body", "")
         message_sid = form_data.get("MessageSid", "")
+        num_media = int(form_data.get("NumMedia", 0))
         
         if not from_phone or not message_body:
             return {"status": "error", "message": "Missing required fields"}
+        
+        # Check for opt-out keywords
+        opt_out_keywords = ["STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"]
+        if message_body.strip().upper() in opt_out_keywords:
+            # Add to opt-out list
+            await db.sms_optouts.update_one(
+                {"phone": from_phone},
+                {"$set": {
+                    "phone": from_phone,
+                    "opted_out": True,
+                    "opted_out_at": datetime.now(timezone.utc).isoformat(),
+                    "reason": message_body.strip().upper()
+                }},
+                upsert=True
+            )
+            
+            # Update all bookings with this phone to mark opted out
+            await db.bookings.update_many(
+                {"customer_phone": from_phone},
+                {"$set": {"sms_opted_out": True}}
+            )
+            
+            # Send confirmation reply
+            await send_sms(from_phone, "You have been unsubscribed from Up-Wash SMS notifications. Reply START to resubscribe.")
+            
+            return {"status": "opted_out", "phone": from_phone}
+        
+        # Check for opt-in keywords
+        opt_in_keywords = ["START", "YES", "SUBSCRIBE"]
+        if message_body.strip().upper() in opt_in_keywords:
+            # Remove from opt-out list
+            await db.sms_optouts.update_one(
+                {"phone": from_phone},
+                {"$set": {"opted_out": False, "resubscribed_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            await db.bookings.update_many(
+                {"customer_phone": from_phone},
+                {"$set": {"sms_opted_out": False}}
+            )
+            await send_sms(from_phone, "Welcome back! You are now subscribed to Up-Wash SMS notifications.")
+            return {"status": "opted_in", "phone": from_phone}
+        
+        # Handle media (images) for quotes
+        media_urls = []
+        for i in range(num_media):
+            media_url = form_data.get(f"MediaUrl{i}")
+            media_type = form_data.get(f"MediaContentType{i}")
+            if media_url:
+                media_urls.append({"url": media_url, "type": media_type})
         
         # Find the customer by phone number
         customer_booking = await db.bookings.find_one(
@@ -4209,11 +4259,12 @@ async def handle_incoming_sms(request: Request):
         # Find contractor who last messaged this customer
         last_conversation = await db.sms_conversations.find_one(
             {"customer_phone": from_phone, "direction": "outbound"},
-            {"_id": 0}
+            {"_id": 0},
+            sort=[("created_at", -1)]
         )
         contractor_id = last_conversation.get("contractor_id") if last_conversation else None
         
-        # Store incoming message
+        # Store incoming message with media
         incoming_msg = {
             "id": str(uuid.uuid4()),
             "from_phone": from_phone,
@@ -4222,12 +4273,27 @@ async def handle_incoming_sms(request: Request):
             "booking_id": booking_id,
             "contractor_id": contractor_id,
             "message": message_body,
+            "media_urls": media_urls,
             "message_sid": message_sid,
             "direction": "inbound",
             "read": False,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.sms_conversations.insert_one(incoming_msg)
+        
+        # If has media, create a quote request for admin
+        if media_urls:
+            quote_request = {
+                "id": str(uuid.uuid4()),
+                "from_phone": from_phone,
+                "customer_name": customer_name,
+                "booking_id": booking_id,
+                "message": message_body,
+                "images": media_urls,
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.quote_requests.insert_one(quote_request)
         
         # Create notification for contractor if found
         if contractor_id:
@@ -4240,6 +4306,7 @@ async def handle_incoming_sms(request: Request):
                 "full_message": message_body,
                 "from_phone": from_phone,
                 "booking_id": booking_id,
+                "has_media": len(media_urls) > 0,
                 "read": False,
                 "play_sound": True,
                 "created_at": datetime.now(timezone.utc).isoformat()
@@ -4250,11 +4317,13 @@ async def handle_incoming_sms(request: Request):
         admin_notif = {
             "id": str(uuid.uuid4()),
             "type": "incoming_sms",
-            "title": f"SMS from {customer_name}",
+            "title": f"SMS from {customer_name}" + (" [📷 Images]" if media_urls else ""),
             "message": f"{from_phone}: {message_body[:100]}...",
             "full_message": message_body,
             "from_phone": from_phone,
             "booking_id": booking_id,
+            "has_media": len(media_urls) > 0,
+            "media_urls": media_urls,
             "read": False,
             "play_sound": True,
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -4262,11 +4331,341 @@ async def handle_incoming_sms(request: Request):
         await db.admin_notifications.insert_one(admin_notif)
         
         # Return TwiML response (empty to acknowledge receipt)
-        return {"status": "received", "message_id": incoming_msg["id"]}
+        return {"status": "received", "message_id": incoming_msg["id"], "has_media": len(media_urls) > 0}
         
     except Exception as e:
         logging.error(f"Twilio webhook error: {e}")
         return {"status": "error", "message": str(e)}
+
+# ===================== SMS OPT-OUT MANAGEMENT =====================
+
+@api_router.get("/admin/sms/optouts")
+async def get_sms_optouts(current_user: dict = Depends(get_admin_user)):
+    """Get list of customers who have opted out of SMS"""
+    optouts = await db.sms_optouts.find({"opted_out": True}, {"_id": 0}).to_list(500)
+    return {"optouts": optouts}
+
+@api_router.post("/admin/sms/optout/{phone}")
+async def manual_optout(phone: str, current_user: dict = Depends(get_admin_user)):
+    """Manually opt out a customer from SMS"""
+    await db.sms_optouts.update_one(
+        {"phone": phone},
+        {"$set": {"phone": phone, "opted_out": True, "opted_out_at": datetime.now(timezone.utc).isoformat(), "reason": "admin_manual"}},
+        upsert=True
+    )
+    await db.bookings.update_many({"customer_phone": phone}, {"$set": {"sms_opted_out": True}})
+    return {"message": f"{phone} has been opted out of SMS"}
+
+@api_router.delete("/admin/sms/optout/{phone}")
+async def remove_optout(phone: str, current_user: dict = Depends(get_admin_user)):
+    """Remove a customer from opt-out list"""
+    await db.sms_optouts.update_one({"phone": phone}, {"$set": {"opted_out": False}})
+    await db.bookings.update_many({"customer_phone": phone}, {"$set": {"sms_opted_out": False}})
+    return {"message": f"{phone} has been re-subscribed to SMS"}
+
+# ===================== QUOTE REQUESTS (SMS WITH IMAGES) =====================
+
+@api_router.get("/admin/quotes")
+async def get_quote_requests(current_user: dict = Depends(get_admin_user)):
+    """Get all quote requests from SMS (with images)"""
+    quotes = await db.quote_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"quotes": quotes}
+
+class QuoteResponse(BaseModel):
+    quote_id: str
+    price: float
+    message: str
+    send_payment_link: bool = True
+
+@api_router.post("/admin/quotes/respond")
+async def respond_to_quote(quote: QuoteResponse, current_user: dict = Depends(get_admin_user)):
+    """Respond to a quote request with price and payment link"""
+    quote_request = await db.quote_requests.find_one({"id": quote.quote_id}, {"_id": 0})
+    if not quote_request:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    phone = quote_request.get("from_phone")
+    customer_name = quote_request.get("customer_name", "Valued Customer")
+    
+    # Create payment link if requested
+    payment_link = ""
+    if quote.send_payment_link:
+        # Generate unique booking token
+        booking_token = str(uuid.uuid4())[:8]
+        payment_link = f"\n\nPay & Confirm: https://2d2346dc-8745-4260-8e34-088886d923bd.preview.emergentagent.com/pay/{booking_token}"
+        
+        # Store pending quote booking
+        pending_booking = {
+            "id": str(uuid.uuid4()),
+            "token": booking_token,
+            "customer_phone": phone,
+            "customer_name": customer_name,
+            "quote_price": quote.price,
+            "quote_message": quote.message,
+            "images": quote_request.get("images", []),
+            "status": "pending_payment",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.pending_bookings.insert_one(pending_booking)
+    
+    # Send SMS response
+    message = f"Hi {customer_name}! {quote.message}\n\nQuoted Price: ${quote.price:.2f}{payment_link}\n\nReply STOP to opt out."
+    result = await send_sms(phone, message)
+    
+    # Update quote status
+    await db.quote_requests.update_one(
+        {"id": quote.quote_id},
+        {"$set": {
+            "status": "responded",
+            "response_price": quote.price,
+            "response_message": quote.message,
+            "responded_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Quote response sent", "status": result["status"], "payment_link": payment_link}
+
+# ===================== CUSTOMER & CONTRACTOR EDITING =====================
+
+class CustomerUpdate(BaseModel):
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_address: Optional[str] = None
+    notes: Optional[str] = None
+
+@api_router.put("/admin/customers/{booking_id}")
+async def update_customer_info(booking_id: str, customer: CustomerUpdate, current_user: dict = Depends(get_admin_user)):
+    """Update customer information for a booking"""
+    update_data = {k: v for k, v in customer.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    return {"message": "Customer information updated"}
+
+class ContractorUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    pay_rate: Optional[float] = None
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None
+
+@api_router.put("/admin/contractors/{contractor_id}")
+async def update_contractor_info(contractor_id: str, contractor: ContractorUpdate, current_user: dict = Depends(get_admin_user)):
+    """Update contractor personal information"""
+    update_data = {k: v for k, v in contractor.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.users.update_one(
+        {"id": contractor_id, "role": "contractor"},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    
+    return {"message": "Contractor information updated"}
+
+@api_router.get("/admin/contractors/{contractor_id}")
+async def get_contractor_details(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Get detailed contractor information"""
+    contractor = await db.users.find_one(
+        {"id": contractor_id, "role": "contractor"},
+        {"_id": 0, "password_hash": 0}
+    )
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    return contractor
+
+# ===================== SEPARATED SMS THREADS =====================
+
+class DirectSMS(BaseModel):
+    recipient_id: str  # contractor_id
+    message: str
+
+@api_router.post("/admin/sms/direct")
+async def send_direct_sms_to_contractor(sms: DirectSMS, current_user: dict = Depends(get_admin_user)):
+    """Send SMS directly to a specific contractor (private thread)"""
+    contractor = await db.users.find_one({"id": sms.recipient_id, "role": "contractor"}, {"_id": 0})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    
+    phone = contractor.get("phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="Contractor has no phone number")
+    
+    result = await send_sms(phone, sms.message)
+    
+    # Store in private thread
+    thread_msg = {
+        "id": str(uuid.uuid4()),
+        "thread_type": "direct",
+        "sender_type": "admin",
+        "sender_id": current_user["user_id"],
+        "recipient_type": "contractor",
+        "recipient_id": sms.recipient_id,
+        "recipient_name": contractor.get("full_name"),
+        "recipient_phone": phone,
+        "message": sms.message,
+        "status": result["status"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.sms_threads.insert_one(thread_msg)
+    
+    # Create notification for contractor
+    notification = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": sms.recipient_id,
+        "type": "admin_direct_sms",
+        "title": "Direct Message from Admin",
+        "message": sms.message[:100] + ("..." if len(sms.message) > 100 else ""),
+        "full_message": sms.message,
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    
+    return {"message": "Direct SMS sent", "status": result["status"]}
+
+class GroupSMS(BaseModel):
+    recipient_ids: List[str]  # list of contractor_ids
+    message: str
+    group_name: Optional[str] = None
+
+@api_router.post("/admin/sms/group")
+async def send_group_sms(sms: GroupSMS, current_user: dict = Depends(get_admin_user)):
+    """Send SMS to a group of contractors"""
+    group_id = str(uuid.uuid4())
+    group_name = sms.group_name or f"Group {datetime.now().strftime('%m/%d %H:%M')}"
+    
+    sent_count = 0
+    failed_count = 0
+    
+    for contractor_id in sms.recipient_ids:
+        contractor = await db.users.find_one({"id": contractor_id, "role": "contractor"}, {"_id": 0})
+        if not contractor:
+            continue
+        
+        phone = contractor.get("phone")
+        if not phone:
+            failed_count += 1
+            continue
+        
+        result = await send_sms(phone, sms.message)
+        
+        # Store in group thread
+        thread_msg = {
+            "id": str(uuid.uuid4()),
+            "thread_type": "group",
+            "group_id": group_id,
+            "group_name": group_name,
+            "sender_type": "admin",
+            "sender_id": current_user["user_id"],
+            "recipient_type": "contractor",
+            "recipient_id": contractor_id,
+            "recipient_name": contractor.get("full_name"),
+            "recipient_phone": phone,
+            "message": sms.message,
+            "status": result["status"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.sms_threads.insert_one(thread_msg)
+        
+        if result["status"] == "sent":
+            sent_count += 1
+        else:
+            failed_count += 1
+        
+        # Create notification
+        notification = {
+            "id": str(uuid.uuid4()),
+            "contractor_id": contractor_id,
+            "type": "admin_group_sms",
+            "title": f"Group Message: {group_name}",
+            "message": sms.message[:100] + ("..." if len(sms.message) > 100 else ""),
+            "full_message": sms.message,
+            "group_id": group_id,
+            "read": False,
+            "play_sound": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(notification)
+    
+    return {
+        "message": f"Group SMS sent to {sent_count} contractors",
+        "group_id": group_id,
+        "sent": sent_count,
+        "failed": failed_count
+    }
+
+@api_router.get("/admin/sms/threads")
+async def get_sms_threads(current_user: dict = Depends(get_admin_user)):
+    """Get all SMS threads (direct and group)"""
+    threads = await db.sms_threads.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    
+    # Group by thread type and recipient/group
+    direct_threads = {}
+    group_threads = {}
+    
+    for msg in threads:
+        if msg.get("thread_type") == "direct":
+            recipient_id = msg.get("recipient_id")
+            if recipient_id not in direct_threads:
+                direct_threads[recipient_id] = {
+                    "recipient_id": recipient_id,
+                    "recipient_name": msg.get("recipient_name"),
+                    "messages": []
+                }
+            direct_threads[recipient_id]["messages"].append(msg)
+        elif msg.get("thread_type") == "group":
+            group_id = msg.get("group_id")
+            if group_id not in group_threads:
+                group_threads[group_id] = {
+                    "group_id": group_id,
+                    "group_name": msg.get("group_name"),
+                    "recipients": set(),
+                    "messages": []
+                }
+            group_threads[group_id]["recipients"].add(msg.get("recipient_name"))
+            group_threads[group_id]["messages"].append(msg)
+    
+    # Convert sets to lists
+    for gid in group_threads:
+        group_threads[gid]["recipients"] = list(group_threads[gid]["recipients"])
+    
+    return {
+        "direct_threads": list(direct_threads.values()),
+        "group_threads": list(group_threads.values())
+    }
+
+@api_router.get("/admin/sms/thread/{contractor_id}")
+async def get_contractor_thread(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Get SMS thread with a specific contractor"""
+    messages = await db.sms_threads.find(
+        {"$or": [
+            {"recipient_id": contractor_id, "thread_type": "direct"},
+            {"sender_id": contractor_id}
+        ]},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(200)
+    
+    return {"messages": messages}
 
 @api_router.get("/contractor/sms/inbox")
 async def get_contractor_sms_inbox(current_user: dict = Depends(get_contractor_user)):
