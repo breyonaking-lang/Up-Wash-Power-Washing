@@ -933,7 +933,7 @@ const BookingPage = () => {
                                 : `${d}${suffix}${i < monthlyServiceDays.length - 2 ? ', ' : ' '}`;
                             })} of each month
                           </p>
-                        )}}
+                        )}
                       </div>
 
                       <div>
