@@ -754,7 +754,7 @@ class ETANotificationAPITester:
             return False
 
         group_sms_data = {
-            "contractor_ids": [self.contractor_id] if self.contractor_id else [],
+            "recipient_ids": [self.contractor_id] if self.contractor_id else [],
             "message": "Group message test - multiple contractors"
         }
         
