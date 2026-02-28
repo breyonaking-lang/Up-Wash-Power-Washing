@@ -4176,6 +4176,318 @@ function DocumentsPage() {
 }
 
 
+// Quote Management Page - View and respond to quote requests
+function QuotesPage() {
+  const [quotes, setQuotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedQuote, setSelectedQuote] = useState(null);
+  const [responsePrice, setResponsePrice] = useState('');
+  const [responseMessage, setResponseMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [filter, setFilter] = useState('all'); // all, pending, quoted, converted
+
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
+
+  const fetchQuotes = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/quotes`, { headers: getAuthHeaders() });
+      const data = await res.json();
+      setQuotes(data.quotes || []);
+    } catch (err) {
+      console.error('Failed to load quotes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendQuoteResponse = async () => {
+    if (!selectedQuote || !responsePrice) {
+      toast.error('Please enter a quote price');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/quotes/${selectedQuote.id}/respond`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          price: parseFloat(responsePrice),
+          message: responseMessage
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to send quote');
+      
+      toast.success('Quote sent to customer via SMS!');
+      setSelectedQuote(null);
+      setResponsePrice('');
+      setResponseMessage('');
+      fetchQuotes();
+    } catch (err) {
+      toast.error('Failed to send quote response');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getServiceLabel = (serviceType) => {
+    const labels = {
+      home_powerwash: 'Home Power Washing',
+      construction_cleanup: 'Construction Cleanup',
+      commercial: 'Commercial Property'
+    };
+    return labels[serviceType] || serviceType;
+  };
+
+  const filteredQuotes = quotes.filter(q => {
+    if (filter === 'all') return true;
+    return q.status === filter;
+  });
+
+  const stats = {
+    total: quotes.length,
+    pending: quotes.filter(q => q.status === 'pending').length,
+    quoted: quotes.filter(q => q.status === 'quoted').length,
+    converted: quotes.filter(q => q.status === 'converted').length
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Quote Requests</h1>
+          <p className="text-white/60">Manage and respond to customer quote requests</p>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+          <p className="text-white/60 text-sm">Total Requests</p>
+          <p className="text-2xl font-bold text-white">{stats.total}</p>
+        </div>
+        <div className="bg-yellow-500/20 backdrop-blur rounded-xl p-4 border border-yellow-500/30">
+          <p className="text-yellow-300 text-sm">Pending</p>
+          <p className="text-2xl font-bold text-yellow-400">{stats.pending}</p>
+        </div>
+        <div className="bg-blue-500/20 backdrop-blur rounded-xl p-4 border border-blue-500/30">
+          <p className="text-blue-300 text-sm">Quoted</p>
+          <p className="text-2xl font-bold text-blue-400">{stats.quoted}</p>
+        </div>
+        <div className="bg-green-500/20 backdrop-blur rounded-xl p-4 border border-green-500/30">
+          <p className="text-green-300 text-sm">Converted</p>
+          <p className="text-2xl font-bold text-green-400">{stats.converted}</p>
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {['all', 'pending', 'quoted', 'converted'].map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              filter === f
+                ? 'bg-blue-500 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+            data-testid={`quote-filter-${f}`}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Quotes List */}
+      {filteredQuotes.length === 0 ? (
+        <div className="bg-white/10 rounded-2xl p-8 text-center">
+          <FileQuestion className="w-12 h-12 text-white/40 mx-auto mb-4" />
+          <p className="text-white/60">No quote requests found</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredQuotes.map(quote => (
+            <div
+              key={quote.id}
+              className="bg-white/10 backdrop-blur rounded-xl p-6 border border-white/20 hover:border-white/40 transition-all"
+              data-testid={`quote-card-${quote.id}`}
+            >
+              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      quote.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                      quote.status === 'quoted' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-green-500/20 text-green-400'
+                    }`}>
+                      {quote.status}
+                    </span>
+                    <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-xs">
+                      {getServiceLabel(quote.service_type)}
+                    </span>
+                    {quote.preferred_day && (
+                      <span className="px-3 py-1 bg-white/10 text-white/70 rounded-full text-xs">
+                        Prefers {quote.preferred_day}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <h3 className="text-lg font-bold text-white">{quote.customer_name}</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm">
+                    <p className="text-white/70 flex items-center gap-2">
+                      <Phone className="w-4 h-4" /> {quote.customer_phone}
+                    </p>
+                    {quote.customer_email && (
+                      <p className="text-white/70 flex items-center gap-2">
+                        <Mail className="w-4 h-4" /> {quote.customer_email}
+                      </p>
+                    )}
+                    <p className="text-white/70 flex items-center gap-2 md:col-span-2">
+                      <MapPin className="w-4 h-4" /> {quote.customer_address}
+                    </p>
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-black/20 rounded-lg">
+                    <p className="text-white/50 text-xs mb-1">Description:</p>
+                    <p className="text-white/80 text-sm">{quote.description}</p>
+                  </div>
+
+                  {/* Photos */}
+                  {quote.photos && quote.photos.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-white/50 text-xs mb-2 flex items-center gap-1">
+                        <Camera className="w-3 h-3" /> {quote.photos.length} Photo{quote.photos.length > 1 ? 's' : ''}
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {quote.photos.map((photo, idx) => (
+                          <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden bg-white/10">
+                            <img 
+                              src={photo.data} 
+                              alt={`Quote photo ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {quote.quoted_price && (
+                    <div className="mt-3 p-3 bg-green-500/20 rounded-lg border border-green-500/30">
+                      <p className="text-green-300 text-sm">Quoted Price: <strong className="text-green-400 text-lg">${quote.quoted_price}</strong></p>
+                      {quote.admin_message && <p className="text-green-200/70 text-sm mt-1">{quote.admin_message}</p>}
+                    </div>
+                  )}
+                  
+                  <p className="text-white/40 text-xs mt-3">
+                    Received {new Date(quote.created_at).toLocaleDateString()} at {new Date(quote.created_at).toLocaleTimeString()}
+                  </p>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  {quote.status === 'pending' && (
+                    <button
+                      onClick={() => setSelectedQuote(quote)}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 flex items-center gap-2"
+                      data-testid={`respond-quote-${quote.id}`}
+                    >
+                      <Send className="w-4 h-4" />
+                      Send Quote
+                    </button>
+                  )}
+                  <a
+                    href={`tel:${quote.customer_phone}`}
+                    className="px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 flex items-center gap-2 justify-center"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Call
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Response Modal */}
+      {selectedQuote && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 max-w-lg w-full"
+          >
+            <h2 className="text-xl font-bold text-white mb-4">Send Quote to {selectedQuote.customer_name}</h2>
+            
+            <div className="bg-white/10 rounded-xl p-4 mb-4">
+              <p className="text-white/60 text-sm">{getServiceLabel(selectedQuote.service_type)}</p>
+              <p className="text-white/80 text-sm mt-1">{selectedQuote.description}</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-white/60 text-sm mb-1 block">Quote Price *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40">$</span>
+                  <input
+                    type="number"
+                    value={responsePrice}
+                    onChange={(e) => setResponsePrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-500"
+                    data-testid="quote-price-input"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-white/60 text-sm mb-1 block">Additional Message (optional)</label>
+                <textarea
+                  value={responseMessage}
+                  onChange={(e) => setResponseMessage(e.target.value)}
+                  placeholder="Any additional details about the quote..."
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-500 min-h-[80px]"
+                  data-testid="quote-message-input"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setSelectedQuote(null)}
+                className="flex-1 px-4 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendQuoteResponse}
+                disabled={sending || !responsePrice}
+                className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                data-testid="send-quote-btn"
+              >
+                {sending ? 'Sending...' : <><Send className="w-4 h-4" /> Send Quote</>}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // Messages Page - 2-Way Admin-Contractor Messaging with Timestamps
 function MessagesPage() {
   const [messages, setMessages] = useState([]);
