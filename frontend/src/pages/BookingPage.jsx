@@ -428,7 +428,15 @@ const BookingPage = () => {
       });
 
       setBookingId(response.data.id);
-      setStep(4);
+      
+      // Show scent bomb upsell for bin/dumpster services (if no scent bombs already added)
+      if ((selectedServices.recycling_bin || selectedServices.trash_bin_cleaning || selectedServices.dumpster) && scentBombs === 0) {
+        setUpsellScentBombs(selectedServices.dumpster ? 2 : binQuantity || 1);
+        setShowScentBombUpsell(true);
+      } else {
+        setStep(4);
+      }
+      
       toast.success("Booking created successfully!");
     } catch (error) {
       console.error("Error creating booking:", error);
