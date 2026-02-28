@@ -3604,6 +3604,19 @@ function SMSLogsPage() {
               Delete All
             </button>
           )}
+          <button
+            onClick={sendPaymentReminders}
+            disabled={sendingReminders}
+            className="px-4 py-2 bg-green-500 text-white rounded-xl flex items-center gap-2 hover:bg-green-600"
+            data-testid="send-payment-reminders-btn"
+          >
+            {sendingReminders ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Bell className="w-5 h-5" />
+            )}
+            Send Payment Reminders (3-Day)
+          </button>
         </div>
       </div>
 
