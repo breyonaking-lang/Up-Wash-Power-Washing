@@ -800,7 +800,7 @@ function TodayRoute() {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-6">
@@ -826,32 +826,107 @@ function TodayRoute() {
                 />
               </div>
 
-              {/* Quick Messages */}
-              <div className="space-y-2">
-                <p className="text-white/40 text-xs">Quick messages:</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I'm on my way to your location and will arrive shortly.`)}
-                    className="text-xs px-3 py-1 bg-white/10 rounded-full text-white/70 hover:bg-white/20"
-                  >
-                    On my way
-                  </button>
-                  <button
-                    onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I've arrived at your location.`)}
-                    className="text-xs px-3 py-1 bg-white/10 rounded-full text-white/70 hover:bg-white/20"
-                  >
-                    Arrived
-                  </button>
-                  <button
-                    onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I'm running about 15 minutes late. Apologies for the delay!`)}
-                    className="text-xs px-3 py-1 bg-white/10 rounded-full text-white/70 hover:bg-white/20"
-                  >
-                    Running late
-                  </button>
+              {/* Quick Templates */}
+              <div className="space-y-3">
+                <p className="text-white/60 text-sm font-medium">Quick Templates:</p>
+                
+                {/* Arrival Templates */}
+                <div className="space-y-2">
+                  <p className="text-emerald-400 text-xs font-medium">Arrival</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I'm on my way to your location and will arrive shortly. Please ensure the area is accessible. Thank you!`)}
+                      className="text-xs px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-400 hover:bg-emerald-500/30"
+                    >
+                      On my way
+                    </button>
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I've arrived at your location. I'll begin servicing now. Thank you!`)}
+                      className="text-xs px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-400 hover:bg-emerald-500/30"
+                    >
+                      Arrived
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delay Templates */}
+                <div className="space-y-2">
+                  <p className="text-amber-400 text-xs font-medium">Delays</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I'm running about 15 minutes late. I apologize for the delay and will be there as soon as possible. Thank you for your patience!`)}
+                      className="text-xs px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-full text-amber-400 hover:bg-amber-500/30"
+                    >
+                      Running 15 min late
+                    </button>
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! Due to weather conditions, we need to reschedule your service. We'll contact you soon with a new date. Thank you for understanding!`)}
+                      className="text-xs px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-full text-amber-400 hover:bg-amber-500/30"
+                    >
+                      Weather delay
+                    </button>
+                  </div>
+                </div>
+
+                {/* Access Templates */}
+                <div className="space-y-2">
+                  <p className="text-blue-400 text-xs font-medium">Access Issues</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I'm at your location but need access. Could you please unlock the gate/door? Thank you!`)}
+                      className="text-xs px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-400 hover:bg-blue-500/30"
+                    >
+                      Need access
+                    </button>
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I'm at your location. Could you please provide the gate code so I can access the property? Thank you!`)}
+                      className="text-xs px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-400 hover:bg-blue-500/30"
+                    >
+                      Gate code needed
+                    </button>
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I'm at your location but your bins are not at the curb. Would you like me to pull them out, or should we reschedule? Please let me know. Thank you!`)}
+                      className="text-xs px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-400 hover:bg-blue-500/30"
+                    >
+                      Bins not out
+                    </button>
+                  </div>
+                </div>
+
+                {/* Completion Templates */}
+                <div className="space-y-2">
+                  <p className="text-green-400 text-xs font-medium">Completion</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! Your Up-Wash service has been completed. Thank you for choosing us! If you have any questions, feel free to reach out. Have a blessed day!`)}
+                      className="text-xs px-3 py-1.5 bg-green-500/20 border border-green-500/30 rounded-full text-green-400 hover:bg-green-500/30"
+                    >
+                      Job complete
+                    </button>
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! I was unable to complete your service today. We'll contact you to reschedule. Apologies for any inconvenience!`)}
+                      className="text-xs px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-full text-red-400 hover:bg-red-500/30"
+                    >
+                      Unable to complete
+                    </button>
+                  </div>
+                </div>
+
+                {/* Follow-up Templates */}
+                <div className="space-y-2">
+                  <p className="text-purple-400 text-xs font-medium">Follow-up</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSmsMessage(`Hi ${smsTask?.customer_name}! Thank you for using Up-Wash! If you were happy with our service, we'd really appreciate a Google review. It helps us serve more customers like you! Thank you!`)}
+                      className="text-xs px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-400 hover:bg-purple-500/30"
+                    >
+                      Request review
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowSMSModal(false)}
                   className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
@@ -864,7 +939,7 @@ function TodayRoute() {
                   className="flex-1 py-3 bg-teal-500 text-white rounded-xl hover:bg-teal-600 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <Send className="w-4 h-4" />
-                  Send
+                  Send SMS
                 </button>
               </div>
             </div>
