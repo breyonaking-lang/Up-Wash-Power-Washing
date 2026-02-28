@@ -1205,6 +1205,39 @@ async def process_payment(payment_req: SquarePaymentRequest):
             "payment_id": result["payment_id"],
             "receipt_url": result.get("receipt_url")
         }
+        
+        # Send booking confirmation SMS to customer
+        customer_phone = booking.get("customer_phone")
+        customer_name = booking.get("customer_name", "Valued Customer")
+        if customer_phone:
+            service_names = ", ".join([s.get("service_id", "").replace("_", " ").title() for s in booking.get("services", [])])
+            booking_dates = booking.get("booking_dates", [])
+            dates_str = ", ".join(booking_dates[:3]) + ("..." if len(booking_dates) > 3 else "")
+            
+            confirmation_msg = f"Hi {customer_name}! Your Up-Wash booking is confirmed. Services: {service_names}. Dates: {dates_str}. Total: ${booking.get('total', 0):.2f}. Thank you for choosing Up-Wash Power Washing! Reply STOP to opt out."
+            
+            await send_sms(customer_phone, confirmation_msg)
+            
+            # Store in customer messages
+            msg_record = {
+                "id": str(uuid.uuid4()),
+                "booking_id": payment_req.booking_id,
+                "customer_phone": customer_phone,
+                "customer_name": customer_name,
+                "type": "booking_confirmation",
+                "message": confirmation_msg,
+                "message_type": "booking_confirmed",
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.customer_messages.insert_one(msg_record)
+        
+        return {
+            "success": True,
+            "payment_id": result["payment_id"],
+            "receipt_url": result.get("receipt_url"),
+            "sms_sent": bool(customer_phone)
+        }
     else:
         raise HTTPException(status_code=400, detail=result.get("error", "Payment failed"))
 
