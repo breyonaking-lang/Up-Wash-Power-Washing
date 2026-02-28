@@ -109,9 +109,10 @@ class TestAdminLogin:
         
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
-        assert "token" in data, "Response should contain token"
+        assert "access_token" in data, "Response should contain access_token"
+        assert "user" in data, "Response should contain user info"
         print("✓ Admin login successful")
-        return data["token"]
+        return data["access_token"]
     
     def test_admin_get_quotes_authenticated(self):
         """Test getting quote requests with valid auth"""
@@ -124,7 +125,7 @@ class TestAdminLogin:
         if login_response.status_code != 200:
             pytest.skip("Could not login as admin")
             
-        token = login_response.json().get("token")
+        token = login_response.json().get("access_token")
         
         # Get quotes
         response = requests.get(
