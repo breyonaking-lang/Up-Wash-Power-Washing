@@ -1338,6 +1338,9 @@ function ContractorsPage() {
   const [smsHistory, setSmsHistory] = useState([]);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [sendCredentials, setSendCredentials] = useState(false);
+  // Edit Contractor States
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingContractor, setEditingContractor] = useState(null);
 
   useEffect(() => {
     fetchContractors();
