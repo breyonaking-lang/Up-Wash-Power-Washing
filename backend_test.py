@@ -12,12 +12,16 @@ from datetime import datetime
 class ETANotificationAPITester:
     def __init__(self, base_url="https://xzr8d2y3-preview.emergentagent.com"):
         self.base_url = base_url
-        self.token = None
+        self.admin_token = None
+        self.contractor_token = None
         self.admin_username = "Hughes0108"
         self.admin_password = "Godfirst7!"
+        self.contractor_username = "ajb123"
+        self.contractor_password = "upwash_test_123"
         self.tests_run = 0
         self.tests_passed = 0
         self.contractor_id = None
+        self.test_results = []
 
     def log_test(self, name, success, details=""):
         """Log test results"""
