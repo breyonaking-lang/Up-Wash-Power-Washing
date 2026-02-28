@@ -558,3 +558,26 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [ ] Resend email integration (user to provide API key)
 - [ ] Production VAPID keys for push notifications
 - [ ] Actual Square payment integration in subscription flow
+
+### Feb 28, 2026 - Session 9 Updates
+
+#### Route Client Details Display ✅ NEW
+- [x] Contractor MyRoutes page shows full client details:
+  - Customer name, address, phone, email
+  - Services with quantities
+  - Call button for each client
+  - Potential earnings ($11/stop)
+- [x] Admin Contractors page shows expandable route cards:
+  - "Show/Hide Clients" toggle button
+  - Client details when expanded (name, address, phone, services)
+  - Call button for each client
+
+#### Route Reassignment ✅ NEW
+- [x] Admin can reassign routes between contractors
+- [x] "Reassign" button on each route card
+- [x] Modal with contractor dropdown selection
+- [x] Shows route info (name, stops, worth)
+- [x] SMS notification sent to new contractor
+- [x] SMS notification sent to old contractor (if any)
+- [x] API: POST /api/admin/routes/{route_id}/reassign
+
