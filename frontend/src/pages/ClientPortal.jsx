@@ -354,10 +354,67 @@ export default function ClientPortal() {
         const notifData = await notifRes.json();
         setNotifications(notifData.notifications || []);
       }
+      if (historyRes.ok) {
+        const historyData = await historyRes.json();
+        setBookingHistory(historyData.bookings || []);
+      }
+      if (upcomingRes.ok) {
+        const upcomingData = await upcomingRes.json();
+        setUpcomingServices(upcomingData.services || []);
+      }
     } catch (err) {
       console.error('Failed to fetch client data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!cancelReason.trim()) {
+      toast.error('Please provide a reason for cancellation');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/client/subscription/cancel`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason: cancelReason })
+      });
+      if (!res.ok) throw new Error('Failed to cancel');
+      toast.success('Subscription cancellation requested. We will contact you shortly.');
+      setShowCancelModal(false);
+      setCancelReason('');
+      fetchClientData();
+    } catch (err) {
+      toast.error('Failed to cancel subscription');
+    }
+  };
+
+  const handlePauseSubscription = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/client/subscription/pause`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to pause');
+      toast.success('Subscription paused successfully');
+      fetchClientData();
+    } catch (err) {
+      toast.error('Failed to pause subscription');
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/client/subscription/resume`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to resume');
+      toast.success('Subscription resumed successfully');
+      fetchClientData();
+    } catch (err) {
+      toast.error('Failed to resume subscription');
     }
   };
 
