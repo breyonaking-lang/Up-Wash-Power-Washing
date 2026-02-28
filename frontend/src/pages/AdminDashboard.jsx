@@ -2530,6 +2530,34 @@ function RoutesPage() {
         </div>
       </div>
 
+      {/* Route Statistics Summary */}
+      {routes.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+            <p className="text-white/60 text-sm">Total Routes</p>
+            <p className="text-2xl font-bold text-white">{routes.length}</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+            <p className="text-white/60 text-sm">Total Stops</p>
+            <p className="text-2xl font-bold text-blue-400">
+              {routes.reduce((sum, r) => sum + (r.bookings?.length || 0), 0)}
+            </p>
+          </div>
+          <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+            <p className="text-white/60 text-sm">Est. Documentor Pay</p>
+            <p className="text-2xl font-bold text-green-400">
+              ${(routes.reduce((sum, r) => sum + (r.bookings?.length || 0), 0) * 11).toFixed(0)}
+            </p>
+          </div>
+          <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+            <p className="text-white/60 text-sm">Zip Codes</p>
+            <p className="text-2xl font-bold text-purple-400">
+              {new Set(routes.map(r => r.zip_code).filter(Boolean)).size}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Info Box */}
       <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 text-blue-200 text-sm">
         <p>📍 Routes are automatically grouped by <strong>zip code</strong> (max 120 bookings per route).</p>
