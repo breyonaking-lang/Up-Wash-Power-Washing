@@ -3842,9 +3842,24 @@ async def get_chat_groups(current_user: dict = Depends(get_current_user)):
 # SMS Helper function
 async def send_sms(to_phone: str, message: str, contractor_id: str = None):
     """Send SMS via Twilio (or log if not configured)"""
+    # Validate inputs
+    if not to_phone or not message or not message.strip():
+        return {"id": str(uuid.uuid4()), "status": "failed", "error": "Phone or message is empty"}
+    
+    # Clean phone number - ensure proper format
+    clean_phone = to_phone.strip()
+    if not clean_phone.startswith('+'):
+        # Add US country code if not present
+        clean_phone = clean_phone.replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
+        if len(clean_phone) == 10:
+            clean_phone = '+1' + clean_phone
+        elif len(clean_phone) == 11 and clean_phone.startswith('1'):
+            clean_phone = '+' + clean_phone
+    
     sms_log = {
         "id": str(uuid.uuid4()),
-        "to_phone": to_phone,
+        "to_phone": clean_phone,
+        "original_phone": to_phone,
         "message": message,
         "contractor_id": contractor_id,
         "status": "pending",
@@ -3857,21 +3872,22 @@ async def send_sms(to_phone: str, message: str, contractor_id: str = None):
             client = Client(twilio_account_sid, twilio_auth_token)
             
             twilio_message = client.messages.create(
-                body=message,
+                body=message.strip(),
                 from_=twilio_phone_number,
-                to=to_phone
+                to=clean_phone
             )
             
             sms_log["status"] = "sent"
             sms_log["twilio_sid"] = twilio_message.sid
+            logging.info(f"SMS sent successfully to {clean_phone}")
         except Exception as e:
-            logging.error(f"Twilio SMS error: {e}")
+            logging.error(f"Twilio SMS error to {clean_phone}: {e}")
             sms_log["status"] = "failed"
             sms_log["error"] = str(e)
     else:
         # Demo mode - log SMS without sending
         sms_log["status"] = "demo_logged"
-        logging.info(f"SMS (Demo): To {to_phone}: {message}")
+        logging.info(f"SMS (Demo): To {clean_phone}: {message}")
     
     await db.sms_logs.insert_one(sms_log)
     return sms_log
