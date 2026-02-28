@@ -6188,12 +6188,16 @@ async def cancel_client_subscription(req: SubscriptionCancelRequest, current_cli
     if not subscription:
         raise HTTPException(status_code=404, detail="No active subscription found")
     
+    # Get client info
+    client = await db.clients.find_one({"email": current_client["email"]}, {"_id": 0})
+    client_name = client.get("name", subscription.get("customer_name", "Unknown")) if client else subscription.get("customer_name", "Unknown")
+    
     # Create cancellation request
     cancel_request = {
         "id": str(uuid.uuid4()),
         "booking_id": subscription["id"],
         "client_id": current_client["client_id"],
-        "client_name": current_client["name"],
+        "client_name": client_name,
         "client_email": current_client["email"],
         "reason": req.reason,
         "status": "pending",
@@ -6205,7 +6209,7 @@ async def cancel_client_subscription(req: SubscriptionCancelRequest, current_cli
     admin_notif = {
         "id": str(uuid.uuid4()),
         "type": "cancellation_request",
-        "title": f"Cancellation Request: {current_client['name']}",
+        "title": f"Cancellation Request: {client_name}",
         "message": f"Reason: {req.reason}",
         "booking_id": subscription["id"],
         "read": False,
