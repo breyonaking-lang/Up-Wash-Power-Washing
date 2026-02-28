@@ -6177,6 +6177,7 @@ export default function AdminDashboard() {
           <Route path="pending-routes" element={<RoutesPage />} />
           <Route path="released-routes" element={<ReleasedRoutesPage />} />
           <Route path="route-requests" element={<RouteRequestsPage />} />
+          <Route path="quotes" element={<QuotesPage />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="inquiries" element={<InquiryMessagesPage />} />
           <Route path="settings" element={<SettingsPage />} />
