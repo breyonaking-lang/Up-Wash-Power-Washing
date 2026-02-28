@@ -1575,6 +1575,36 @@ function ContractorsPage() {
     }
   };
 
+  const openEditContractor = (contractor) => {
+    setEditingContractor({...contractor});
+    setShowEditModal(true);
+  };
+
+  const saveContractorEdit = async () => {
+    if (!editingContractor) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${editingContractor.id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          full_name: editingContractor.full_name,
+          email: editingContractor.email,
+          phone: editingContractor.phone,
+          address: editingContractor.address,
+          pay_rate: editingContractor.pay_rate,
+          is_active: editingContractor.is_active,
+          notes: editingContractor.notes
+        })
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      toast.success('Contractor information updated!');
+      setShowEditModal(false);
+      fetchContractors();
+    } catch (err) {
+      toast.error('Failed to update contractor');
+    }
+  };
+
   const deleteContractor = async (contractorId) => {
     if (!window.confirm('Are you sure you want to delete this contractor?')) return;
 
