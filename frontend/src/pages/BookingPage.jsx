@@ -306,6 +306,41 @@ const BookingPage = () => {
     }
   }, [serviceDaysPerMonth]);
 
+  // Auto-calculate nearest start date when monthly service days are selected
+  useEffect(() => {
+    if (bookingMode === 'monthly' && monthlyServiceDays.length > 0) {
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const currentDay = today.getDate();
+      
+      // Find the nearest selected day that's at least tomorrow
+      let nearestDate = null;
+      
+      // Check current month first
+      for (const day of monthlyServiceDays.sort((a, b) => a - b)) {
+        if (day > currentDay) {
+          const testDate = new Date(currentYear, currentMonth, day);
+          // Make sure it's a valid date and matches selected services' available days
+          if (testDate.getMonth() === currentMonth) {
+            nearestDate = testDate;
+            break;
+          }
+        }
+      }
+      
+      // If no date found in current month, use first day in next month
+      if (!nearestDate) {
+        const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+        const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+        const firstDay = Math.min(...monthlyServiceDays);
+        nearestDate = new Date(nextYear, nextMonth, firstDay);
+      }
+      
+      setMonthlyStartDate(nearestDate);
+    }
+  }, [monthlyServiceDays, bookingMode]);
+
   // Auto-populate nearest available days for monthly subscription
   const autoPopulateMonthlyDays = () => {
     // Get allowed days of week based on selected services
