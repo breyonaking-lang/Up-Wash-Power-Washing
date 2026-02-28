@@ -338,3 +338,16 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] Weekly earnings reset every Monday
 - [x] "Resets in X days" countdown displayed
 - [x] CNS stops shown for current week only
+
+#### Enhanced Client Portal ✅ NEW
+- [x] GET /api/client/booking-history - View past completed services
+- [x] GET /api/client/upcoming-services - View scheduled services
+- [x] POST /api/client/subscription/pause - Pause subscription
+- [x] POST /api/client/subscription/resume - Resume paused subscription
+- [x] POST /api/client/subscription/cancel - Request cancellation (admin notified)
+- [x] Navigation tabs: Dashboard, Upcoming Services, Service History, Subscription
+- [x] Quick stats on dashboard (upcoming count, completed count, status)
+- [x] Subscription details with service days and pricing
+- [x] Pause/Resume/Cancel buttons for subscription management
+- [x] Cancellation reason modal
+- [x] Admin notified of cancellation requests
