@@ -1993,36 +1993,50 @@ async def get_admin_calendar(month: Optional[int] = None, year: Optional[int] = 
     # Get all bookings
     bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
     
+    # Get contractors for name lookup
+    contractors = await db.users.find({"role": "contractor"}, {"_id": 0, "password_hash": 0}).to_list(100)
+    contractor_map = {c["id"]: c.get("full_name", c.get("username")) for c in contractors}
+    
     # Organize by date
     calendar_data = {}
     for booking in bookings:
+        # Get assigned contractor name
+        assigned_contractor_name = None
+        if booking.get("assigned_contractor_id"):
+            assigned_contractor_name = contractor_map.get(booking["assigned_contractor_id"])
+        elif booking.get("route_id"):
+            # Check if the route has an assigned contractor
+            route = await db.routes.find_one({"id": booking["route_id"]}, {"_id": 0})
+            if route and route.get("assigned_contractor_id"):
+                assigned_contractor_name = contractor_map.get(route["assigned_contractor_id"])
+        
         for date_str in booking.get("booking_dates", []):
             if date_str not in calendar_data:
                 calendar_data[date_str] = []
             calendar_data[date_str].append({
                 "id": booking.get("id"),
                 "customer_name": booking.get("customer_name"),
+                "customer_phone": booking.get("customer_phone"),
+                "customer_email": booking.get("customer_email"),
                 "services": booking.get("services"),
                 "status": booking.get("status"),
                 "payment_status": booking.get("payment_status"),
                 "is_monthly": booking.get("is_monthly", False),
                 "address": booking.get("customer_address"),
+                "total": booking.get("total"),
                 "route_id": booking.get("route_id"),
-                "assigned_contractor_id": booking.get("assigned_contractor_id")
+                "assigned_contractor_id": booking.get("assigned_contractor_id"),
+                "assigned_contractor_name": assigned_contractor_name
             })
     
     # Get routes for today
     today_str = today.strftime("%Y-%m-%d")
     routes = await db.routes.find({}, {"_id": 0}).to_list(100)
     
-    # Get contractors
-    contractors = await db.users.find({"role": "contractor"}, {"_id": 0, "password_hash": 0}).to_list(100)
-    contractor_map = {c["id"]: c.get("full_name", c.get("username")) for c in contractors}
-    
     # Add contractor names to routes
     for route in routes:
         if route.get("assigned_contractor_id"):
-            route["contractor_name"] = contractor_map.get(route["assigned_contractor_id"], "Unassigned")
+            route["documentor_name"] = contractor_map.get(route["assigned_contractor_id"], "Unassigned")
     
     return {
         "calendar": calendar_data,
