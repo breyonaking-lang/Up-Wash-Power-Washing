@@ -820,8 +820,273 @@ export default function ClientPortal() {
               </div>
             )}
           </div>
+            </>
+          )}
+
+          {/* Upcoming Services Tab */}
+          {activeTab === 'upcoming' && (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                <Calendar className="text-blue-400" />
+                Upcoming Services
+              </h2>
+              {upcomingServices.length === 0 ? (
+                <div className="bg-white/10 rounded-2xl p-8 text-center">
+                  <Calendar className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <p className="text-white/60">No upcoming services scheduled</p>
+                  <a href="/" className="text-blue-400 hover:underline mt-2 inline-block">
+                    Book a service →
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingServices.map((service) => (
+                    <div key={service.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
+                      <div className="flex justify-between items-start flex-wrap gap-4">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-semibold">
+                              {new Date(service.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </div>
+                            {service.is_monthly && (
+                              <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">Monthly</span>
+                            )}
+                          </div>
+                          <p className="text-white font-semibold">
+                            {service.services?.map(s => s.service_id?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())).join(', ')}
+                          </p>
+                          <p className="text-white/60 text-sm">{service.address}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-green-400 font-bold">${service.total?.toFixed(2)}</p>
+                          <p className="text-white/40 text-xs">{service.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Service History Tab */}
+          {activeTab === 'history' && (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                <Clock className="text-green-400" />
+                Service History
+              </h2>
+              {bookingHistory.length === 0 ? (
+                <div className="bg-white/10 rounded-2xl p-8 text-center">
+                  <Clock className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <p className="text-white/60">No service history yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {bookingHistory.map((booking) => (
+                    <div key={booking.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
+                      <div className="flex justify-between items-start flex-wrap gap-4">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                              booking.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {booking.status === 'completed' ? '✓ Completed' : booking.status}
+                            </div>
+                            <span className="text-white/60 text-sm">
+                              {booking.service_date && new Date(booking.service_date).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-white font-semibold">
+                            {booking.services?.map(s => s.service_id?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())).join(', ')}
+                          </p>
+                          <p className="text-white/60 text-sm">{booking.address}</p>
+                          {booking.contractor_notes && (
+                            <p className="text-white/50 text-sm mt-2 italic">"{booking.contractor_notes}"</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-green-400 font-bold">${booking.total?.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Subscription Management Tab */}
+          {activeTab === 'subscription' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                <CreditCard className="text-purple-400" />
+                Subscription Management
+              </h2>
+              
+              {subscription ? (
+                <>
+                  {/* Subscription Details */}
+                  <div className={`rounded-2xl p-6 border ${
+                    subscription.subscription_status === 'paused' 
+                      ? 'bg-yellow-500/10 border-yellow-500/30'
+                      : 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30'
+                  }`}>
+                    <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Monthly Subscription</h3>
+                        <p className={`text-sm font-semibold ${
+                          subscription.subscription_status === 'paused' ? 'text-yellow-400' : 'text-green-400'
+                        }`}>
+                          {subscription.subscription_status === 'paused' ? '⏸ Paused' : '✓ Active'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/60 text-sm">Monthly Total</p>
+                        <p className="text-2xl font-bold text-white">${subscription.total?.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-3 gap-4 mb-6">
+                      <div className="bg-white/10 rounded-xl p-4">
+                        <p className="text-white/60 text-sm">Service Days/Month</p>
+                        <p className="text-white font-semibold text-lg">{subscription.service_days_per_month || 2}</p>
+                      </div>
+                      <div className="bg-white/10 rounded-xl p-4">
+                        <p className="text-white/60 text-sm">Scheduled Days</p>
+                        <p className="text-white font-semibold">
+                          {(subscription.monthly_service_days || []).map(d => `${d}${['st','nd','rd'][((d+90)%100-10)%10-1]||'th'}`).join(', ') || 'Not set'}
+                        </p>
+                      </div>
+                      <div className="bg-white/10 rounded-xl p-4">
+                        <p className="text-white/60 text-sm">Next Payment</p>
+                        <p className="text-white font-semibold">{subscription.next_payment_date || 'TBD'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white/5 rounded-xl p-4 mb-6">
+                      <p className="text-white/60 text-sm mb-2">Services Included</p>
+                      <div className="flex flex-wrap gap-2">
+                        {subscription.services?.map((service, i) => (
+                          <span key={i} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm">
+                            {service.service_id?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Subscription Actions */}
+                    <div className="flex flex-wrap gap-3">
+                      {subscription.subscription_status === 'paused' ? (
+                        <button
+                          onClick={handleResumeSubscription}
+                          className="px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 flex items-center gap-2"
+                          data-testid="resume-subscription-btn"
+                        >
+                          <Play className="w-5 h-5" />
+                          Resume Subscription
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handlePauseSubscription}
+                          className="px-6 py-3 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 flex items-center gap-2"
+                          data-testid="pause-subscription-btn"
+                        >
+                          <Pause className="w-5 h-5" />
+                          Pause Subscription
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowCancelModal(true)}
+                        className="px-6 py-3 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 flex items-center gap-2"
+                        data-testid="cancel-subscription-btn"
+                      >
+                        <X className="w-5 h-5" />
+                        Cancel Subscription
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Subscription Benefits */}
+                  <div className="bg-white/10 rounded-2xl p-6 border border-white/20">
+                    <h3 className="text-lg font-bold text-white mb-4">Subscription Benefits</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
+                          <Check className="w-4 h-4 text-green-400" />
+                        </div>
+                        <p className="text-white/80">5% Monthly Discount</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
+                          <Check className="w-4 h-4 text-green-400" />
+                        </div>
+                        <p className="text-white/80">Priority Scheduling</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
+                          <Check className="w-4 h-4 text-green-400" />
+                        </div>
+                        <p className="text-white/80">Automatic Service Reminders</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
+                          <Check className="w-4 h-4 text-green-400" />
+                        </div>
+                        <p className="text-white/80">Flexible Pause/Resume</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white/10 rounded-2xl p-8 text-center">
+                  <CreditCard className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <p className="text-white/60 mb-4">You don't have an active subscription</p>
+                  <a href="/" className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 inline-flex items-center gap-2">
+                    Subscribe & Save 5% →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </main>
+
+      {/* Cancel Subscription Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowCancelModal(false)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-white mb-4">Cancel Subscription</h2>
+            <p className="text-white/60 mb-4">We're sorry to see you go! Please let us know why you're cancelling so we can improve.</p>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Reason for cancellation..."
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 h-32 mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Keep Subscription
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                className="flex-1 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600"
+              >
+                Cancel Subscription
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Contract Signing Modal */}
       {signingContract && (
