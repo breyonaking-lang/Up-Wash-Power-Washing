@@ -775,7 +775,7 @@ export default function ClientPortal() {
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
               <FileText className="text-purple-400" />
-              My Contracts
+              My Documents
             </h2>
             {contracts.length === 0 ? (
               <p className="text-white/60">No contracts on file</p>

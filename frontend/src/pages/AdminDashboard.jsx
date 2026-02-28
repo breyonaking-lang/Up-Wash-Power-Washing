@@ -49,7 +49,7 @@ const navItems = [
   { path: 'unpaid-subscriptions', icon: AlertCircle, label: 'Unpaid Subscriptions' },
   { path: 'revenue', icon: DollarSign, label: 'Revenue' },
   { path: 'subscriptions', icon: Users, label: 'Subscriptions' },
-  { path: 'contracts', icon: FileText, label: 'Contracts' },
+  { path: 'contracts', icon: FileText, label: 'Documents' },
   { path: 'deleted-subscriptions', icon: Trash2, label: 'Deleted Subscriptions' },
   { path: 'contractors', icon: UserPlus, label: 'Contractors' },
   { path: 'payroll', icon: Banknote, label: 'Payroll' },
@@ -3672,7 +3672,7 @@ function SMSLogsPage() {
 
 
 // Contracts Management Page
-function ContractsPage() {
+function DocumentsPage() {
   const [contracts, setContracts] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -5933,7 +5933,7 @@ export default function AdminDashboard() {
           <Route path="unpaid-subscriptions" element={<UnpaidSubscriptionsPage />} />
           <Route path="revenue" element={<RevenuePage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
-          <Route path="contracts" element={<ContractsPage />} />
+          <Route path="contracts" element={<DocumentsPage />} />
           <Route path="deleted-subscriptions" element={<DeletedSubscriptionsPage />} />
           <Route path="contractors" element={<ContractorsPage />} />
           <Route path="payroll" element={<PayrollPage />} />
