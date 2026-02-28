@@ -462,5 +462,33 @@ Power washing business website with booking system, admin dashboard, contractor 
 - Errors in logs were for invalid test numbers (555-xxx-xxxx)
 - Real phone numbers receive SMS successfully
 
+### Feb 28, 2026 - Session 6 Updates
+
+#### Scent Bomb Pricing Update ✅ NEW
+- [x] Reverted to $3.50 as single standalone item
+- [x] Removed quantity options (1/2/3/4)
+- [x] Now clickable like other services
+
+#### Documentor → Contractor Rename ✅ NEW
+- [x] Changed all 'Documentor' references to 'Contractor' throughout admin dashboard
+- [x] Navigation: 'Contractors' instead of 'Documentors'
+- [x] Portal link card: 'Contractor Portal Link'
+- [x] Route stats: 'Est. Contractor Pay'
+- [x] All dispatching UI updated
+
+#### Quote Management Dashboard ✅ NEW
+- [x] New 'Quote Requests' page in admin navigation
+- [x] Stats cards: Total Requests, Pending, Quoted, Converted
+- [x] Filter tabs: All, Pending, Quoted, Converted
+- [x] Quote cards show:
+  - Service type, customer name, phone, email
+  - Address, description, photos
+  - Preferred day (Thu/Fri)
+  - Status badges
+- [x] Send Quote modal with:
+  - Quote price input ($)
+  - Additional message textarea
+  - SMS notification to customer
+
 #### Still TODO (Next Session):
-- [ ] Admin dashboard "All" tabs clickable with filterable lists (stats cards already link to relevant pages)
+- [ ] Admin dashboard "All" tabs clickable with filterable lists
