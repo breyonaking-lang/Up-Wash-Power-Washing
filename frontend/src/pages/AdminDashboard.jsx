@@ -101,7 +101,7 @@ function DashboardOverview() {
     { label: 'Completed', value: stats?.completed || 0, icon: CheckCircle, color: 'bg-green-500', link: '/admin/dashboard/completed' },
     { label: 'Revenue', value: `$${(stats?.total_revenue || 0).toFixed(2)}`, icon: DollarSign, color: 'bg-emerald-500', link: '/admin/dashboard/revenue' },
     { label: 'Scent Bomb Orders', value: stats?.scent_bomb_orders || 0, icon: Droplets, color: 'bg-purple-500', link: '/admin/dashboard/scent-bombs' },
-    { label: 'Contractors', value: stats?.contractor_count || stats?.documentor_count || 0, icon: Users, color: 'bg-indigo-500', link: '/admin/dashboard/contractors' },
+    { label: 'Contractors', value: stats?.contractor_count || stats?.contractor_count || 0, icon: Users, color: 'bg-indigo-500', link: '/admin/dashboard/contractors' },
   ];
 
   return (
@@ -943,15 +943,15 @@ function DeletedSubscriptionsPage() {
 // Released Routes Management
 function ReleasedRoutesPage() {
   const [releasedRoutes, setReleasedRoutes] = useState([]);
-  const [documentors, setDocumentors] = useState([]);
+  const [contractors, setContractors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dispatchModal, setDispatchModal] = useState(null);
-  const [selectedDocumentor, setSelectedDocumentor] = useState('');
+  const [selectedContractor, setSelectedContractor] = useState('');
   const [dispatchMessage, setDispatchMessage] = useState('');
 
   useEffect(() => {
     fetchReleasedRoutes();
-    fetchDocumentors();
+    fetchContractors();
   }, []);
 
   const fetchReleasedRoutes = async () => {
@@ -967,20 +967,20 @@ function ReleasedRoutesPage() {
     }
   };
 
-  const fetchDocumentors = async () => {
+  const fetchContractors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setDocumentors(data.documentors || []);
+      setContractors(data.contractors || []);
     } catch (err) {
-      console.error('Failed to load documentors');
+      console.error('Failed to load contractors');
     }
   };
 
   const dispatchRoute = async () => {
-    if (!dispatchModal || !selectedDocumentor) {
-      toast.error('Please select a documentor');
+    if (!dispatchModal || !selectedContractor) {
+      toast.error('Please select a contractor');
       return;
     }
 
@@ -989,14 +989,14 @@ function ReleasedRoutesPage() {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          documentor_id: selectedDocumentor,
+          contractor_id: selectedContractor,
           message: dispatchMessage
         })
       });
       if (!res.ok) throw new Error('Failed to dispatch');
-      toast.success('Route dispatched! Documentor notified.');
+      toast.success('Route dispatched! Contractor notified.');
       setDispatchModal(null);
-      setSelectedDocumentor('');
+      setSelectedContractor('');
       setDispatchMessage('');
       fetchReleasedRoutes();
     } catch (err) {
@@ -1014,8 +1014,8 @@ function ReleasedRoutesPage() {
       </h1>
       
       <div className="bg-purple-500/20 rounded-xl p-4 text-purple-200 text-sm">
-        <p><strong>Released routes</strong> are routes that documentors have released back to you. 
-        You can dispatch them to other documentors. Documentors earn <strong>$10 per stop</strong>.</p>
+        <p><strong>Released routes</strong> are routes that contractors have released back to you. 
+        You can dispatch them to other contractors. Contractors earn <strong>$10 per stop</strong>.</p>
       </div>
 
       {releasedRoutes.length === 0 ? (
@@ -1035,7 +1035,7 @@ function ReleasedRoutesPage() {
                   <h3 className="text-xl font-bold text-white">{route.route_name}</h3>
                   <p className="text-white/60">Area: {route.route_area || 'Not specified'}</p>
                   <p className="text-white/40 text-sm">
-                    Released by {route.released_by_documentor_name} on {new Date(route.released_at).toLocaleDateString()}
+                    Released by {route.released_by_contractor_name} on {new Date(route.released_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -1059,8 +1059,8 @@ function ReleasedRoutesPage() {
                   <p className="text-white/60 text-sm">Stops</p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-green-400">${route.documentor_pay?.toFixed(2)}</p>
-                  <p className="text-white/60 text-sm">Documentor Pay</p>
+                  <p className="text-2xl font-bold text-green-400">${route.contractor_pay?.toFixed(2)}</p>
+                  <p className="text-white/60 text-sm">Contractor Pay</p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-3 text-center">
                   <p className="text-2xl font-bold text-white">$10</p>
@@ -1093,19 +1093,19 @@ function ReleasedRoutesPage() {
                   className="w-full py-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center justify-center gap-2"
                 >
                   <Send className="w-5 h-5" />
-                  Dispatch to Documentor
+                  Dispatch to Contractor
                 </button>
               )}
               
               {route.status === 'dispatched' && (
                 <p className="text-yellow-400 text-sm text-center">
-                  Dispatched - Waiting for documentor to claim
+                  Dispatched - Waiting for contractor to claim
                 </p>
               )}
               
               {route.status === 'claimed' && (
                 <p className="text-green-400 text-sm text-center">
-                  ✓ Route claimed by documentor
+                  ✓ Route claimed by contractor
                 </p>
               )}
             </div>
@@ -1124,7 +1124,7 @@ function ReleasedRoutesPage() {
           >
             <h2 className="text-2xl font-bold text-white mb-2">Dispatch Route</h2>
             <p className="text-white/60 mb-6">
-              Send <strong>{dispatchModal.route_name}</strong> to a documentor
+              Send <strong>{dispatchModal.route_name}</strong> to a contractor
             </p>
             
             <div className="bg-purple-500/20 rounded-xl p-4 mb-6">
@@ -1134,25 +1134,25 @@ function ReleasedRoutesPage() {
                   <p className="text-white/60 text-sm">Stops</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-green-400">${dispatchModal.documentor_pay?.toFixed(2)}</p>
-                  <p className="text-white/60 text-sm">Documentor Earns</p>
+                  <p className="text-2xl font-bold text-green-400">${dispatchModal.contractor_pay?.toFixed(2)}</p>
+                  <p className="text-white/60 text-sm">Contractor Earns</p>
                 </div>
               </div>
               <p className="text-center text-purple-300 text-sm mt-2">
-                Route is FREE - No charge to documentor
+                Route is FREE - No charge to contractor
               </p>
             </div>
             
             <div className="space-y-4">
               <div>
-                <label className="text-white/60 text-sm">Select Documentor *</label>
+                <label className="text-white/60 text-sm">Select Contractor *</label>
                 <select
-                  value={selectedDocumentor}
-                  onChange={(e) => setSelectedDocumentor(e.target.value)}
+                  value={selectedContractor}
+                  onChange={(e) => setSelectedContractor(e.target.value)}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 >
-                  <option value="">Choose a documentor...</option>
-                  {documentors.map(c => (
+                  <option value="">Choose a contractor...</option>
+                  {contractors.map(c => (
                     <option key={c.id} value={c.id}>{c.full_name}</option>
                   ))}
                 </select>
@@ -1191,7 +1191,7 @@ function ReleasedRoutesPage() {
   );
 }
 
-// Route Requests Page - View and approve documentor route requests
+// Route Requests Page - View and approve contractor route requests
 function RouteRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1251,7 +1251,7 @@ function RouteRequestsPage() {
       </h1>
       
       <div className="bg-yellow-500/20 rounded-xl p-4 text-yellow-200 text-sm">
-        <p>Documentors request routes by zip code. Approve requests to assign routes and charge <strong>$11 per stop</strong>.</p>
+        <p>Contractors request routes by zip code. Approve requests to assign routes and charge <strong>$11 per stop</strong>.</p>
       </div>
 
       {requests.length === 0 ? (
@@ -1265,7 +1265,7 @@ function RouteRequestsPage() {
             <div key={request.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-yellow-500/30">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-white">{request.documentor_name}</h3>
+                  <h3 className="text-xl font-bold text-white">{request.contractor_name}</h3>
                   <p className="text-white/60">Requested: {new Date(request.created_at).toLocaleDateString()}</p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -1316,45 +1316,45 @@ function RouteRequestsPage() {
   );
 }
 
-// Documentors Management with Enhanced Details
-function DocumentorsPage() {
-  const [documentors, setDocumentors] = useState([]);
+// Contractors Management with Enhanced Details
+function ContractorsPage() {
+  const [contractors, setContractors] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedDocumentor, setSelectedDocumentor] = useState(null);
-  const [documentorEarnings, setDocumentorEarnings] = useState(null);
+  const [selectedContractor, setSelectedContractor] = useState(null);
+  const [contractorEarnings, setContractorEarnings] = useState(null);
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('bank_transfer');
   const [payNotes, setPayNotes] = useState('');
-  const [newDocumentor, setNewDocumentor] = useState({
+  const [newContractor, setNewContractor] = useState({
     username: '', password: '', full_name: '', phone: '', email: ''
   });
   // SMS States
   const [showSMSModal, setShowSMSModal] = useState(false);
-  const [smsDocumentor, setSmsDocumentor] = useState(null);
+  const [smsContractor, setSmsContractor] = useState(null);
   const [smsMessage, setSmsMessage] = useState('');
   const [smsHistory, setSmsHistory] = useState([]);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [sendCredentials, setSendCredentials] = useState(false);
-  // Edit Documentor States
+  // Edit Contractor States
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingDocumentor, setEditingDocumentor] = useState(null);
+  const [editingContractor, setEditingContractor] = useState(null);
 
   useEffect(() => {
-    fetchDocumentors();
+    fetchContractors();
     fetchRoutes();
   }, []);
 
-  const fetchDocumentors = async () => {
+  const fetchContractors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setDocumentors(data.documentors || []);
+      setContractors(data.contractors || []);
     } catch (err) {
-      toast.error('Failed to load documentors');
+      toast.error('Failed to load contractors');
     } finally {
       setLoading(false);
     }
@@ -1371,26 +1371,26 @@ function DocumentorsPage() {
     }
   };
 
-  const fetchDocumentorEarnings = async (documentorId) => {
+  const fetchContractorEarnings = async (contractorId) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors/${documentorId}/earnings`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/earnings`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setDocumentorEarnings(data);
+      setContractorEarnings(data);
     } catch (err) {
       console.error('Failed to load earnings');
-      setDocumentorEarnings(null);
+      setContractorEarnings(null);
     }
   };
 
-  const payDocumentor = async () => {
-    if (!selectedDocumentor || !payAmount) {
+  const payContractor = async () => {
+    if (!selectedContractor || !payAmount) {
       toast.error('Please enter payment amount');
       return;
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors/${selectedDocumentor.id}/pay`, {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${selectedContractor.id}/pay`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1404,45 +1404,45 @@ function DocumentorsPage() {
       setShowPayModal(false);
       setPayAmount('');
       setPayNotes('');
-      fetchDocumentorEarnings(selectedDocumentor.id);
+      fetchContractorEarnings(selectedContractor.id);
     } catch (err) {
       toast.error('Failed to record payment');
     }
   };
 
-  const openDocumentorDetails = async (documentor) => {
-    setSelectedDocumentor(documentor);
-    await fetchDocumentorEarnings(documentor.id);
+  const openContractorDetails = async (contractor) => {
+    setSelectedContractor(contractor);
+    await fetchContractorEarnings(contractor.id);
   };
 
-  const createDocumentor = async () => {
-    if (!newDocumentor.username || !newDocumentor.password || !newDocumentor.full_name || !newDocumentor.phone) {
+  const createContractor = async () => {
+    if (!newContractor.username || !newContractor.password || !newContractor.full_name || !newContractor.phone) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors`, {
+      const res = await fetch(`${API_URL}/api/admin/contractors`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(newDocumentor)
+        body: JSON.stringify(newContractor)
       });
       if (!res.ok) throw new Error('Failed to create');
-      toast.success('Documentor created!');
+      toast.success('Contractor created!');
       setShowCreateModal(false);
-      setNewDocumentor({ username: '', password: '', full_name: '', phone: '', email: '' });
-      fetchDocumentors();
+      setNewContractor({ username: '', password: '', full_name: '', phone: '', email: '' });
+      fetchContractors();
     } catch (err) {
-      toast.error('Failed to create documentor');
+      toast.error('Failed to create contractor');
     }
   };
 
-  const resetPassword = async (documentorId) => {
+  const resetPassword = async (contractorId) => {
     const newPassword = prompt('Enter new password:');
     if (!newPassword) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors/${documentorId}/password?new_password=${encodeURIComponent(newPassword)}`, {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/password?new_password=${encodeURIComponent(newPassword)}`, {
         method: 'PATCH',
         headers: getAuthHeaders()
       });
@@ -1453,14 +1453,14 @@ function DocumentorsPage() {
     }
   };
 
-  const sendSMS = async (documentor) => {
-    setSmsDocumentor(documentor);
+  const sendSMS = async (contractor) => {
+    setSmsContractor(contractor);
     setShowSMSModal(true);
     setSmsMessage('');
     setSendCredentials(false);
     // Fetch SMS history
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/documentor/history/${documentor.id}`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor/history/${contractor.id}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setSmsHistory(data.messages || []);
@@ -1477,17 +1477,17 @@ function DocumentorsPage() {
     }
     setSendingSMS(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/documentor`, {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          documentor_id: smsDocumentor.id,
+          contractor_id: smsContractor.id,
           message: smsMessage
         })
       });
       const data = await res.json();
       if (data.status === 'sent') {
-        toast.success(`SMS sent to ${smsDocumentor.full_name}!`);
+        toast.success(`SMS sent to ${smsContractor.full_name}!`);
       } else if (data.status === 'failed') {
         toast.error('SMS failed - check phone number');
       } else {
@@ -1495,7 +1495,7 @@ function DocumentorsPage() {
       }
       setSmsMessage('');
       // Refresh history
-      const histRes = await fetch(`${API_URL}/api/admin/sms/documentor/history/${smsDocumentor.id}`, { headers: getAuthHeaders() });
+      const histRes = await fetch(`${API_URL}/api/admin/sms/contractor/history/${smsContractor.id}`, { headers: getAuthHeaders() });
       if (histRes.ok) {
         const histData = await histRes.json();
         setSmsHistory(histData.messages || []);
@@ -1510,17 +1510,17 @@ function DocumentorsPage() {
   const handleSendLoginCredentials = async () => {
     setSendingSMS(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/documentor/login`, {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor/login`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          documentor_id: smsDocumentor.id,
+          contractor_id: smsContractor.id,
           include_password: true
         })
       });
       const data = await res.json();
       if (data.status === 'sent') {
-        toast.success(`Login credentials sent to ${data.documentor_name}!`);
+        toast.success(`Login credentials sent to ${data.contractor_name}!`);
       } else if (data.status === 'failed') {
         toast.error('SMS failed - check phone number');
       } else {
@@ -1534,7 +1534,7 @@ function DocumentorsPage() {
     }
   };
 
-  const sendNotification = async (documentor) => {
+  const sendNotification = async (contractor) => {
     const title = prompt('Notification Title:');
     if (!title) return;
     const message = prompt('Notification Message:');
@@ -1545,13 +1545,13 @@ function DocumentorsPage() {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          documentor_id: documentor.id,
+          contractor_id: contractor.id,
           title: title,
           message: message
         })
       });
       if (!res.ok) throw new Error('Failed to send');
-      toast.success(`Notification sent to ${documentor.full_name}!`);
+      toast.success(`Notification sent to ${contractor.full_name}!`);
     } catch (err) {
       toast.error('Failed to send notification');
     }
@@ -1569,60 +1569,60 @@ function DocumentorsPage() {
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error('Failed to send');
-      toast.success('Notification sent to all documentors!');
+      toast.success('Notification sent to all contractors!');
     } catch (err) {
       toast.error('Failed to broadcast notification');
     }
   };
 
-  const openEditDocumentor = (documentor) => {
-    setEditingDocumentor({...documentor});
+  const openEditContractor = (contractor) => {
+    setEditingContractor({...contractor});
     setShowEditModal(true);
   };
 
-  const saveDocumentorEdit = async () => {
-    if (!editingDocumentor) return;
+  const saveContractorEdit = async () => {
+    if (!editingContractor) return;
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors/${editingDocumentor.id}`, {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${editingContractor.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          full_name: editingDocumentor.full_name,
-          email: editingDocumentor.email,
-          phone: editingDocumentor.phone,
-          address: editingDocumentor.address,
-          pay_rate: editingDocumentor.pay_rate,
-          is_active: editingDocumentor.is_active,
-          notes: editingDocumentor.notes
+          full_name: editingContractor.full_name,
+          email: editingContractor.email,
+          phone: editingContractor.phone,
+          address: editingContractor.address,
+          pay_rate: editingContractor.pay_rate,
+          is_active: editingContractor.is_active,
+          notes: editingContractor.notes
         })
       });
       if (!res.ok) throw new Error('Failed to update');
-      toast.success('Documentor information updated!');
+      toast.success('Contractor information updated!');
       setShowEditModal(false);
-      fetchDocumentors();
+      fetchContractors();
     } catch (err) {
-      toast.error('Failed to update documentor');
+      toast.error('Failed to update contractor');
     }
   };
 
-  const deleteDocumentor = async (documentorId) => {
-    if (!window.confirm('Are you sure you want to delete this documentor?')) return;
+  const deleteContractor = async (contractorId) => {
+    if (!window.confirm('Are you sure you want to delete this contractor?')) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors/${documentorId}`, {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error('Failed to delete');
-      toast.success('Documentor deleted');
-      fetchDocumentors();
+      toast.success('Contractor deleted');
+      fetchContractors();
     } catch (err) {
-      toast.error('Failed to delete documentor');
+      toast.error('Failed to delete contractor');
     }
   };
 
-  const getDocumentorRoutes = (documentorId) => {
-    return routes.filter(r => r.assigned_documentor_id === documentorId);
+  const getContractorRoutes = (contractorId) => {
+    return routes.filter(r => r.assigned_contractor_id === contractorId);
   };
 
   if (loading) return <LoadingSpinner />;
@@ -1632,7 +1632,7 @@ function DocumentorsPage() {
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
           <UserPlus className="text-indigo-400" />
-          Documentors
+          Contractors
         </h1>
         <div className="flex gap-2">
           <button
@@ -1645,18 +1645,18 @@ function DocumentorsPage() {
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-indigo-500 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-600"
-            data-testid="create-documentor-btn"
+            data-testid="create-contractor-btn"
           >
             <Plus className="w-5 h-5" />
-            Add Documentor
+            Add Contractor
           </button>
         </div>
       </div>
 
-      {/* Documentor Portal Link */}
+      {/* Contractor Portal Link */}
       <div className="bg-indigo-500/20 rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p className="text-indigo-200 text-sm">Share this link with new documentors:</p>
+          <p className="text-indigo-200 text-sm">Share this link with new contractors:</p>
           <code className="text-indigo-300">{CONTRACTOR_PORTAL_URL}</code>
         </div>
         <button
@@ -1667,32 +1667,32 @@ function DocumentorsPage() {
         </button>
       </div>
 
-      {documentors.length === 0 ? (
+      {contractors.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
-          <p className="text-white/60">No documentors yet</p>
+          <p className="text-white/60">No contractors yet</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {documentors.map((documentor) => {
-            const documentorRoutes = getDocumentorRoutes(documentor.id);
+          {contractors.map((contractor) => {
+            const contractorRoutes = getContractorRoutes(contractor.id);
             
             return (
-              <div key={documentor.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
+              <div key={contractor.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white">{documentor.full_name}</h3>
-                    <p className="text-white/60">@{documentor.username}</p>
-                    <p className="text-white/60">{documentor.phone}</p>
-                    <p className="text-white/60">{documentor.email || 'No email'}</p>
+                    <h3 className="text-xl font-bold text-white">{contractor.full_name}</h3>
+                    <p className="text-white/60">@{contractor.username}</p>
+                    <p className="text-white/60">{contractor.phone}</p>
+                    <p className="text-white/60">{contractor.email || 'No email'}</p>
                     
                     {/* Routes assigned */}
                     <div className="mt-4">
                       <p className="text-white/60 text-sm mb-2">Assigned Routes:</p>
-                      {documentorRoutes.length === 0 ? (
+                      {contractorRoutes.length === 0 ? (
                         <p className="text-yellow-400 text-sm">No routes assigned</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          {documentorRoutes.map(route => (
+                          {contractorRoutes.map(route => (
                             <span key={route.id} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
                               {route.name} ({route.bookings?.length || 0} stops)
                             </span>
@@ -1704,43 +1704,43 @@ function DocumentorsPage() {
                   
                   <div className="flex flex-col gap-2">
                     <button
-                      onClick={() => openDocumentorDetails(documentor)}
+                      onClick={() => openContractorDetails(contractor)}
                       className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
                       title="View Details & Earnings"
                     >
                       <Eye className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => openEditDocumentor(documentor)}
+                      onClick={() => openEditContractor(contractor)}
                       className="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30"
-                      title="Edit Documentor"
-                      data-testid={`edit-documentor-${documentor.id}`}
+                      title="Edit Contractor"
+                      data-testid={`edit-contractor-${contractor.id}`}
                     >
                       <Edit className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => sendNotification(documentor)}
+                      onClick={() => sendNotification(contractor)}
                       className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30"
                       title="Send Notification"
                     >
                       <Bell className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => sendSMS(documentor)}
+                      onClick={() => sendSMS(contractor)}
                       className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
                       title="Send SMS"
                     >
                       <Phone className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => resetPassword(documentor.id)}
+                      onClick={() => resetPassword(contractor.id)}
                       className="p-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30"
                       title="Reset Password"
                     >
                       <Key className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => deleteDocumentor(documentor.id)}
+                      onClick={() => deleteContractor(contractor.id)}
                       className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
                       title="Delete"
                     >
@@ -1754,9 +1754,9 @@ function DocumentorsPage() {
         </div>
       )}
 
-      {/* Documentor Detail Modal with Earnings */}
-      {selectedDocumentor && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => { setSelectedDocumentor(null); setDocumentorEarnings(null); }}>
+      {/* Contractor Detail Modal with Earnings */}
+      {selectedContractor && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => { setSelectedContractor(null); setContractorEarnings(null); }}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1765,10 +1765,10 @@ function DocumentorsPage() {
           >
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-white">{selectedDocumentor.full_name}</h2>
-                <p className="text-white/60">@{selectedDocumentor.username}</p>
+                <h2 className="text-2xl font-bold text-white">{selectedContractor.full_name}</h2>
+                <p className="text-white/60">@{selectedContractor.username}</p>
               </div>
-              <button onClick={() => { setSelectedDocumentor(null); setDocumentorEarnings(null); }} className="text-white/60 hover:text-white">
+              <button onClick={() => { setSelectedContractor(null); setContractorEarnings(null); }} className="text-white/60 hover:text-white">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1777,12 +1777,12 @@ function DocumentorsPage() {
               {/* Contact Info */}
               <div className="bg-white/10 rounded-xl p-4">
                 <h3 className="text-white font-semibold mb-3">Contact Information</h3>
-                <p className="text-white/80"><Phone className="w-4 h-4 inline mr-2" />{selectedDocumentor.phone}</p>
-                <p className="text-white/80"><Mail className="w-4 h-4 inline mr-2" />{selectedDocumentor.email || 'No email'}</p>
+                <p className="text-white/80"><Phone className="w-4 h-4 inline mr-2" />{selectedContractor.phone}</p>
+                <p className="text-white/80"><Mail className="w-4 h-4 inline mr-2" />{selectedContractor.email || 'No email'}</p>
               </div>
 
               {/* Earnings Summary */}
-              {documentorEarnings && (
+              {contractorEarnings && (
                 <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl p-4 border border-green-500/30">
                   <h3 className="text-green-400 font-semibold mb-4 flex items-center gap-2">
                     <DollarSign className="w-5 h-5" />
@@ -1791,43 +1791,43 @@ function DocumentorsPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-white/60 text-sm">This Week</p>
-                      <p className="text-2xl font-bold text-green-400">${(documentorEarnings.this_week_earnings || 0).toFixed(2)}</p>
-                      <p className="text-white/40 text-xs">{documentorEarnings.this_week_stops || 0} stops</p>
+                      <p className="text-2xl font-bold text-green-400">${(contractorEarnings.this_week_earnings || 0).toFixed(2)}</p>
+                      <p className="text-white/40 text-xs">{contractorEarnings.this_week_stops || 0} stops</p>
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Total Earnings</p>
-                      <p className="text-2xl font-bold text-white">${(documentorEarnings.total_earnings || 0).toFixed(2)}</p>
-                      <p className="text-white/40 text-xs">{documentorEarnings.total_completed_stops || 0} stops</p>
+                      <p className="text-2xl font-bold text-white">${(contractorEarnings.total_earnings || 0).toFixed(2)}</p>
+                      <p className="text-white/40 text-xs">{contractorEarnings.total_completed_stops || 0} stops</p>
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Total Paid</p>
-                      <p className="text-2xl font-bold text-blue-400">${(documentorEarnings.total_paid || 0).toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-blue-400">${(contractorEarnings.total_paid || 0).toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Owed</p>
-                      <p className={`text-2xl font-bold ${(documentorEarnings.unpaid_balance || 0) > 0 ? 'text-yellow-400' : 'text-white/60'}`}>
-                        ${(documentorEarnings.unpaid_balance || 0).toFixed(2)}
+                      <p className={`text-2xl font-bold ${(contractorEarnings.unpaid_balance || 0) > 0 ? 'text-yellow-400' : 'text-white/60'}`}>
+                        ${(contractorEarnings.unpaid_balance || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>
                   
                   {/* CNS Stops */}
-                  {documentorEarnings.total_cns_stops > 0 && (
+                  {contractorEarnings.total_cns_stops > 0 && (
                     <div className="mt-4 bg-red-500/20 rounded-lg p-3">
                       <p className="text-red-400 text-sm">
-                        <strong>{documentorEarnings.total_cns_stops}</strong> CNS stops (Cannot Service - no pay)
+                        <strong>{contractorEarnings.total_cns_stops}</strong> CNS stops (Cannot Service - no pay)
                       </p>
                     </div>
                   )}
 
                   {/* Pay Button */}
-                  {(documentorEarnings.unpaid_balance || 0) > 0 && (
+                  {(contractorEarnings.unpaid_balance || 0) > 0 && (
                     <button
-                      onClick={() => { setPayAmount(documentorEarnings.unpaid_balance.toFixed(2)); setShowPayModal(true); }}
+                      onClick={() => { setPayAmount(contractorEarnings.unpaid_balance.toFixed(2)); setShowPayModal(true); }}
                       className="mt-4 w-full py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 flex items-center justify-center gap-2"
                     >
                       <DollarSign className="w-5 h-5" />
-                      Pay ${(documentorEarnings.unpaid_balance || 0).toFixed(2)} Now
+                      Pay ${(contractorEarnings.unpaid_balance || 0).toFixed(2)} Now
                     </button>
                   )}
                 </div>
@@ -1836,11 +1836,11 @@ function DocumentorsPage() {
               {/* Routes */}
               <div className="bg-white/10 rounded-xl p-4">
                 <h3 className="text-white font-semibold mb-3">Assigned Routes</h3>
-                {getDocumentorRoutes(selectedDocumentor.id).length === 0 ? (
+                {getContractorRoutes(selectedContractor.id).length === 0 ? (
                   <p className="text-white/60">No routes assigned</p>
                 ) : (
                   <div className="space-y-2">
-                    {getDocumentorRoutes(selectedDocumentor.id).map(route => (
+                    {getContractorRoutes(selectedContractor.id).map(route => (
                       <div key={route.id} className="bg-white/5 rounded-lg p-3">
                         <p className="text-white font-semibold">{route.name}</p>
                         <p className="text-white/60 text-sm">{route.area}</p>
@@ -1852,11 +1852,11 @@ function DocumentorsPage() {
               </div>
 
               {/* Payment History */}
-              {documentorEarnings?.payment_history?.length > 0 && (
+              {contractorEarnings?.payment_history?.length > 0 && (
                 <div className="bg-white/10 rounded-xl p-4">
                   <h3 className="text-white font-semibold mb-3">Payment History</h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {documentorEarnings.payment_history.map((payment, i) => (
+                    {contractorEarnings.payment_history.map((payment, i) => (
                       <div key={i} className="flex justify-between items-center py-2 border-b border-white/10 last:border-0">
                         <div>
                           <p className="text-white">${payment.amount.toFixed(2)}</p>
@@ -1872,14 +1872,14 @@ function DocumentorsPage() {
               {/* Quick Actions */}
               <div className="flex gap-3">
                 <button
-                  onClick={() => sendSMS(selectedDocumentor)}
+                  onClick={() => sendSMS(selectedContractor)}
                   className="flex-1 py-3 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2"
                 >
                   <Phone className="w-5 h-5" />
                   Send SMS
                 </button>
                 <button
-                  onClick={() => resetPassword(selectedDocumentor.id)}
+                  onClick={() => resetPassword(selectedContractor.id)}
                   className="flex-1 py-3 bg-yellow-500 text-white rounded-xl flex items-center justify-center gap-2"
                 >
                   <Key className="w-5 h-5" />
@@ -1891,8 +1891,8 @@ function DocumentorsPage() {
         </div>
       )}
 
-      {/* Pay Documentor Modal */}
-      {showPayModal && selectedDocumentor && (
+      {/* Pay Contractor Modal */}
+      {showPayModal && selectedContractor && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[60]" onClick={() => setShowPayModal(false)}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -1900,8 +1900,8 @@ function DocumentorsPage() {
             className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
             onClick={e => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-white mb-2">Pay {selectedDocumentor.full_name}</h2>
-            <p className="text-white/60 mb-6">Record payment to documentor</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Pay {selectedContractor.full_name}</h2>
+            <p className="text-white/60 mb-6">Record payment to contractor</p>
             
             <div className="space-y-4">
               <div>
@@ -1949,7 +1949,7 @@ function DocumentorsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={payDocumentor}
+                  onClick={payContractor}
                   className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-bold"
                 >
                   Record Payment
@@ -1960,7 +1960,7 @@ function DocumentorsPage() {
         </div>
       )}
 
-      {/* Create Documentor Modal */}
+      {/* Create Contractor Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setShowCreateModal(false)}>
           <motion.div
@@ -1969,45 +1969,45 @@ function DocumentorsPage() {
             className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
             onClick={e => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-white mb-6">Create Documentor Account</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">Create Contractor Account</h2>
             <div className="space-y-4">
               <input
                 type="text"
                 placeholder="Username *"
-                value={newDocumentor.username}
-                onChange={(e) => setNewDocumentor(prev => ({ ...prev, username: e.target.value }))}
+                value={newContractor.username}
+                onChange={(e) => setNewContractor(prev => ({ ...prev, username: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="documentor-username"
+                data-testid="contractor-username"
               />
               <input
                 type="password"
                 placeholder="Password *"
-                value={newDocumentor.password}
-                onChange={(e) => setNewDocumentor(prev => ({ ...prev, password: e.target.value }))}
+                value={newContractor.password}
+                onChange={(e) => setNewContractor(prev => ({ ...prev, password: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="documentor-password"
+                data-testid="contractor-password"
               />
               <input
                 type="text"
                 placeholder="Full Name *"
-                value={newDocumentor.full_name}
-                onChange={(e) => setNewDocumentor(prev => ({ ...prev, full_name: e.target.value }))}
+                value={newContractor.full_name}
+                onChange={(e) => setNewContractor(prev => ({ ...prev, full_name: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="documentor-fullname"
+                data-testid="contractor-fullname"
               />
               <input
                 type="tel"
                 placeholder="Phone Number *"
-                value={newDocumentor.phone}
-                onChange={(e) => setNewDocumentor(prev => ({ ...prev, phone: e.target.value }))}
+                value={newContractor.phone}
+                onChange={(e) => setNewContractor(prev => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="documentor-phone"
+                data-testid="contractor-phone"
               />
               <input
                 type="email"
                 placeholder="Email (optional)"
-                value={newDocumentor.email}
-                onChange={(e) => setNewDocumentor(prev => ({ ...prev, email: e.target.value }))}
+                value={newContractor.email}
+                onChange={(e) => setNewContractor(prev => ({ ...prev, email: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
               />
               <div className="flex gap-3 pt-4">
@@ -2018,9 +2018,9 @@ function DocumentorsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={createDocumentor}
+                  onClick={createContractor}
                   className="flex-1 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600"
-                  data-testid="save-documentor-btn"
+                  data-testid="save-contractor-btn"
                 >
                   Create Account
                 </button>
@@ -2031,7 +2031,7 @@ function DocumentorsPage() {
       )}
 
       {/* SMS Modal */}
-      {showSMSModal && smsDocumentor && (
+      {showSMSModal && smsContractor && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={() => setShowSMSModal(false)}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -2043,9 +2043,9 @@ function DocumentorsPage() {
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-green-400" />
-                  SMS to {smsDocumentor.full_name}
+                  SMS to {smsContractor.full_name}
                 </h2>
-                <p className="text-white/60 text-sm">{smsDocumentor.phone}</p>
+                <p className="text-white/60 text-sm">{smsContractor.phone}</p>
               </div>
               <button onClick={() => setShowSMSModal(false)} className="text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
@@ -2118,8 +2118,8 @@ function DocumentorsPage() {
         </div>
       )}
 
-      {/* Edit Documentor Modal */}
-      {showEditModal && editingDocumentor && (
+      {/* Edit Contractor Modal */}
+      {showEditModal && editingContractor && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={() => setShowEditModal(false)}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -2130,7 +2130,7 @@ function DocumentorsPage() {
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Edit className="w-5 h-5 text-indigo-400" />
-                Edit Documentor
+                Edit Contractor
               </h2>
               <button onClick={() => setShowEditModal(false)} className="text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
@@ -2142,8 +2142,8 @@ function DocumentorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Full Name</label>
                 <input
                   type="text"
-                  value={editingDocumentor.full_name || ''}
-                  onChange={(e) => setEditingDocumentor({...editingDocumentor, full_name: e.target.value})}
+                  value={editingContractor.full_name || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, full_name: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2151,8 +2151,8 @@ function DocumentorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Email</label>
                 <input
                   type="email"
-                  value={editingDocumentor.email || ''}
-                  onChange={(e) => setEditingDocumentor({...editingDocumentor, email: e.target.value})}
+                  value={editingContractor.email || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, email: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2160,8 +2160,8 @@ function DocumentorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Phone</label>
                 <input
                   type="tel"
-                  value={editingDocumentor.phone || ''}
-                  onChange={(e) => setEditingDocumentor({...editingDocumentor, phone: e.target.value})}
+                  value={editingContractor.phone || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, phone: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2169,8 +2169,8 @@ function DocumentorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Address</label>
                 <input
                   type="text"
-                  value={editingDocumentor.address || ''}
-                  onChange={(e) => setEditingDocumentor({...editingDocumentor, address: e.target.value})}
+                  value={editingContractor.address || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, address: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2178,8 +2178,8 @@ function DocumentorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Pay Rate (per stop)</label>
                 <input
                   type="number"
-                  value={editingDocumentor.pay_rate || ''}
-                  onChange={(e) => setEditingDocumentor({...editingDocumentor, pay_rate: parseFloat(e.target.value)})}
+                  value={editingContractor.pay_rate || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, pay_rate: parseFloat(e.target.value)})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                   step="0.01"
                 />
@@ -2187,16 +2187,16 @@ function DocumentorsPage() {
               <div>
                 <label className="block text-white/60 text-sm mb-1">Notes</label>
                 <textarea
-                  value={editingDocumentor.notes || ''}
-                  onChange={(e) => setEditingDocumentor({...editingDocumentor, notes: e.target.value})}
+                  value={editingContractor.notes || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, notes: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white h-20"
                 />
               </div>
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
-                  checked={editingDocumentor.is_active !== false}
-                  onChange={(e) => setEditingDocumentor({...editingDocumentor, is_active: e.target.checked})}
+                  checked={editingContractor.is_active !== false}
+                  onChange={(e) => setEditingContractor({...editingContractor, is_active: e.target.checked})}
                   className="w-5 h-5"
                 />
                 <label className="text-white">Active</label>
@@ -2210,9 +2210,9 @@ function DocumentorsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={saveDocumentorEdit}
+                  onClick={saveContractorEdit}
                   className="flex-1 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600"
-                  data-testid="save-documentor-edit-btn"
+                  data-testid="save-contractor-edit-btn"
                 >
                   Save Changes
                 </button>
@@ -2228,7 +2228,7 @@ function DocumentorsPage() {
 // Routes Management
 function RoutesPage() {
   const [routes, setRoutes] = useState([]);
-  const [documentors, setDocumentors] = useState([]);
+  const [contractors, setContractors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCombineModal, setShowCombineModal] = useState(false);
@@ -2240,7 +2240,7 @@ function RoutesPage() {
 
   useEffect(() => {
     fetchRoutes();
-    fetchDocumentors();
+    fetchContractors();
   }, []);
 
   const fetchRoutes = async () => {
@@ -2250,7 +2250,7 @@ function RoutesPage() {
       const data = await res.json();
       // Filter out assigned routes (only show pending/unassigned)
       const pendingRoutes = (data.routes || []).filter(r => 
-        !r.assigned_documentor_id && r.status !== 'assigned'
+        !r.assigned_contractor_id && r.status !== 'assigned'
       );
       setRoutes(pendingRoutes);
     } catch (err) {
@@ -2260,14 +2260,14 @@ function RoutesPage() {
     }
   };
 
-  const fetchDocumentors = async () => {
+  const fetchContractors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setDocumentors(data.documentors || []);
+      setContractors(data.contractors || []);
     } catch (err) {
-      console.error('Failed to load documentors');
+      console.error('Failed to load contractors');
     }
   };
 
@@ -2293,12 +2293,12 @@ function RoutesPage() {
     }
   };
 
-  const assignRoute = async (routeId, documentorId) => {
+  const assignRoute = async (routeId, contractorId) => {
     try {
       const res = await fetch(`${API_URL}/api/admin/routes/${routeId}/assign`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ route_id: routeId, documentor_id: documentorId })
+        body: JSON.stringify({ route_id: routeId, contractor_id: contractorId })
       });
       if (!res.ok) throw new Error('Failed to assign');
       toast.success('Route assigned and moved from pending!');
@@ -2472,8 +2472,8 @@ function RoutesPage() {
   }, {});
 
   // Filter only pending (unassigned) routes
-  const pendingRoutes = routes.filter(r => !r.assigned_documentor_id);
-  const assignedRoutes = routes.filter(r => r.assigned_documentor_id);
+  const pendingRoutes = routes.filter(r => !r.assigned_contractor_id);
+  const assignedRoutes = routes.filter(r => r.assigned_contractor_id);
 
   if (loading) return <LoadingSpinner />;
 
@@ -2544,7 +2544,7 @@ function RoutesPage() {
             </p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
-            <p className="text-white/60 text-sm">Est. Documentor Pay</p>
+            <p className="text-white/60 text-sm">Est. Contractor Pay</p>
             <p className="text-2xl font-bold text-green-400">
               ${(routes.reduce((sum, r) => sum + (r.bookings?.length || 0), 0) * 11).toFixed(0)}
             </p>
@@ -2561,7 +2561,7 @@ function RoutesPage() {
       {/* Info Box */}
       <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 text-blue-200 text-sm">
         <p>📍 Routes are automatically grouped by <strong>zip code</strong> (max 120 bookings per route).</p>
-        <p className="mt-1">💰 Documentor pay: <strong>$11 per stop</strong> | Select routes to combine or delete them.</p>
+        <p className="mt-1">💰 Contractor pay: <strong>$11 per stop</strong> | Select routes to combine or delete them.</p>
         <p className="mt-1">✅ Once assigned, routes automatically move out of this list.</p>
       </div>
 
@@ -2612,7 +2612,7 @@ function RoutesPage() {
           {Object.entries(groupedRoutes)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([groupKey, groupRoutes]) => {
-              const pendingInGroup = groupRoutes.filter(r => !r.assigned_documentor_id);
+              const pendingInGroup = groupRoutes.filter(r => !r.assigned_contractor_id);
               if (pendingInGroup.length === 0) return null;
               
               const groupLabel = groupBy === 'zip' ? 'Zip Code' : groupBy === 'city' ? 'City' : 'State';
@@ -2654,7 +2654,7 @@ function RoutesPage() {
                                   {route.bookings?.length || 0} / 120 stops
                                 </p>
                                 <p className="text-green-400 text-sm font-bold">
-                                  ${((route.bookings?.length || 0) * 11).toFixed(2)} documentor pay
+                                  ${((route.bookings?.length || 0) * 11).toFixed(2)} contractor pay
                                 </p>
                                 {route.optimized && (
                                   <p className="text-purple-400 text-sm">
@@ -2677,12 +2677,12 @@ function RoutesPage() {
                             <div>
                               <p className="text-white/60 text-sm mb-2">Assign to:</p>
                               <select
-                                value={route.assigned_documentor_id || ''}
+                                value={route.assigned_contractor_id || ''}
                                 onChange={(e) => assignRoute(route.id, e.target.value)}
                                 className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white [&>option]:text-black"
                               >
                                 <option value="">Unassigned</option>
-                                {documentors.map(c => (
+                                {contractors.map(c => (
                                   <option key={c.id} value={c.id}>{c.full_name}</option>
                                 ))}
                               </select>
@@ -2715,23 +2715,23 @@ function RoutesPage() {
           </h2>
           <div className="space-y-3">
             {assignedRoutes.map((route) => {
-              const documentor = documentors.find(c => c.id === route.assigned_documentor_id);
+              const contractor = contractors.find(c => c.id === route.assigned_contractor_id);
               return (
                 <div key={route.id} className="bg-green-500/10 backdrop-blur rounded-2xl p-4 border border-green-500/20">
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="text-lg font-bold text-white">{route.name}</h3>
                       <p className="text-green-400 text-sm">
-                        Assigned to: {documentor?.full_name || 'Unknown'} | {route.bookings?.length || 0} stops
+                        Assigned to: {contractor?.full_name || 'Unknown'} | {route.bookings?.length || 0} stops
                       </p>
                     </div>
                     <select
-                      value={route.assigned_documentor_id || ''}
+                      value={route.assigned_contractor_id || ''}
                       onChange={(e) => assignRoute(route.id, e.target.value)}
                       className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
                     >
                       <option value="">Unassign</option>
-                      {documentors.map(c => (
+                      {contractors.map(c => (
                         <option key={c.id} value={c.id}>{c.full_name}</option>
                       ))}
                     </select>
@@ -3066,9 +3066,9 @@ function SettingsPage() {
       <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
         <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <DollarSign className="text-green-400" />
-          Documentor Pay Rate
+          Contractor Pay Rate
         </h2>
-        <p className="text-white/60 mb-4">Set the amount documentors earn per completed stop.</p>
+        <p className="text-white/60 mb-4">Set the amount contractors earn per completed stop.</p>
         
         <div className="flex items-center gap-4">
           <div className="flex-1 max-w-xs">
@@ -3110,7 +3110,7 @@ function SettingsPage() {
           <Truck className="text-blue-400" />
           Truck Rental Prices
         </h2>
-        <p className="text-white/60 mb-4">Set weekly rental prices for documentor trucks.</p>
+        <p className="text-white/60 mb-4">Set weekly rental prices for contractor trucks.</p>
         
         <div className="grid md:grid-cols-2 gap-6">
           {/* Small Truck */}
@@ -3205,9 +3205,9 @@ function PayrollPage() {
     }
   };
 
-  const processPayroll = async (documentorId) => {
+  const processPayroll = async (contractorId) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/payroll/process/${documentorId}`, {
+      const res = await fetch(`${API_URL}/api/admin/payroll/process/${contractorId}`, {
         method: 'POST',
         headers: getAuthHeaders()
       });
@@ -3229,7 +3229,7 @@ function PayrollPage() {
       });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
-      toast.success(`Processed $${data.total_paid.toFixed(2)} for ${data.processed.length} documentors`);
+      toast.success(`Processed $${data.total_paid.toFixed(2)} for ${data.processed.length} contractors`);
       fetchPayrollData();
     } catch (err) {
       toast.error('Failed to process payroll');
@@ -3248,7 +3248,7 @@ function PayrollPage() {
       const stubData = await res.json();
       setSelectedPayStub({
         id: stubData.paystub_id,
-        documentor_name: stubData.documentor?.name || record.documentor_name,
+        contractor_name: stubData.contractor?.name || record.contractor_name,
         period_start: stubData.pay_period?.start,
         period_end: stubData.pay_period?.end,
         stops_paid: stubData.earnings?.completed_stops || record.stops_paid,
@@ -3271,7 +3271,7 @@ function PayrollPage() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Pay Stub - ${selectedPayStub.documentor_name}</title>
+        <title>Pay Stub - ${selectedPayStub.contractor_name}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
           .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
@@ -3295,7 +3295,7 @@ function PayrollPage() {
         
         <div class="stub-info">
           <div>
-            <strong>Employee:</strong> ${selectedPayStub.documentor_name}<br>
+            <strong>Employee:</strong> ${selectedPayStub.contractor_name}<br>
             <strong>Period:</strong> ${new Date(selectedPayStub.period_start).toLocaleDateString()} - ${new Date(selectedPayStub.period_end).toLocaleDateString()}
           </div>
           <div style="text-align: right;">
@@ -3406,30 +3406,30 @@ function PayrollPage() {
 
       {/* Pending Payments */}
       <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
-        <h2 className="text-lg font-bold text-white mb-4">Pending Documentor Payments</h2>
+        <h2 className="text-lg font-bold text-white mb-4">Pending Contractor Payments</h2>
         {pendingPayroll.length === 0 ? (
           <p className="text-white/60 text-center py-8">No pending payments</p>
         ) : (
           <div className="space-y-3">
-            {pendingPayroll.map((documentor) => (
-              <div key={documentor.documentor_id} className="bg-white/5 rounded-xl p-4 flex justify-between items-center flex-wrap gap-4">
+            {pendingPayroll.map((contractor) => (
+              <div key={contractor.contractor_id} className="bg-white/5 rounded-xl p-4 flex justify-between items-center flex-wrap gap-4">
                 <div>
-                  <p className="text-white font-semibold">{documentor.documentor_name}</p>
-                  <p className="text-white/60 text-sm">{documentor.phone}</p>
+                  <p className="text-white font-semibold">{contractor.contractor_name}</p>
+                  <p className="text-white/60 text-sm">{contractor.phone}</p>
                   <div className="flex gap-4 mt-1 text-sm">
-                    <span className="text-green-400">{documentor.completed_stops} completed</span>
-                    <span className="text-red-400">{documentor.cns_stops} CNS (no pay)</span>
+                    <span className="text-green-400">{contractor.completed_stops} completed</span>
+                    <span className="text-red-400">{contractor.cns_stops} CNS (no pay)</span>
                   </div>
-                  {documentor.last_paid && (
-                    <p className="text-white/40 text-xs mt-1">Last paid: {new Date(documentor.last_paid).toLocaleDateString()}</p>
+                  {contractor.last_paid && (
+                    <p className="text-white/40 text-xs mt-1">Last paid: {new Date(contractor.last_paid).toLocaleDateString()}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-2xl font-bold text-green-400">${documentor.unpaid_amount.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-green-400">${contractor.unpaid_amount.toFixed(2)}</span>
                   <button
-                    onClick={() => processPayroll(documentor.documentor_id)}
+                    onClick={() => processPayroll(contractor.contractor_id)}
                     className="px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600"
-                    data-testid={`pay-documentor-${documentor.documentor_id}`}
+                    data-testid={`pay-contractor-${contractor.contractor_id}`}
                   >
                     Pay Now
                   </button>
@@ -3451,7 +3451,7 @@ function PayrollPage() {
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="py-3 px-4 text-white/60 text-sm">Date</th>
-                  <th className="py-3 px-4 text-white/60 text-sm">Documentor</th>
+                  <th className="py-3 px-4 text-white/60 text-sm">Contractor</th>
                   <th className="py-3 px-4 text-white/60 text-sm">Stops</th>
                   <th className="py-3 px-4 text-white/60 text-sm">Amount</th>
                   <th className="py-3 px-4 text-white/60 text-sm">Pay Stub</th>
@@ -3461,7 +3461,7 @@ function PayrollPage() {
                 {payrollHistory.slice(0, 20).map((record) => (
                   <tr key={record.id} className="border-b border-white/5 hover:bg-white/5">
                     <td className="py-3 px-4 text-white">{new Date(record.paid_at).toLocaleDateString()}</td>
-                    <td className="py-3 px-4 text-white">{record.documentor_name}</td>
+                    <td className="py-3 px-4 text-white">{record.contractor_name}</td>
                     <td className="py-3 px-4 text-white">{record.stops_paid}</td>
                     <td className="py-3 px-4 text-green-400 font-bold">${record.amount.toFixed(2)}</td>
                     <td className="py-3 px-4">
@@ -3521,8 +3521,8 @@ function PayrollPage() {
               {/* Employee & Period Info */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-white/60 text-sm">Documentor</p>
-                  <p className="text-white font-semibold text-lg">{selectedPayStub.documentor_name}</p>
+                  <p className="text-white/60 text-sm">Contractor</p>
+                  <p className="text-white font-semibold text-lg">{selectedPayStub.contractor_name}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-white/60 text-sm">Pay Period</p>
@@ -4175,34 +4175,34 @@ function DocumentsPage() {
 }
 
 
-// Messages Page - 2-Way Admin-Documentor Messaging with Timestamps
+// Messages Page - 2-Way Admin-Contractor Messaging with Timestamps
 function MessagesPage() {
   const [messages, setMessages] = useState([]);
-  const [documentors, setDocumentors] = useState([]);
+  const [contractors, setContractors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
-  const [selectedDocumentor, setSelectedDocumentor] = useState(null);
+  const [selectedContractor, setSelectedContractor] = useState(null);
   const [messageThreads, setMessageThreads] = useState({});
 
   useEffect(() => {
-    fetchDocumentors();
+    fetchContractors();
     fetchAllMessages();
   }, []);
 
   useEffect(() => {
-    if (selectedDocumentor) {
-      fetchDocumentorThread(selectedDocumentor);
+    if (selectedContractor) {
+      fetchContractorThread(selectedContractor);
     }
-  }, [selectedDocumentor]);
+  }, [selectedContractor]);
 
-  const fetchDocumentors = async () => {
+  const fetchContractors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setDocumentors(data.documentors || []);
+      setContractors(data.contractors || []);
     } catch (err) {
-      console.error('Failed to load documentors');
+      console.error('Failed to load contractors');
     } finally {
       setLoading(false);
     }
@@ -4210,7 +4210,7 @@ function MessagesPage() {
 
   const fetchAllMessages = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/documentors/all`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/sms/contractors/all`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setMessages(data.messages || []);
@@ -4219,39 +4219,39 @@ function MessagesPage() {
     }
   };
 
-  const fetchDocumentorThread = async (documentorId) => {
+  const fetchContractorThread = async (contractorId) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/documentor/history/${documentorId}`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor/history/${contractorId}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setMessageThreads(prev => ({ ...prev, [documentorId]: data.messages || [] }));
+      setMessageThreads(prev => ({ ...prev, [contractorId]: data.messages || [] }));
     } catch (err) {
       console.error('Failed to load thread');
     }
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedDocumentor) {
-      if (!selectedDocumentor) toast.error('Please select a documentor');
+    if (!newMessage.trim() || !selectedContractor) {
+      if (!selectedContractor) toast.error('Please select a contractor');
       return;
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/documentor`, {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          documentor_id: selectedDocumentor,
+          contractor_id: selectedContractor,
           message: newMessage
         })
       });
       if (!res.ok) throw new Error('Failed to send');
       const data = await res.json();
       setNewMessage('');
-      fetchDocumentorThread(selectedDocumentor);
+      fetchContractorThread(selectedContractor);
       fetchAllMessages();
       if (data.status === 'sent') {
-        toast.success(`SMS sent to ${data.documentor_name}!`);
+        toast.success(`SMS sent to ${data.contractor_name}!`);
       } else {
         toast.info(`Message logged (${data.status})`);
       }
@@ -4272,18 +4272,18 @@ function MessagesPage() {
     });
   };
 
-  const getUnreadCount = (documentorId) => {
+  const getUnreadCount = (contractorId) => {
     return messages.filter(m => 
-      m.sender_id === documentorId && 
-      m.sender_type === 'documentor' && 
+      m.sender_id === contractorId && 
+      m.sender_type === 'contractor' && 
       !m.read
     ).length;
   };
 
   if (loading) return <LoadingSpinner />;
 
-  const currentThread = selectedDocumentor ? (messageThreads[selectedDocumentor] || []) : [];
-  const selectedDocumentorInfo = documentors.find(c => c.id === selectedDocumentor);
+  const currentThread = selectedContractor ? (messageThreads[selectedContractor] || []) : [];
+  const selectedContractorInfo = contractors.find(c => c.id === selectedContractor);
 
   return (
     <div className="space-y-6">
@@ -4293,21 +4293,21 @@ function MessagesPage() {
       </h1>
 
       <div className="grid md:grid-cols-3 gap-6 h-[600px]">
-        {/* Documentor List */}
+        {/* Contractor List */}
         <div className="bg-white/10 rounded-2xl p-4 overflow-y-auto">
-          <h3 className="text-white font-semibold mb-4">Documentors</h3>
+          <h3 className="text-white font-semibold mb-4">Contractors</h3>
           <div className="space-y-2">
-            {documentors.length === 0 ? (
-              <p className="text-white/60 text-sm">No documentors yet</p>
+            {contractors.length === 0 ? (
+              <p className="text-white/60 text-sm">No contractors yet</p>
             ) : (
-              documentors.map(c => {
+              contractors.map(c => {
                 const unread = getUnreadCount(c.id);
                 return (
                   <button
                     key={c.id}
-                    onClick={() => setSelectedDocumentor(c.id)}
+                    onClick={() => setSelectedContractor(c.id)}
                     className={`w-full text-left p-3 rounded-xl transition flex justify-between items-center ${
-                      selectedDocumentor === c.id ? 'bg-teal-500' : 'bg-white/10 hover:bg-white/20'
+                      selectedContractor === c.id ? 'bg-teal-500' : 'bg-white/10 hover:bg-white/20'
                     }`}
                   >
                     <div>
@@ -4328,25 +4328,25 @@ function MessagesPage() {
         <div className="md:col-span-2 bg-white/10 rounded-2xl p-4 flex flex-col">
           {/* Header */}
           <div className="pb-3 border-b border-white/20 mb-3">
-            {selectedDocumentorInfo ? (
+            {selectedContractorInfo ? (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center">
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold">{selectedDocumentorInfo.full_name}</h3>
-                  <p className="text-white/60 text-sm">{selectedDocumentorInfo.phone}</p>
+                  <h3 className="text-white font-semibold">{selectedContractorInfo.full_name}</h3>
+                  <p className="text-white/60 text-sm">{selectedContractorInfo.phone}</p>
                 </div>
               </div>
             ) : (
-              <p className="text-white/60">Select a documentor to start messaging</p>
+              <p className="text-white/60">Select a contractor to start messaging</p>
             )}
           </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-            {!selectedDocumentor ? (
-              <p className="text-white/60 text-center py-8">Select a documentor to view messages</p>
+            {!selectedContractor ? (
+              <p className="text-white/60 text-center py-8">Select a contractor to view messages</p>
             ) : currentThread.length === 0 ? (
               <p className="text-white/60 text-center py-8">No messages yet. Start a conversation!</p>
             ) : (
@@ -4379,7 +4379,7 @@ function MessagesPage() {
           </div>
 
           {/* Input */}
-          {selectedDocumentor && (
+          {selectedContractor && (
             <div className="flex gap-2">
               <input
                 type="text"
@@ -4747,7 +4747,7 @@ function CalendarPage() {
                   <p className="text-white/60 text-sm">{route.area}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-blue-400 text-sm">{route.documentor_name || 'Unassigned'}</p>
+                  <p className="text-blue-400 text-sm">{route.contractor_name || 'Unassigned'}</p>
                   <p className="text-white/60 text-sm">{route.bookings?.length || 0} stops</p>
                 </div>
               </div>
@@ -4820,7 +4820,7 @@ function CalendarPage() {
                         
                         {/* Assigned Contractor */}
                         <div className="mt-2">
-                          <p className="text-white/50 text-xs">Assigned Documentor:</p>
+                          <p className="text-white/50 text-xs">Assigned Contractor:</p>
                           <p className={`text-sm font-medium ${booking.assigned_contractor_name ? 'text-green-400' : 'text-yellow-400'}`}>
                             {booking.assigned_contractor_name || 'Not Assigned'}
                           </p>
@@ -5854,10 +5854,10 @@ export default function AdminDashboard() {
         // Play URGENT sound if new released route
         if (available > lastReleasedCountRef.current && lastReleasedCountRef.current > 0) {
           playUrgentSound();
-          toast.error('⚠️ URGENT: Route Released by Documentor!', { duration: 10000 });
+          toast.error('⚠️ URGENT: Route Released by Contractor!', { duration: 10000 });
           showBrowserNotification({ 
             sender_name: '⚠️ URGENT', 
-            content: 'A documentor has released a route! Immediate action required.' 
+            content: 'A contractor has released a route! Immediate action required.' 
           });
         }
         lastReleasedCountRef.current = available;
@@ -5872,7 +5872,7 @@ export default function AdminDashboard() {
         const res = await fetch(`${API_URL}/api/admin/routes`, { headers: getAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
-        const pending = (data.routes || []).filter(r => !r.assigned_documentor_id).length;
+        const pending = (data.routes || []).filter(r => !r.assigned_contractor_id).length;
         setPendingRoutesCount(pending);
       } catch (err) {
         console.error('Failed to check pending routes:', err);
@@ -6170,7 +6170,7 @@ export default function AdminDashboard() {
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="deleted-subscriptions" element={<DeletedSubscriptionsPage />} />
-          <Route path="documentors" element={<DocumentorsPage />} />
+          <Route path="contractors" element={<ContractorsPage />} />
           <Route path="payroll" element={<PayrollPage />} />
           <Route path="sms-logs" element={<SMSLogsPage />} />
           <Route path="pending-routes" element={<RoutesPage />} />
