@@ -337,7 +337,6 @@ export default function ClientPortal() {
         fetch(`${API_URL}/api/client/booking-history`, { headers: getAuthHeaders() }),
         fetch(`${API_URL}/api/client/upcoming-services`, { headers: getAuthHeaders() })
       ]);
-      ]);
 
       if (subRes.ok) {
         const subData = await subRes.json();
