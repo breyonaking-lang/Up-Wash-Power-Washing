@@ -1,6 +1,6 @@
 # Up-Wash Power Washing - Product Requirements Document
 
-## Last Updated: Feb 27, 2026
+## Last Updated: Feb 28, 2026
 
 ## Original Problem Statement
 Power washing business website with booking system, admin dashboard, contractor portal, client portal, subscription management, Square payment integration, route management, and contractor earnings tracking.
@@ -10,7 +10,7 @@ Power washing business website with booking system, admin dashboard, contractor 
 - **Backend**: FastAPI (Python)
 - **Database**: MongoDB
 - **Payments**: Square (Sandbox)
-- **Notifications**: In-app messaging (Twilio removed)
+- **SMS**: Twilio (Live Integration)
 - **Photo Storage**: In-house at /app/backend/uploads/photos
 
 ## User Personas
