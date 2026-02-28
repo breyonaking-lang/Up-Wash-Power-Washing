@@ -1,0 +1,38 @@
+{
+  "name": "Up-Wash Power Washing",
+  "short_name": "Up-Wash",
+  "description": "Professional power washing services in Burleson, TX",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "lifestyle"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Book Service",
+      "url": "/booking",
+      "description": "Book a power washing service"
+    },
+    {
+      "name": "My Account",
+      "url": "/client/portal",
+      "description": "View your account and bookings"
+    }
+  ]
+}
