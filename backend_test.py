@@ -9,7 +9,7 @@ import sys
 import json
 from datetime import datetime
 
-class ETANotificationAPITester:
+class SMSPaymentReminderAPITester:
     def __init__(self, base_url="https://2d2346dc-8745-4260-8e34-088886d923bd.preview.emergentagent.com"):
         self.base_url = base_url
         self.admin_token = None
