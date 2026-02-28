@@ -2323,6 +2323,62 @@ function ContractorsPage() {
           </motion.div>
         </div>
       )}
+
+      {/* Route Reassignment Modal */}
+      {showReassignModal && reassignRoute && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 max-w-md w-full"
+          >
+            <h2 className="text-xl font-bold text-white mb-4">Reassign Route</h2>
+            
+            <div className="bg-white/10 rounded-xl p-4 mb-4">
+              <p className="text-white font-medium">{reassignRoute.name}</p>
+              <p className="text-white/60 text-sm">{reassignRoute.bookings?.length || 0} stops</p>
+              <p className="text-green-400 text-sm">Worth ${((reassignRoute.bookings?.length || 0) * 11).toFixed(2)}</p>
+            </div>
+            
+            <div className="mb-4">
+              <label className="text-white/60 text-sm mb-2 block">Select New Contractor</label>
+              <select
+                value={reassignToContractor}
+                onChange={(e) => setReassignToContractor(e.target.value)}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white [&>option]:text-black"
+                data-testid="reassign-contractor-select"
+              >
+                <option value="">-- Select Contractor --</option>
+                {contractors
+                  .filter(c => c.id !== reassignRoute.assigned_contractor_id)
+                  .map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name} (@{c.username})
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowReassignModal(false); setReassignRoute(null); }}
+                className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={reassignRouteToContractor}
+                disabled={!reassignToContractor}
+                className="flex-1 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-50"
+                data-testid="confirm-reassign-btn"
+              >
+                Reassign Route
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
