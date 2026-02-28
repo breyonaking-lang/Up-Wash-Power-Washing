@@ -195,6 +195,11 @@ Power washing business website with booking system, admin dashboard, contractor 
 - **Contractor**: ajb123 / upwash_test_123
 - **Client (Test)**: test@example.com / test123
 
+## Twilio Configuration
+- Account SID: AC625a6a6aa54b5aed4ec936f16b75976b
+- Auth Token: (configured in .env)
+- Phone Number: +18557894541
+
 ## Square Sandbox
 - App ID: sandbox-sq0idb-QbTRBR0SjaHj-Myt_wXXMQ
 - Location ID: LP6GV30TZNAR3
