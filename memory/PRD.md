@@ -513,6 +513,48 @@ Power washing business website with booking system, admin dashboard, contractor 
   - Sound notification
 - [x] Polling every 10 seconds for new messages
 
+### Feb 28, 2026 - Session 8 Updates
+
+#### Enhanced Subscription Payment Flow ✅ NEW
+- [x] Charge first day of service at checkout
+- [x] Charge 3 days in advance for subsequent services based on selected days
+- [x] If payment succeeds → Add booking to pending routes for contractor assignment
+- [x] If payment fails → Send SMS reminder to customer
+- [x] Retry payment at 8am on service day
+- [x] If retry fails → Remove from schedule (don't cancel subscription)
+- [x] Try again 3 days before next subscription date
+- [x] Endpoints:
+  - POST /api/subscriptions/process-initial-payment
+  - POST /api/cron/process-advance-payments (run daily)
+  - POST /api/cron/retry-failed-payments (run at 8am daily)
+
+#### In-App Messaging System ✅ NEW
+- [x] Client ↔ Admin communication
+- [x] Contractor ↔ Admin communication
+- [x] Client ↔ Contractor direct messaging
+- [x] Message notifications with sender's name
+- [x] Audio and visual notifications
+- [x] Endpoints:
+  - GET /api/messages/contacts - Get messageable contacts
+  - POST /api/messages/send - Send in-app message
+  - GET /api/messages/inbox - Get all messages for user
+  - GET /api/messages/thread/{user_id} - Get conversation thread
+  - GET /api/messages/notifications - Get unread notifications
+  - POST /api/messages/notifications/{id}/read - Mark as read
+
+#### PWA Conversion ✅ NEW
+- [x] manifest.json with app name, icons, display mode
+- [x] Service worker (sw.js) for offline caching
+- [x] Push notification support (push event handler)
+- [x] Install prompt capability (add to home screen)
+- [x] App icons generated (logo192.png, logo512.png)
+- [x] Service worker registration on app load
+- [x] Push subscription endpoints:
+  - POST /api/push/subscribe
+  - DELETE /api/push/unsubscribe
+
 #### Still TODO (Next Session):
 - [ ] Admin dashboard "All" tabs clickable with filterable lists
-- [ ] Resend email integration for quote responses (user to provide API key)
+- [ ] Resend email integration (user to provide API key)
+- [ ] Production VAPID keys for push notifications
+- [ ] Actual Square payment integration in subscription flow
