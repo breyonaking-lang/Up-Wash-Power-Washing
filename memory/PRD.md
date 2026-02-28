@@ -228,7 +228,7 @@ Power washing business website with booking system, admin dashboard, contractor 
 ### P1 (High) - DEFERRED BY USER
 - [ ] Test real payments in production
 - [ ] Apple Pay domain verification
-- [ ] Configure Twilio credentials for live SMS
+- [x] Configure Twilio credentials for live SMS ✅ DONE
 
 ### P2 (Medium) - TODO
 - [ ] Customer SMS when contractor arrives (GPS proximity trigger)
