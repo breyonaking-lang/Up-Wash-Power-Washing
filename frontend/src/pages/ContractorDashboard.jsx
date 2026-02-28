@@ -400,6 +400,46 @@ function TodayRoute() {
     }
   };
 
+  const sendManualETA = async (task) => {
+    // Get current location and send ETA
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const res = await fetch(`${API_URL}/api/contractor/sms/eta-alert`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                booking_id: task.id,
+                contractor_lat: position.coords.latitude,
+                contractor_lng: position.coords.longitude
+              })
+            });
+            const data = await res.json();
+            if (data.status === 'sent' || data.status === 'demo_logged') {
+              toast.success(`📍 ETA sent to ${task.customer_name} (${data.eta_minutes} min away)`);
+              fetchTodayTasks();
+            } else if (data.status === 'too_far') {
+              toast.info(`You're ${data.eta_minutes} min away - ETA typically sent within 15 min range`);
+            } else if (data.status === 'already_sent') {
+              toast.info('ETA notification already sent for this stop');
+            } else {
+              toast.error('Failed to send ETA - check phone number');
+            }
+          } catch (err) {
+            toast.error('Failed to send ETA notification');
+          }
+        },
+        (err) => {
+          toast.error('Unable to get your location');
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      toast.error('Location not available on this device');
+    }
+  };
+
   const sendCompletionNotification = async (task) => {
     try {
       const res = await fetch(`${API_URL}/api/contractor/sms/completed/${task.id}`, {
