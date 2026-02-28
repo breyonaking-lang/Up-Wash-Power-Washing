@@ -572,42 +572,94 @@ export default function ClientPortal() {
         </div>
       </header>
 
+      {/* Navigation Tabs */}
+      <div className="bg-white/5 border-b border-white/10">
+        <div className="max-w-6xl mx-auto flex gap-2 px-6 py-3 overflow-x-auto">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: User },
+            { id: 'upcoming', label: 'Upcoming Services', icon: Calendar },
+            { id: 'history', label: 'Service History', icon: Clock },
+            { id: 'subscription', label: 'My Subscription', icon: CreditCard }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-xl flex items-center gap-2 whitespace-nowrap transition-colors ${
+                activeTab === tab.id 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-white/10 text-white/70 hover:bg-white/20'
+              }`}
+              data-testid={`tab-${tab.id}`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="flex-1 p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Profile Section */}
-          <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <User className="text-blue-400" />
-              Profile Information
-            </h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-white/60 text-sm">Name</p>
-                <p className="text-white font-semibold">{client.name}</p>
+          
+          {/* Dashboard Tab */}
+          {activeTab === 'dashboard' && (
+            <>
+              {/* Profile Section */}
+              <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  <User className="text-blue-400" />
+                  Profile Information
+                </h2>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-white/60 text-sm">Name</p>
+                    <p className="text-white font-semibold">{client.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60 text-sm">Email</p>
+                    <p className="text-white font-semibold">{client.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60 text-sm">Phone</p>
+                    <p className="text-white font-semibold">{client.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60 text-sm">Address</p>
+                    <p className="text-white font-semibold">{client.address}</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-white/60 text-sm">Email</p>
-                <p className="text-white font-semibold">{client.email}</p>
-              </div>
-              <div>
-                <p className="text-white/60 text-sm">Phone</p>
-                <p className="text-white font-semibold">{client.phone}</p>
-              </div>
-              <div>
-                <p className="text-white/60 text-sm">Address</p>
-                <p className="text-white font-semibold">{client.address}</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Notification Center */}
-          <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Bell className="text-yellow-400" />
-              Notifications
-              {notifications.filter(n => !n.read).length > 0 && (
-                <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+              {/* Quick Stats */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-2xl p-6 border border-blue-500/30">
+                  <p className="text-blue-400 text-sm">Upcoming Services</p>
+                  <p className="text-3xl font-bold text-white">{upcomingServices.length}</p>
+                </div>
+                <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl p-6 border border-green-500/30">
+                  <p className="text-green-400 text-sm">Services Completed</p>
+                  <p className="text-3xl font-bold text-white">{bookingHistory.length}</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl p-6 border border-purple-500/30">
+                  <p className="text-purple-400 text-sm">Subscription Status</p>
+                  <p className="text-xl font-bold text-white">
+                    {subscription ? (subscription.subscription_status === 'paused' ? 'Paused' : 'Active') : 'None'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Notification Center */}
+              <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Bell className="text-yellow-400" />
+                  Notifications
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                      {notifications.filter(n => !n.read).length} new
+                    </span>
+                  )}
+                </h2>
                   {notifications.filter(n => !n.read).length} new
                 </span>
               )}
