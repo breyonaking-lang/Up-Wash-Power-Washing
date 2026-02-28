@@ -2117,6 +2117,110 @@ function ContractorsPage() {
           </motion.div>
         </div>
       )}
+
+      {/* Edit Contractor Modal */}
+      {showEditModal && editingContractor && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={() => setShowEditModal(false)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-lg"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Edit className="w-5 h-5 text-indigo-400" />
+                Edit Contractor
+              </h2>
+              <button onClick={() => setShowEditModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-white/60 text-sm mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={editingContractor.full_name || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, full_name: e.target.value})}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-white/60 text-sm mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editingContractor.email || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, email: e.target.value})}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-white/60 text-sm mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={editingContractor.phone || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, phone: e.target.value})}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-white/60 text-sm mb-1">Address</label>
+                <input
+                  type="text"
+                  value={editingContractor.address || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, address: e.target.value})}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-white/60 text-sm mb-1">Pay Rate (per stop)</label>
+                <input
+                  type="number"
+                  value={editingContractor.pay_rate || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, pay_rate: parseFloat(e.target.value)})}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="block text-white/60 text-sm mb-1">Notes</label>
+                <textarea
+                  value={editingContractor.notes || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, notes: e.target.value})}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white h-20"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={editingContractor.is_active !== false}
+                  onChange={(e) => setEditingContractor({...editingContractor, is_active: e.target.checked})}
+                  className="w-5 h-5"
+                />
+                <label className="text-white">Active</label>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveContractorEdit}
+                  className="flex-1 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600"
+                  data-testid="save-contractor-edit-btn"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
