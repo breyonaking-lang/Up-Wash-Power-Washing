@@ -3085,52 +3085,53 @@ async def contractor_profile(current_user: dict = Depends(get_contractor_user)):
 
 @api_router.get("/contractor/earnings")
 async def contractor_earnings(current_user: dict = Depends(get_contractor_user)):
-    """Get contractor's earnings summary"""
+    """Get contractor's earnings summary (daily and weekly only - resets weekly)"""
     contractor_id = current_user["user_id"]
     pay_per_stop = await get_pay_per_stop()
     
-    # Get all completed stops
+    # Calculate week boundaries
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Get this week's completed stops only (weekly reset)
     completed_stops = await db.stop_completions.find(
-        {"contractor_id": contractor_id, "status": "completed"},
+        {
+            "contractor_id": contractor_id, 
+            "status": "completed",
+            "completed_at": {"$gte": week_start.isoformat()}
+        },
         {"_id": 0}
     ).to_list(1000)
     
-    # Get CNS stops (no pay)
-    cns_stops = await db.stop_completions.find(
-        {"contractor_id": contractor_id, "status": "cns"},
-        {"_id": 0}
-    ).to_list(1000)
-    
-    # Calculate earnings
-    total_completed = len(completed_stops)
-    total_earnings = total_completed * pay_per_stop
-    
-    # Get paid history
-    payments = await db.contractor_payments.find(
-        {"contractor_id": contractor_id},
-        {"_id": 0}
-    ).sort("paid_at", -1).to_list(100)
-    
-    total_paid = sum(p.get("amount", 0) for p in payments)
-    unpaid_balance = total_earnings - total_paid
+    # Today's stops
+    today_stops = [s for s in completed_stops if s.get("completed_at", "") >= today_start.isoformat()]
+    today_earnings = len(today_stops) * pay_per_stop
     
     # This week's earnings
-    from datetime import timedelta
-    week_start = (datetime.now(timezone.utc) - timedelta(days=datetime.now(timezone.utc).weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    this_week_earnings = len(completed_stops) * pay_per_stop
     
-    this_week_stops = [s for s in completed_stops if s.get("completed_at", "") >= week_start.isoformat()]
-    this_week_earnings = len(this_week_stops) * pay_per_stop
+    # Get CNS stops for this week
+    cns_stops = await db.stop_completions.find(
+        {
+            "contractor_id": contractor_id, 
+            "status": "cns",
+            "completed_at": {"$gte": week_start.isoformat()}
+        },
+        {"_id": 0}
+    ).to_list(1000)
     
     return {
-        "total_completed_stops": total_completed,
-        "total_cns_stops": len(cns_stops),
-        "total_earnings": total_earnings,
-        "total_paid": total_paid,
-        "unpaid_balance": unpaid_balance,
-        "this_week_stops": len(this_week_stops),
+        "today_stops": len(today_stops),
+        "today_earnings": today_earnings,
+        "this_week_stops": len(completed_stops),
         "this_week_earnings": this_week_earnings,
+        "this_week_cns_stops": len(cns_stops),
         "pay_per_stop": pay_per_stop,
-        "recent_payments": payments[:10]
+        "week_start": week_start.strftime("%A, %b %d"),
+        "week_end": (week_start + timedelta(days=6)).strftime("%A, %b %d"),
+        "resets_in_days": 6 - now.weekday()
     }
 
 @api_router.get("/contractor/routes")
