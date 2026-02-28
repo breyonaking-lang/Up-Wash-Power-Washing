@@ -184,6 +184,16 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] Real-time SMS status tracking (sent/failed/pending)
 - [x] Twilio credentials configured and tested
 
+#### Automated ETA Notifications ✅ NEW
+- [x] POST /api/contractor/sms/eta-alert - Send ETA SMS when contractor is close
+- [x] POST /api/contractor/check-proximity - Check if contractor is within 10-15 min range
+- [x] Auto ETA tracking with 30-second location polling
+- [x] Auto ETA toggle button in Contractor Dashboard
+- [x] Manual "Send ETA" button for each task
+- [x] ETA sent badge shows on task cards after notification
+- [x] Google Maps Distance Matrix API integration for accurate ETA
+- [x] Customer receives SMS: "Your technician is approximately X minutes away"
+
 #### Automated Payroll System
 - [x] Admin Payroll page with pending payments dashboard
 - [x] Shows dynamic pay rate from settings
