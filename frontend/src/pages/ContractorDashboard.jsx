@@ -557,6 +557,16 @@ function TodayRoute() {
                         <Car className="w-4 h-4" />
                         En Route SMS
                       </button>
+                      {!task.eta_notified && (
+                        <button
+                          onClick={() => sendManualETA(task)}
+                          className="flex-1 py-2 bg-emerald-500 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-600 text-sm"
+                          data-testid={`eta-sms-${task.id}`}
+                        >
+                          <Navigation className="w-4 h-4" />
+                          Send ETA
+                        </button>
+                      )}
                       <button
                         onClick={() => openSMSModal(task)}
                         className="flex-1 py-2 bg-purple-500 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-purple-600 text-sm"
