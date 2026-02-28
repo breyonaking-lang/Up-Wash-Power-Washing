@@ -4496,10 +4496,59 @@ function MessagesPage() {
   const [newMessage, setNewMessage] = useState('');
   const [selectedContractor, setSelectedContractor] = useState(null);
   const [messageThreads, setMessageThreads] = useState({});
+  const [lastMessageCount, setLastMessageCount] = useState(0);
+  const [newMessageNotification, setNewMessageNotification] = useState(null);
+  const notificationAudioRef = useRef(null);
+
+  // Play notification sound
+  const playNotificationSound = () => {
+    try {
+      if (notificationAudioRef.current) {
+        notificationAudioRef.current.currentTime = 0;
+        notificationAudioRef.current.play();
+      }
+    } catch (e) {
+      console.log('Could not play notification sound');
+    }
+  };
+
+  // Check for new messages and show notification
+  const checkForNewMessages = (newMessages) => {
+    if (newMessages.length > lastMessageCount && lastMessageCount > 0) {
+      // Find the newest message from a contractor
+      const contractorMessages = newMessages.filter(m => !m.is_admin_sender);
+      if (contractorMessages.length > 0) {
+        const latestMessage = contractorMessages[0];
+        const contractor = contractors.find(c => c.id === latestMessage.contractor_id);
+        const senderName = contractor?.full_name || contractor?.username || 'Contractor';
+        
+        // Show notification
+        setNewMessageNotification({
+          sender: senderName,
+          message: latestMessage.message?.substring(0, 50) + (latestMessage.message?.length > 50 ? '...' : ''),
+          contractorId: latestMessage.contractor_id
+        });
+        
+        // Play sound
+        playNotificationSound();
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => setNewMessageNotification(null), 5000);
+      }
+    }
+    setLastMessageCount(newMessages.length);
+  };
 
   useEffect(() => {
     fetchContractors();
     fetchAllMessages();
+    
+    // Poll for new messages every 10 seconds
+    const pollInterval = setInterval(() => {
+      fetchAllMessages(true);
+    }, 10000);
+    
+    return () => clearInterval(pollInterval);
   }, []);
 
   useEffect(() => {
