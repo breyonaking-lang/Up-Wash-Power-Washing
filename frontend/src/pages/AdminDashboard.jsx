@@ -1342,6 +1342,12 @@ function ContractorsPage() {
   // Edit Contractor States
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingContractor, setEditingContractor] = useState(null);
+  // Route Reassignment States
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [reassignRoute, setReassignRoute] = useState(null);
+  const [reassignToContractor, setReassignToContractor] = useState('');
+  // Expanded Route View
+  const [expandedRoutes, setExpandedRoutes] = useState({});
 
   useEffect(() => {
     fetchContractors();
