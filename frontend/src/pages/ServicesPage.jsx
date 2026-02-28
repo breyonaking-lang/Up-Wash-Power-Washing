@@ -226,7 +226,7 @@ const ServicesPage = () => {
                         className="flex justify-between items-center cursor-pointer hover:bg-white/50 p-2 rounded-lg transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleBookService(service.id, price.qty || 1);
+                          handleBookService(service.id, price.qty || 1, service.isQuote || price.isQuote);
                         }}
                       >
                         <span className="text-slate-700">{price.label}</span>
