@@ -4758,10 +4758,52 @@ function CalendarPage() {
                       : 'bg-white/10'
                   }`}>
                     <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-white font-semibold">{booking.customer_name}</p>
+                      <div className="flex-1">
+                        <p className="text-white font-semibold text-lg">{booking.customer_name}</p>
                         <p className="text-white/60 text-sm">{booking.address}</p>
-                        <div className="flex gap-2 mt-2 flex-wrap">
+                        
+                        {/* Contact Info */}
+                        <div className="mt-2 space-y-1">
+                          {booking.customer_phone && (
+                            <p className="text-white/70 text-sm flex items-center gap-2">
+                              <Phone className="w-3 h-3" /> {booking.customer_phone}
+                            </p>
+                          )}
+                          {booking.customer_email && (
+                            <p className="text-white/70 text-sm flex items-center gap-2">
+                              <Mail className="w-3 h-3" /> {booking.customer_email}
+                            </p>
+                          )}
+                        </div>
+                        
+                        {/* Services */}
+                        {booking.services && booking.services.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-white/50 text-xs">Services:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {booking.services.map((svc, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-white/10 text-white/80 text-xs rounded">
+                                  {svc.name || svc.service_id} {svc.quantity > 1 ? `x${svc.quantity}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Assigned Contractor */}
+                        <div className="mt-2">
+                          <p className="text-white/50 text-xs">Assigned Documentor:</p>
+                          <p className={`text-sm font-medium ${booking.assigned_contractor_name ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {booking.assigned_contractor_name || 'Not Assigned'}
+                          </p>
+                        </div>
+                        
+                        {/* Price */}
+                        {booking.total && (
+                          <p className="text-blue-400 font-bold mt-2">${booking.total.toFixed(2)}</p>
+                        )}
+                        
+                        <div className="flex gap-2 mt-3 flex-wrap">
                           {booking.is_monthly && (
                             <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">Subscription</span>
                           )}
@@ -4781,7 +4823,7 @@ function CalendarPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 ml-4">
                         <button
                           onClick={() => openRescheduleModal(booking, selectedDate.date)}
                           className="px-3 py-2 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 flex items-center gap-1"
