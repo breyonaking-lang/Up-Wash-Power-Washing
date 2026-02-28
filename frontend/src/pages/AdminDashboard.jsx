@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import DailyBibleVerse from '../components/shared/DailyBibleVerse';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
-const CONTRACTOR_PORTAL_URL = `${window.location.origin}/documentor/login`;
+const CONTRACTOR_PORTAL_URL = `${window.location.origin}/contractor/login`;
 
 // Notification sound
 const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6Xj4F1cXV9iJSgn5aLfnJucX2IlZ6dloyAc29weoeSm5uUjYF2c3V8hpGZmZSNg3d0dXuFj5eXko2Bd3R2fIaQl5aRjIF3dHZ9hpCWlZCLgHZ0dn6Hj5WUj4qAdnR3foeOk5KNiYB2dHd+ho2SkIuIf3Z0d36GjJCOioZ+dnR4fYaLjo2IhX12dHh+hYqMi4aDfHZ0eH6EiYqJhIJ7dnV4foSIiYeEgXp2dXl+g4eHhoOAeXZ1eX6Ch4aFgn94dnV5fYKGhYOBfnd2dXl9gYSEgoB9d3V2eX2BhIOBf3x3dXZ5fYCDgYB+e3d1dnl9gIKAgH17d3V2enmAgIB/fHp3dXZ6eX9/f357eXd2dnp5fn5+fXx6eHd3d3p5fX19fHt5eHd3d3p5fHx8e3p5eHd4eHp5fHt7enl4eHh4eXl7e3t6eXl4eHh4eXp6enp5eXh4eHl5enp5eXl5eHh4eXl5eXl5eXl4eHh5eXl5eXl5eHh4eHl5eXl5eXh4eHh4eXl5eXl5eHh4eHh5eXl5eXl4eHh4eHh4eXl5eXl4eHh4eHh4eHl5eXh4eHh4eHh4eHh5eXh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eA==";
@@ -51,7 +51,7 @@ const navItems = [
   { path: 'subscriptions', icon: Users, label: 'Subscriptions' },
   { path: 'documents', icon: FileText, label: 'Documents' },
   { path: 'deleted-subscriptions', icon: Trash2, label: 'Deleted Subscriptions' },
-  { path: 'documentors', icon: UserPlus, label: 'Documentors' },
+  { path: 'contractors', icon: UserPlus, label: 'Contractors' },
   { path: 'payroll', icon: Banknote, label: 'Payroll' },
   { path: 'pending-routes', icon: RouteIcon, label: 'Pending Routes' },
   { path: 'released-routes', icon: AlertTriangle, label: 'Released Routes' },
@@ -88,9 +88,9 @@ function DashboardOverview() {
     }
   };
 
-  const copyDocumentorLink = () => {
+  const copyContractorLink = () => {
     navigator.clipboard.writeText(CONTRACTOR_PORTAL_URL);
-    toast.success('Documentor portal link copied!');
+    toast.success('Contractor portal link copied!');
   };
 
   if (loading) return <LoadingSpinner />;
@@ -101,7 +101,7 @@ function DashboardOverview() {
     { label: 'Completed', value: stats?.completed || 0, icon: CheckCircle, color: 'bg-green-500', link: '/admin/dashboard/completed' },
     { label: 'Revenue', value: `$${(stats?.total_revenue || 0).toFixed(2)}`, icon: DollarSign, color: 'bg-emerald-500', link: '/admin/dashboard/revenue' },
     { label: 'Scent Bomb Orders', value: stats?.scent_bomb_orders || 0, icon: Droplets, color: 'bg-purple-500', link: '/admin/dashboard/scent-bombs' },
-    { label: 'Documentors', value: stats?.documentor_count || 0, icon: Users, color: 'bg-indigo-500', link: '/admin/dashboard/documentors' },
+    { label: 'Contractors', value: stats?.contractor_count || stats?.documentor_count || 0, icon: Users, color: 'bg-indigo-500', link: '/admin/dashboard/contractors' },
   ];
 
   return (
