@@ -2318,6 +2318,184 @@ async def delete_contractor(contractor_id: str, current_user: dict = Depends(get
         raise HTTPException(status_code=404, detail="Contractor not found")
     return {"message": "Contractor deleted"}
 
+# ===================== DOCUMENTOR ALIAS ROUTES (redirects to contractors) =====================
+
+@api_router.get("/admin/documentors")
+async def list_documentors(current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors - supports frontend naming convention"""
+    contractors = await db.users.find(
+        {"role": "contractor"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    return {"documentors": contractors}
+
+@api_router.get("/admin/documentors/{documentor_id}")
+async def get_documentor(documentor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors/{id}"""
+    contractor = await db.users.find_one(
+        {"id": documentor_id, "role": "contractor"},
+        {"_id": 0, "password_hash": 0}
+    )
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Documentor not found")
+    return contractor
+
+@api_router.post("/admin/documentors")
+async def create_documentor(contractor: ContractorCreate, current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors POST"""
+    existing = await db.users.find_one({"username": contractor.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "username": contractor.username,
+        "password_hash": hash_password(contractor.password),
+        "full_name": contractor.full_name,
+        "email": contractor.email,
+        "phone": contractor.phone,
+        "role": "contractor",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(user_doc)
+    user_doc.pop("_id", None)
+    user_doc.pop("password_hash", None)
+    
+    return {"id": user_doc["id"], "username": contractor.username, "message": "Documentor created"}
+
+@api_router.patch("/admin/documentors/{documentor_id}/password")
+async def reset_documentor_password(documentor_id: str, new_password: str, current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors/{id}/password"""
+    result = await db.users.update_one(
+        {"id": documentor_id, "role": "contractor"},
+        {"$set": {
+            "password_hash": hash_password(new_password),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Documentor not found")
+    
+    return {"message": "Password updated"}
+
+@api_router.delete("/admin/documentors/{documentor_id}")
+async def delete_documentor(documentor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors/{id} DELETE"""
+    result = await db.users.delete_one({"id": documentor_id, "role": "contractor"})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Documentor not found")
+    return {"message": "Documentor deleted"}
+
+@api_router.put("/admin/documentors/{documentor_id}")
+async def update_documentor(documentor_id: str, request: Request, current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors/{id} PUT"""
+    data = await request.json()
+    
+    update_fields = {}
+    if "full_name" in data:
+        update_fields["full_name"] = data["full_name"]
+    if "email" in data:
+        update_fields["email"] = data["email"]
+    if "phone" in data:
+        update_fields["phone"] = data["phone"]
+    if "pay_rate" in data:
+        update_fields["pay_rate"] = data["pay_rate"]
+    if "notes" in data:
+        update_fields["notes"] = data["notes"]
+    if "is_active" in data:
+        update_fields["is_active"] = data["is_active"]
+    
+    if update_fields:
+        update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+        result = await db.users.update_one(
+            {"id": documentor_id, "role": "contractor"},
+            {"$set": update_fields}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Documentor not found")
+    
+    return {"message": "Documentor updated"}
+
+@api_router.get("/admin/documentors/{documentor_id}/earnings")
+async def get_documentor_earnings(documentor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors/{id}/earnings"""
+    contractor = await db.users.find_one({"id": documentor_id, "role": "contractor"})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Documentor not found")
+    
+    # Get settings for pay rate
+    settings = await db.settings.find_one({"type": "global"}, {"_id": 0})
+    pay_per_stop = settings.get("pay_per_stop", 11) if settings else 11
+    
+    # Get completed routes for this contractor
+    routes = await db.routes.find({
+        "assigned_contractor_id": documentor_id,
+        "status": "completed"
+    }, {"_id": 0}).to_list(1000)
+    
+    total_stops = sum(len(r.get("bookings", [])) for r in routes)
+    total_earnings = total_stops * pay_per_stop
+    
+    return {
+        "contractor_id": documentor_id,
+        "total_routes": len(routes),
+        "total_stops": total_stops,
+        "pay_per_stop": pay_per_stop,
+        "total_earnings": total_earnings
+    }
+
+@api_router.post("/admin/documentors/{documentor_id}/pay")
+async def process_documentor_payment(documentor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Alias for /admin/contractors/{id}/pay"""
+    contractor = await db.users.find_one({"id": documentor_id, "role": "contractor"})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Documentor not found")
+    
+    # Get settings for pay rate
+    settings = await db.settings.find_one({"type": "global"}, {"_id": 0})
+    pay_per_stop = settings.get("pay_per_stop", 11) if settings else 11
+    
+    # Get unpaid completed routes
+    routes = await db.routes.find({
+        "assigned_contractor_id": documentor_id,
+        "status": "completed",
+        "paid": {"$ne": True}
+    }, {"_id": 0}).to_list(1000)
+    
+    if not routes:
+        raise HTTPException(status_code=400, detail="No unpaid routes to process")
+    
+    total_stops = sum(len(r.get("bookings", [])) for r in routes)
+    total_earnings = total_stops * pay_per_stop
+    
+    # Mark routes as paid
+    route_ids = [r["id"] for r in routes]
+    await db.routes.update_many(
+        {"id": {"$in": route_ids}},
+        {"$set": {"paid": True, "paid_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Create payment record
+    payment = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": documentor_id,
+        "contractor_name": contractor.get("full_name"),
+        "routes": route_ids,
+        "total_stops": total_stops,
+        "pay_per_stop": pay_per_stop,
+        "total_amount": total_earnings,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.payments.insert_one(payment)
+    
+    return {
+        "message": "Payment processed",
+        "total_amount": total_earnings,
+        "routes_paid": len(routes)
+    }
+
 # ===================== ROUTE MANAGEMENT ROUTES =====================
 
 @api_router.post("/admin/routes")
