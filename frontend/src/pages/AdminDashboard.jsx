@@ -3674,7 +3674,6 @@ function SMSLogsPage() {
 // Documents Management Page
 function DocumentsPage() {
   const [documents, setDocuments] = useState([]);
-  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
@@ -3689,7 +3688,6 @@ function DocumentsPage() {
   useEffect(() => {
     fetchDocuments();
     fetchBookings();
-    fetchDocuments();
   }, []);
 
   const fetchDocuments = async () => {
