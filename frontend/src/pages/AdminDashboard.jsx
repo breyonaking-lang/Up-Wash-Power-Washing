@@ -4570,12 +4570,20 @@ function MessagesPage() {
     }
   };
 
-  const fetchAllMessages = async () => {
+  const fetchAllMessages = async (isPolling = false) => {
     try {
       const res = await fetch(`${API_URL}/api/admin/sms/contractors/all`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setMessages(data.messages || []);
+      const newMessages = data.messages || [];
+      setMessages(newMessages);
+      
+      // Check for new messages only during polling
+      if (isPolling) {
+        checkForNewMessages(newMessages);
+      } else {
+        setLastMessageCount(newMessages.length);
+      }
     } catch (err) {
       console.error('Failed to load messages');
     }
