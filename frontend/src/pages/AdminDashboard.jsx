@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import DailyBibleVerse from '../components/shared/DailyBibleVerse';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
-const CONTRACTOR_PORTAL_URL = `${window.location.origin}/contractor/login`;
+const CONTRACTOR_PORTAL_URL = `${window.location.origin}/documentor/login`;
 
 // Notification sound
 const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6Xj4F1cXV9iJSgn5aLfnJucX2IlZ6dloyAc29weoeSm5uUjYF2c3V8hpGZmZSNg3d0dXuFj5eXko2Bd3R2fIaQl5aRjIF3dHZ9hpCWlZCLgHZ0dn6Hj5WUj4qAdnR3foeOk5KNiYB2dHd+ho2SkIuIf3Z0d36GjJCOioZ+dnR4fYaLjo2IhX12dHh+hYqMi4aDfHZ0eH6EiYqJhIJ7dnV4foSIiYeEgXp2dXl+g4eHhoOAeXZ1eX6Ch4aFgn94dnV5fYKGhYOBfnd2dXl9gYSEgoB9d3V2eX2BhIOBf3x3dXZ5fYCDgYB+e3d1dnl9gIKAgH17d3V2enmAgIB/fHp3dXZ6eX9/f357eXd2dnp5fn5+fXx6eHd3d3p5fX19fHt5eHd3d3p5fHx8e3p5eHd4eHp5fHt7enl4eHh4eXl7e3t6eXl4eHh4eXp6enp5eXh4eHl5enp5eXl5eHh4eXl5eXl5eXl4eHh5eXl5eXl5eHh4eHl5eXl5eXh4eHh4eXl5eXl5eHh4eHh5eXl5eXl4eHh4eHh4eXl5eXl4eHh4eHh4eHl5eXh4eHh4eHh4eHh5eXh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eA==";
@@ -49,9 +49,9 @@ const navItems = [
   { path: 'unpaid-subscriptions', icon: AlertCircle, label: 'Unpaid Subscriptions' },
   { path: 'revenue', icon: DollarSign, label: 'Revenue' },
   { path: 'subscriptions', icon: Users, label: 'Subscriptions' },
-  { path: 'contracts', icon: FileText, label: 'Documents' },
+  { path: 'documents', icon: FileText, label: 'Documents' },
   { path: 'deleted-subscriptions', icon: Trash2, label: 'Deleted Subscriptions' },
-  { path: 'contractors', icon: UserPlus, label: 'Contractors' },
+  { path: 'documentors', icon: UserPlus, label: 'Documentors' },
   { path: 'payroll', icon: Banknote, label: 'Payroll' },
   { path: 'pending-routes', icon: RouteIcon, label: 'Pending Routes' },
   { path: 'released-routes', icon: AlertTriangle, label: 'Released Routes' },
@@ -88,9 +88,9 @@ function DashboardOverview() {
     }
   };
 
-  const copyContractorLink = () => {
+  const copyDocumentorLink = () => {
     navigator.clipboard.writeText(CONTRACTOR_PORTAL_URL);
-    toast.success('Contractor portal link copied!');
+    toast.success('Documentor portal link copied!');
   };
 
   if (loading) return <LoadingSpinner />;
@@ -101,7 +101,7 @@ function DashboardOverview() {
     { label: 'Completed', value: stats?.completed || 0, icon: CheckCircle, color: 'bg-green-500', link: '/admin/dashboard/completed' },
     { label: 'Revenue', value: `$${(stats?.total_revenue || 0).toFixed(2)}`, icon: DollarSign, color: 'bg-emerald-500', link: '/admin/dashboard/revenue' },
     { label: 'Scent Bomb Orders', value: stats?.scent_bomb_orders || 0, icon: Droplets, color: 'bg-purple-500', link: '/admin/dashboard/scent-bombs' },
-    { label: 'Contractors', value: stats?.contractor_count || 0, icon: Users, color: 'bg-indigo-500', link: '/admin/dashboard/contractors' },
+    { label: 'Documentors', value: stats?.documentor_count || 0, icon: Users, color: 'bg-indigo-500', link: '/admin/dashboard/documentors' },
   ];
 
   return (
@@ -111,19 +111,19 @@ function DashboardOverview() {
       {/* Daily Bible Verse */}
       <DailyBibleVerse />
       
-      {/* Contractor Portal Link Card */}
+      {/* Documentor Portal Link Card */}
       <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 backdrop-blur rounded-2xl p-6 border border-indigo-500/30">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h3 className="text-lg font-bold text-white mb-1">Contractor Portal Link</h3>
-            <p className="text-white/60 text-sm mb-2">Share this link with new contractors</p>
+            <h3 className="text-lg font-bold text-white mb-1">Documentor Portal Link</h3>
+            <p className="text-white/60 text-sm mb-2">Share this link with new documentors</p>
             <code className="bg-black/30 px-3 py-1 rounded text-indigo-300 text-sm break-all">{CONTRACTOR_PORTAL_URL}</code>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={copyContractorLink}
+              onClick={copyDocumentorLink}
               className="px-4 py-2 bg-indigo-500 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-600"
-              data-testid="copy-contractor-link"
+              data-testid="copy-documentor-link"
             >
               <Copy className="w-4 h-4" />
               Copy Link
@@ -943,15 +943,15 @@ function DeletedSubscriptionsPage() {
 // Released Routes Management
 function ReleasedRoutesPage() {
   const [releasedRoutes, setReleasedRoutes] = useState([]);
-  const [contractors, setContractors] = useState([]);
+  const [documentors, setDocumentors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dispatchModal, setDispatchModal] = useState(null);
-  const [selectedContractor, setSelectedContractor] = useState('');
+  const [selectedDocumentor, setSelectedDocumentor] = useState('');
   const [dispatchMessage, setDispatchMessage] = useState('');
 
   useEffect(() => {
     fetchReleasedRoutes();
-    fetchContractors();
+    fetchDocumentors();
   }, []);
 
   const fetchReleasedRoutes = async () => {
@@ -967,20 +967,20 @@ function ReleasedRoutesPage() {
     }
   };
 
-  const fetchContractors = async () => {
+  const fetchDocumentors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setContractors(data.contractors || []);
+      setDocumentors(data.documentors || []);
     } catch (err) {
-      console.error('Failed to load contractors');
+      console.error('Failed to load documentors');
     }
   };
 
   const dispatchRoute = async () => {
-    if (!dispatchModal || !selectedContractor) {
-      toast.error('Please select a contractor');
+    if (!dispatchModal || !selectedDocumentor) {
+      toast.error('Please select a documentor');
       return;
     }
 
@@ -989,14 +989,14 @@ function ReleasedRoutesPage() {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          contractor_id: selectedContractor,
+          documentor_id: selectedDocumentor,
           message: dispatchMessage
         })
       });
       if (!res.ok) throw new Error('Failed to dispatch');
-      toast.success('Route dispatched! Contractor notified.');
+      toast.success('Route dispatched! Documentor notified.');
       setDispatchModal(null);
-      setSelectedContractor('');
+      setSelectedDocumentor('');
       setDispatchMessage('');
       fetchReleasedRoutes();
     } catch (err) {
@@ -1014,8 +1014,8 @@ function ReleasedRoutesPage() {
       </h1>
       
       <div className="bg-purple-500/20 rounded-xl p-4 text-purple-200 text-sm">
-        <p><strong>Released routes</strong> are routes that contractors have released back to you. 
-        You can dispatch them to other contractors. Contractors earn <strong>$10 per stop</strong>.</p>
+        <p><strong>Released routes</strong> are routes that documentors have released back to you. 
+        You can dispatch them to other documentors. Documentors earn <strong>$10 per stop</strong>.</p>
       </div>
 
       {releasedRoutes.length === 0 ? (
@@ -1035,7 +1035,7 @@ function ReleasedRoutesPage() {
                   <h3 className="text-xl font-bold text-white">{route.route_name}</h3>
                   <p className="text-white/60">Area: {route.route_area || 'Not specified'}</p>
                   <p className="text-white/40 text-sm">
-                    Released by {route.released_by_contractor_name} on {new Date(route.released_at).toLocaleDateString()}
+                    Released by {route.released_by_documentor_name} on {new Date(route.released_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -1059,8 +1059,8 @@ function ReleasedRoutesPage() {
                   <p className="text-white/60 text-sm">Stops</p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-green-400">${route.contractor_pay?.toFixed(2)}</p>
-                  <p className="text-white/60 text-sm">Contractor Pay</p>
+                  <p className="text-2xl font-bold text-green-400">${route.documentor_pay?.toFixed(2)}</p>
+                  <p className="text-white/60 text-sm">Documentor Pay</p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-3 text-center">
                   <p className="text-2xl font-bold text-white">$10</p>
@@ -1093,19 +1093,19 @@ function ReleasedRoutesPage() {
                   className="w-full py-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center justify-center gap-2"
                 >
                   <Send className="w-5 h-5" />
-                  Dispatch to Contractor
+                  Dispatch to Documentor
                 </button>
               )}
               
               {route.status === 'dispatched' && (
                 <p className="text-yellow-400 text-sm text-center">
-                  Dispatched - Waiting for contractor to claim
+                  Dispatched - Waiting for documentor to claim
                 </p>
               )}
               
               {route.status === 'claimed' && (
                 <p className="text-green-400 text-sm text-center">
-                  ✓ Route claimed by contractor
+                  ✓ Route claimed by documentor
                 </p>
               )}
             </div>
@@ -1124,7 +1124,7 @@ function ReleasedRoutesPage() {
           >
             <h2 className="text-2xl font-bold text-white mb-2">Dispatch Route</h2>
             <p className="text-white/60 mb-6">
-              Send <strong>{dispatchModal.route_name}</strong> to a contractor
+              Send <strong>{dispatchModal.route_name}</strong> to a documentor
             </p>
             
             <div className="bg-purple-500/20 rounded-xl p-4 mb-6">
@@ -1134,25 +1134,25 @@ function ReleasedRoutesPage() {
                   <p className="text-white/60 text-sm">Stops</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-green-400">${dispatchModal.contractor_pay?.toFixed(2)}</p>
-                  <p className="text-white/60 text-sm">Contractor Earns</p>
+                  <p className="text-2xl font-bold text-green-400">${dispatchModal.documentor_pay?.toFixed(2)}</p>
+                  <p className="text-white/60 text-sm">Documentor Earns</p>
                 </div>
               </div>
               <p className="text-center text-purple-300 text-sm mt-2">
-                Route is FREE - No charge to contractor
+                Route is FREE - No charge to documentor
               </p>
             </div>
             
             <div className="space-y-4">
               <div>
-                <label className="text-white/60 text-sm">Select Contractor *</label>
+                <label className="text-white/60 text-sm">Select Documentor *</label>
                 <select
-                  value={selectedContractor}
-                  onChange={(e) => setSelectedContractor(e.target.value)}
+                  value={selectedDocumentor}
+                  onChange={(e) => setSelectedDocumentor(e.target.value)}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 >
-                  <option value="">Choose a contractor...</option>
-                  {contractors.map(c => (
+                  <option value="">Choose a documentor...</option>
+                  {documentors.map(c => (
                     <option key={c.id} value={c.id}>{c.full_name}</option>
                   ))}
                 </select>
@@ -1191,7 +1191,7 @@ function ReleasedRoutesPage() {
   );
 }
 
-// Route Requests Page - View and approve contractor route requests
+// Route Requests Page - View and approve documentor route requests
 function RouteRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1251,7 +1251,7 @@ function RouteRequestsPage() {
       </h1>
       
       <div className="bg-yellow-500/20 rounded-xl p-4 text-yellow-200 text-sm">
-        <p>Contractors request routes by zip code. Approve requests to assign routes and charge <strong>$11 per stop</strong>.</p>
+        <p>Documentors request routes by zip code. Approve requests to assign routes and charge <strong>$11 per stop</strong>.</p>
       </div>
 
       {requests.length === 0 ? (
@@ -1265,7 +1265,7 @@ function RouteRequestsPage() {
             <div key={request.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-yellow-500/30">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-white">{request.contractor_name}</h3>
+                  <h3 className="text-xl font-bold text-white">{request.documentor_name}</h3>
                   <p className="text-white/60">Requested: {new Date(request.created_at).toLocaleDateString()}</p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -1316,45 +1316,45 @@ function RouteRequestsPage() {
   );
 }
 
-// Contractors Management with Enhanced Details
-function ContractorsPage() {
-  const [contractors, setContractors] = useState([]);
+// Documentors Management with Enhanced Details
+function DocumentorsPage() {
+  const [documentors, setDocumentors] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedContractor, setSelectedContractor] = useState(null);
-  const [contractorEarnings, setContractorEarnings] = useState(null);
+  const [selectedDocumentor, setSelectedDocumentor] = useState(null);
+  const [documentorEarnings, setDocumentorEarnings] = useState(null);
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('bank_transfer');
   const [payNotes, setPayNotes] = useState('');
-  const [newContractor, setNewContractor] = useState({
+  const [newDocumentor, setNewDocumentor] = useState({
     username: '', password: '', full_name: '', phone: '', email: ''
   });
   // SMS States
   const [showSMSModal, setShowSMSModal] = useState(false);
-  const [smsContractor, setSmsContractor] = useState(null);
+  const [smsDocumentor, setSmsDocumentor] = useState(null);
   const [smsMessage, setSmsMessage] = useState('');
   const [smsHistory, setSmsHistory] = useState([]);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [sendCredentials, setSendCredentials] = useState(false);
-  // Edit Contractor States
+  // Edit Documentor States
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingContractor, setEditingContractor] = useState(null);
+  const [editingDocumentor, setEditingDocumentor] = useState(null);
 
   useEffect(() => {
-    fetchContractors();
+    fetchDocumentors();
     fetchRoutes();
   }, []);
 
-  const fetchContractors = async () => {
+  const fetchDocumentors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setContractors(data.contractors || []);
+      setDocumentors(data.documentors || []);
     } catch (err) {
-      toast.error('Failed to load contractors');
+      toast.error('Failed to load documentors');
     } finally {
       setLoading(false);
     }
@@ -1371,26 +1371,26 @@ function ContractorsPage() {
     }
   };
 
-  const fetchContractorEarnings = async (contractorId) => {
+  const fetchDocumentorEarnings = async (documentorId) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/earnings`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/documentors/${documentorId}/earnings`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setContractorEarnings(data);
+      setDocumentorEarnings(data);
     } catch (err) {
       console.error('Failed to load earnings');
-      setContractorEarnings(null);
+      setDocumentorEarnings(null);
     }
   };
 
-  const payContractor = async () => {
-    if (!selectedContractor || !payAmount) {
+  const payDocumentor = async () => {
+    if (!selectedDocumentor || !payAmount) {
       toast.error('Please enter payment amount');
       return;
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors/${selectedContractor.id}/pay`, {
+      const res = await fetch(`${API_URL}/api/admin/documentors/${selectedDocumentor.id}/pay`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1404,45 +1404,45 @@ function ContractorsPage() {
       setShowPayModal(false);
       setPayAmount('');
       setPayNotes('');
-      fetchContractorEarnings(selectedContractor.id);
+      fetchDocumentorEarnings(selectedDocumentor.id);
     } catch (err) {
       toast.error('Failed to record payment');
     }
   };
 
-  const openContractorDetails = async (contractor) => {
-    setSelectedContractor(contractor);
-    await fetchContractorEarnings(contractor.id);
+  const openDocumentorDetails = async (documentor) => {
+    setSelectedDocumentor(documentor);
+    await fetchDocumentorEarnings(documentor.id);
   };
 
-  const createContractor = async () => {
-    if (!newContractor.username || !newContractor.password || !newContractor.full_name || !newContractor.phone) {
+  const createDocumentor = async () => {
+    if (!newDocumentor.username || !newDocumentor.password || !newDocumentor.full_name || !newDocumentor.phone) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors`, {
+      const res = await fetch(`${API_URL}/api/admin/documentors`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(newContractor)
+        body: JSON.stringify(newDocumentor)
       });
       if (!res.ok) throw new Error('Failed to create');
-      toast.success('Contractor created!');
+      toast.success('Documentor created!');
       setShowCreateModal(false);
-      setNewContractor({ username: '', password: '', full_name: '', phone: '', email: '' });
-      fetchContractors();
+      setNewDocumentor({ username: '', password: '', full_name: '', phone: '', email: '' });
+      fetchDocumentors();
     } catch (err) {
-      toast.error('Failed to create contractor');
+      toast.error('Failed to create documentor');
     }
   };
 
-  const resetPassword = async (contractorId) => {
+  const resetPassword = async (documentorId) => {
     const newPassword = prompt('Enter new password:');
     if (!newPassword) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/password?new_password=${encodeURIComponent(newPassword)}`, {
+      const res = await fetch(`${API_URL}/api/admin/documentors/${documentorId}/password?new_password=${encodeURIComponent(newPassword)}`, {
         method: 'PATCH',
         headers: getAuthHeaders()
       });
@@ -1453,14 +1453,14 @@ function ContractorsPage() {
     }
   };
 
-  const sendSMS = async (contractor) => {
-    setSmsContractor(contractor);
+  const sendSMS = async (documentor) => {
+    setSmsDocumentor(documentor);
     setShowSMSModal(true);
     setSmsMessage('');
     setSendCredentials(false);
     // Fetch SMS history
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/contractor/history/${contractor.id}`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/sms/documentor/history/${documentor.id}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setSmsHistory(data.messages || []);
@@ -1477,17 +1477,17 @@ function ContractorsPage() {
     }
     setSendingSMS(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/contractor`, {
+      const res = await fetch(`${API_URL}/api/admin/sms/documentor`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          contractor_id: smsContractor.id,
+          documentor_id: smsDocumentor.id,
           message: smsMessage
         })
       });
       const data = await res.json();
       if (data.status === 'sent') {
-        toast.success(`SMS sent to ${smsContractor.full_name}!`);
+        toast.success(`SMS sent to ${smsDocumentor.full_name}!`);
       } else if (data.status === 'failed') {
         toast.error('SMS failed - check phone number');
       } else {
@@ -1495,7 +1495,7 @@ function ContractorsPage() {
       }
       setSmsMessage('');
       // Refresh history
-      const histRes = await fetch(`${API_URL}/api/admin/sms/contractor/history/${smsContractor.id}`, { headers: getAuthHeaders() });
+      const histRes = await fetch(`${API_URL}/api/admin/sms/documentor/history/${smsDocumentor.id}`, { headers: getAuthHeaders() });
       if (histRes.ok) {
         const histData = await histRes.json();
         setSmsHistory(histData.messages || []);
@@ -1510,17 +1510,17 @@ function ContractorsPage() {
   const handleSendLoginCredentials = async () => {
     setSendingSMS(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/contractor/login`, {
+      const res = await fetch(`${API_URL}/api/admin/sms/documentor/login`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          contractor_id: smsContractor.id,
+          documentor_id: smsDocumentor.id,
           include_password: true
         })
       });
       const data = await res.json();
       if (data.status === 'sent') {
-        toast.success(`Login credentials sent to ${data.contractor_name}!`);
+        toast.success(`Login credentials sent to ${data.documentor_name}!`);
       } else if (data.status === 'failed') {
         toast.error('SMS failed - check phone number');
       } else {
@@ -1534,7 +1534,7 @@ function ContractorsPage() {
     }
   };
 
-  const sendNotification = async (contractor) => {
+  const sendNotification = async (documentor) => {
     const title = prompt('Notification Title:');
     if (!title) return;
     const message = prompt('Notification Message:');
@@ -1545,13 +1545,13 @@ function ContractorsPage() {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          contractor_id: contractor.id,
+          documentor_id: documentor.id,
           title: title,
           message: message
         })
       });
       if (!res.ok) throw new Error('Failed to send');
-      toast.success(`Notification sent to ${contractor.full_name}!`);
+      toast.success(`Notification sent to ${documentor.full_name}!`);
     } catch (err) {
       toast.error('Failed to send notification');
     }
@@ -1569,60 +1569,60 @@ function ContractorsPage() {
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error('Failed to send');
-      toast.success('Notification sent to all contractors!');
+      toast.success('Notification sent to all documentors!');
     } catch (err) {
       toast.error('Failed to broadcast notification');
     }
   };
 
-  const openEditContractor = (contractor) => {
-    setEditingContractor({...contractor});
+  const openEditDocumentor = (documentor) => {
+    setEditingDocumentor({...documentor});
     setShowEditModal(true);
   };
 
-  const saveContractorEdit = async () => {
-    if (!editingContractor) return;
+  const saveDocumentorEdit = async () => {
+    if (!editingDocumentor) return;
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors/${editingContractor.id}`, {
+      const res = await fetch(`${API_URL}/api/admin/documentors/${editingDocumentor.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          full_name: editingContractor.full_name,
-          email: editingContractor.email,
-          phone: editingContractor.phone,
-          address: editingContractor.address,
-          pay_rate: editingContractor.pay_rate,
-          is_active: editingContractor.is_active,
-          notes: editingContractor.notes
+          full_name: editingDocumentor.full_name,
+          email: editingDocumentor.email,
+          phone: editingDocumentor.phone,
+          address: editingDocumentor.address,
+          pay_rate: editingDocumentor.pay_rate,
+          is_active: editingDocumentor.is_active,
+          notes: editingDocumentor.notes
         })
       });
       if (!res.ok) throw new Error('Failed to update');
-      toast.success('Contractor information updated!');
+      toast.success('Documentor information updated!');
       setShowEditModal(false);
-      fetchContractors();
+      fetchDocumentors();
     } catch (err) {
-      toast.error('Failed to update contractor');
+      toast.error('Failed to update documentor');
     }
   };
 
-  const deleteContractor = async (contractorId) => {
-    if (!window.confirm('Are you sure you want to delete this contractor?')) return;
+  const deleteDocumentor = async (documentorId) => {
+    if (!window.confirm('Are you sure you want to delete this documentor?')) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}`, {
+      const res = await fetch(`${API_URL}/api/admin/documentors/${documentorId}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error('Failed to delete');
-      toast.success('Contractor deleted');
-      fetchContractors();
+      toast.success('Documentor deleted');
+      fetchDocumentors();
     } catch (err) {
-      toast.error('Failed to delete contractor');
+      toast.error('Failed to delete documentor');
     }
   };
 
-  const getContractorRoutes = (contractorId) => {
-    return routes.filter(r => r.assigned_contractor_id === contractorId);
+  const getDocumentorRoutes = (documentorId) => {
+    return routes.filter(r => r.assigned_documentor_id === documentorId);
   };
 
   if (loading) return <LoadingSpinner />;
@@ -1632,7 +1632,7 @@ function ContractorsPage() {
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
           <UserPlus className="text-indigo-400" />
-          Contractors
+          Documentors
         </h1>
         <div className="flex gap-2">
           <button
@@ -1645,18 +1645,18 @@ function ContractorsPage() {
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-indigo-500 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-600"
-            data-testid="create-contractor-btn"
+            data-testid="create-documentor-btn"
           >
             <Plus className="w-5 h-5" />
-            Add Contractor
+            Add Documentor
           </button>
         </div>
       </div>
 
-      {/* Contractor Portal Link */}
+      {/* Documentor Portal Link */}
       <div className="bg-indigo-500/20 rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p className="text-indigo-200 text-sm">Share this link with new contractors:</p>
+          <p className="text-indigo-200 text-sm">Share this link with new documentors:</p>
           <code className="text-indigo-300">{CONTRACTOR_PORTAL_URL}</code>
         </div>
         <button
@@ -1667,32 +1667,32 @@ function ContractorsPage() {
         </button>
       </div>
 
-      {contractors.length === 0 ? (
+      {documentors.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
-          <p className="text-white/60">No contractors yet</p>
+          <p className="text-white/60">No documentors yet</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {contractors.map((contractor) => {
-            const contractorRoutes = getContractorRoutes(contractor.id);
+          {documentors.map((documentor) => {
+            const documentorRoutes = getDocumentorRoutes(documentor.id);
             
             return (
-              <div key={contractor.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
+              <div key={documentor.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white">{contractor.full_name}</h3>
-                    <p className="text-white/60">@{contractor.username}</p>
-                    <p className="text-white/60">{contractor.phone}</p>
-                    <p className="text-white/60">{contractor.email || 'No email'}</p>
+                    <h3 className="text-xl font-bold text-white">{documentor.full_name}</h3>
+                    <p className="text-white/60">@{documentor.username}</p>
+                    <p className="text-white/60">{documentor.phone}</p>
+                    <p className="text-white/60">{documentor.email || 'No email'}</p>
                     
                     {/* Routes assigned */}
                     <div className="mt-4">
                       <p className="text-white/60 text-sm mb-2">Assigned Routes:</p>
-                      {contractorRoutes.length === 0 ? (
+                      {documentorRoutes.length === 0 ? (
                         <p className="text-yellow-400 text-sm">No routes assigned</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          {contractorRoutes.map(route => (
+                          {documentorRoutes.map(route => (
                             <span key={route.id} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
                               {route.name} ({route.bookings?.length || 0} stops)
                             </span>
@@ -1704,43 +1704,43 @@ function ContractorsPage() {
                   
                   <div className="flex flex-col gap-2">
                     <button
-                      onClick={() => openContractorDetails(contractor)}
+                      onClick={() => openDocumentorDetails(documentor)}
                       className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
                       title="View Details & Earnings"
                     >
                       <Eye className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => openEditContractor(contractor)}
+                      onClick={() => openEditDocumentor(documentor)}
                       className="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30"
-                      title="Edit Contractor"
-                      data-testid={`edit-contractor-${contractor.id}`}
+                      title="Edit Documentor"
+                      data-testid={`edit-documentor-${documentor.id}`}
                     >
                       <Edit className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => sendNotification(contractor)}
+                      onClick={() => sendNotification(documentor)}
                       className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30"
                       title="Send Notification"
                     >
                       <Bell className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => sendSMS(contractor)}
+                      onClick={() => sendSMS(documentor)}
                       className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
                       title="Send SMS"
                     >
                       <Phone className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => resetPassword(contractor.id)}
+                      onClick={() => resetPassword(documentor.id)}
                       className="p-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30"
                       title="Reset Password"
                     >
                       <Key className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => deleteContractor(contractor.id)}
+                      onClick={() => deleteDocumentor(documentor.id)}
                       className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
                       title="Delete"
                     >
@@ -1754,9 +1754,9 @@ function ContractorsPage() {
         </div>
       )}
 
-      {/* Contractor Detail Modal with Earnings */}
-      {selectedContractor && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => { setSelectedContractor(null); setContractorEarnings(null); }}>
+      {/* Documentor Detail Modal with Earnings */}
+      {selectedDocumentor && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => { setSelectedDocumentor(null); setDocumentorEarnings(null); }}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1765,10 +1765,10 @@ function ContractorsPage() {
           >
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-white">{selectedContractor.full_name}</h2>
-                <p className="text-white/60">@{selectedContractor.username}</p>
+                <h2 className="text-2xl font-bold text-white">{selectedDocumentor.full_name}</h2>
+                <p className="text-white/60">@{selectedDocumentor.username}</p>
               </div>
-              <button onClick={() => { setSelectedContractor(null); setContractorEarnings(null); }} className="text-white/60 hover:text-white">
+              <button onClick={() => { setSelectedDocumentor(null); setDocumentorEarnings(null); }} className="text-white/60 hover:text-white">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1777,12 +1777,12 @@ function ContractorsPage() {
               {/* Contact Info */}
               <div className="bg-white/10 rounded-xl p-4">
                 <h3 className="text-white font-semibold mb-3">Contact Information</h3>
-                <p className="text-white/80"><Phone className="w-4 h-4 inline mr-2" />{selectedContractor.phone}</p>
-                <p className="text-white/80"><Mail className="w-4 h-4 inline mr-2" />{selectedContractor.email || 'No email'}</p>
+                <p className="text-white/80"><Phone className="w-4 h-4 inline mr-2" />{selectedDocumentor.phone}</p>
+                <p className="text-white/80"><Mail className="w-4 h-4 inline mr-2" />{selectedDocumentor.email || 'No email'}</p>
               </div>
 
               {/* Earnings Summary */}
-              {contractorEarnings && (
+              {documentorEarnings && (
                 <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl p-4 border border-green-500/30">
                   <h3 className="text-green-400 font-semibold mb-4 flex items-center gap-2">
                     <DollarSign className="w-5 h-5" />
@@ -1791,43 +1791,43 @@ function ContractorsPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-white/60 text-sm">This Week</p>
-                      <p className="text-2xl font-bold text-green-400">${(contractorEarnings.this_week_earnings || 0).toFixed(2)}</p>
-                      <p className="text-white/40 text-xs">{contractorEarnings.this_week_stops || 0} stops</p>
+                      <p className="text-2xl font-bold text-green-400">${(documentorEarnings.this_week_earnings || 0).toFixed(2)}</p>
+                      <p className="text-white/40 text-xs">{documentorEarnings.this_week_stops || 0} stops</p>
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Total Earnings</p>
-                      <p className="text-2xl font-bold text-white">${(contractorEarnings.total_earnings || 0).toFixed(2)}</p>
-                      <p className="text-white/40 text-xs">{contractorEarnings.total_completed_stops || 0} stops</p>
+                      <p className="text-2xl font-bold text-white">${(documentorEarnings.total_earnings || 0).toFixed(2)}</p>
+                      <p className="text-white/40 text-xs">{documentorEarnings.total_completed_stops || 0} stops</p>
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Total Paid</p>
-                      <p className="text-2xl font-bold text-blue-400">${(contractorEarnings.total_paid || 0).toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-blue-400">${(documentorEarnings.total_paid || 0).toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Owed</p>
-                      <p className={`text-2xl font-bold ${(contractorEarnings.unpaid_balance || 0) > 0 ? 'text-yellow-400' : 'text-white/60'}`}>
-                        ${(contractorEarnings.unpaid_balance || 0).toFixed(2)}
+                      <p className={`text-2xl font-bold ${(documentorEarnings.unpaid_balance || 0) > 0 ? 'text-yellow-400' : 'text-white/60'}`}>
+                        ${(documentorEarnings.unpaid_balance || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>
                   
                   {/* CNS Stops */}
-                  {contractorEarnings.total_cns_stops > 0 && (
+                  {documentorEarnings.total_cns_stops > 0 && (
                     <div className="mt-4 bg-red-500/20 rounded-lg p-3">
                       <p className="text-red-400 text-sm">
-                        <strong>{contractorEarnings.total_cns_stops}</strong> CNS stops (Cannot Service - no pay)
+                        <strong>{documentorEarnings.total_cns_stops}</strong> CNS stops (Cannot Service - no pay)
                       </p>
                     </div>
                   )}
 
                   {/* Pay Button */}
-                  {(contractorEarnings.unpaid_balance || 0) > 0 && (
+                  {(documentorEarnings.unpaid_balance || 0) > 0 && (
                     <button
-                      onClick={() => { setPayAmount(contractorEarnings.unpaid_balance.toFixed(2)); setShowPayModal(true); }}
+                      onClick={() => { setPayAmount(documentorEarnings.unpaid_balance.toFixed(2)); setShowPayModal(true); }}
                       className="mt-4 w-full py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 flex items-center justify-center gap-2"
                     >
                       <DollarSign className="w-5 h-5" />
-                      Pay ${(contractorEarnings.unpaid_balance || 0).toFixed(2)} Now
+                      Pay ${(documentorEarnings.unpaid_balance || 0).toFixed(2)} Now
                     </button>
                   )}
                 </div>
@@ -1836,11 +1836,11 @@ function ContractorsPage() {
               {/* Routes */}
               <div className="bg-white/10 rounded-xl p-4">
                 <h3 className="text-white font-semibold mb-3">Assigned Routes</h3>
-                {getContractorRoutes(selectedContractor.id).length === 0 ? (
+                {getDocumentorRoutes(selectedDocumentor.id).length === 0 ? (
                   <p className="text-white/60">No routes assigned</p>
                 ) : (
                   <div className="space-y-2">
-                    {getContractorRoutes(selectedContractor.id).map(route => (
+                    {getDocumentorRoutes(selectedDocumentor.id).map(route => (
                       <div key={route.id} className="bg-white/5 rounded-lg p-3">
                         <p className="text-white font-semibold">{route.name}</p>
                         <p className="text-white/60 text-sm">{route.area}</p>
@@ -1852,11 +1852,11 @@ function ContractorsPage() {
               </div>
 
               {/* Payment History */}
-              {contractorEarnings?.payment_history?.length > 0 && (
+              {documentorEarnings?.payment_history?.length > 0 && (
                 <div className="bg-white/10 rounded-xl p-4">
                   <h3 className="text-white font-semibold mb-3">Payment History</h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {contractorEarnings.payment_history.map((payment, i) => (
+                    {documentorEarnings.payment_history.map((payment, i) => (
                       <div key={i} className="flex justify-between items-center py-2 border-b border-white/10 last:border-0">
                         <div>
                           <p className="text-white">${payment.amount.toFixed(2)}</p>
@@ -1872,14 +1872,14 @@ function ContractorsPage() {
               {/* Quick Actions */}
               <div className="flex gap-3">
                 <button
-                  onClick={() => sendSMS(selectedContractor)}
+                  onClick={() => sendSMS(selectedDocumentor)}
                   className="flex-1 py-3 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2"
                 >
                   <Phone className="w-5 h-5" />
                   Send SMS
                 </button>
                 <button
-                  onClick={() => resetPassword(selectedContractor.id)}
+                  onClick={() => resetPassword(selectedDocumentor.id)}
                   className="flex-1 py-3 bg-yellow-500 text-white rounded-xl flex items-center justify-center gap-2"
                 >
                   <Key className="w-5 h-5" />
@@ -1891,8 +1891,8 @@ function ContractorsPage() {
         </div>
       )}
 
-      {/* Pay Contractor Modal */}
-      {showPayModal && selectedContractor && (
+      {/* Pay Documentor Modal */}
+      {showPayModal && selectedDocumentor && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[60]" onClick={() => setShowPayModal(false)}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -1900,8 +1900,8 @@ function ContractorsPage() {
             className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
             onClick={e => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-white mb-2">Pay {selectedContractor.full_name}</h2>
-            <p className="text-white/60 mb-6">Record payment to contractor</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Pay {selectedDocumentor.full_name}</h2>
+            <p className="text-white/60 mb-6">Record payment to documentor</p>
             
             <div className="space-y-4">
               <div>
@@ -1949,7 +1949,7 @@ function ContractorsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={payContractor}
+                  onClick={payDocumentor}
                   className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-bold"
                 >
                   Record Payment
@@ -1960,7 +1960,7 @@ function ContractorsPage() {
         </div>
       )}
 
-      {/* Create Contractor Modal */}
+      {/* Create Documentor Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setShowCreateModal(false)}>
           <motion.div
@@ -1969,45 +1969,45 @@ function ContractorsPage() {
             className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
             onClick={e => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-white mb-6">Create Contractor Account</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">Create Documentor Account</h2>
             <div className="space-y-4">
               <input
                 type="text"
                 placeholder="Username *"
-                value={newContractor.username}
-                onChange={(e) => setNewContractor(prev => ({ ...prev, username: e.target.value }))}
+                value={newDocumentor.username}
+                onChange={(e) => setNewDocumentor(prev => ({ ...prev, username: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="contractor-username"
+                data-testid="documentor-username"
               />
               <input
                 type="password"
                 placeholder="Password *"
-                value={newContractor.password}
-                onChange={(e) => setNewContractor(prev => ({ ...prev, password: e.target.value }))}
+                value={newDocumentor.password}
+                onChange={(e) => setNewDocumentor(prev => ({ ...prev, password: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="contractor-password"
+                data-testid="documentor-password"
               />
               <input
                 type="text"
                 placeholder="Full Name *"
-                value={newContractor.full_name}
-                onChange={(e) => setNewContractor(prev => ({ ...prev, full_name: e.target.value }))}
+                value={newDocumentor.full_name}
+                onChange={(e) => setNewDocumentor(prev => ({ ...prev, full_name: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="contractor-fullname"
+                data-testid="documentor-fullname"
               />
               <input
                 type="tel"
                 placeholder="Phone Number *"
-                value={newContractor.phone}
-                onChange={(e) => setNewContractor(prev => ({ ...prev, phone: e.target.value }))}
+                value={newDocumentor.phone}
+                onChange={(e) => setNewDocumentor(prev => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-                data-testid="contractor-phone"
+                data-testid="documentor-phone"
               />
               <input
                 type="email"
                 placeholder="Email (optional)"
-                value={newContractor.email}
-                onChange={(e) => setNewContractor(prev => ({ ...prev, email: e.target.value }))}
+                value={newDocumentor.email}
+                onChange={(e) => setNewDocumentor(prev => ({ ...prev, email: e.target.value }))}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
               />
               <div className="flex gap-3 pt-4">
@@ -2018,9 +2018,9 @@ function ContractorsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={createContractor}
+                  onClick={createDocumentor}
                   className="flex-1 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600"
-                  data-testid="save-contractor-btn"
+                  data-testid="save-documentor-btn"
                 >
                   Create Account
                 </button>
@@ -2031,7 +2031,7 @@ function ContractorsPage() {
       )}
 
       {/* SMS Modal */}
-      {showSMSModal && smsContractor && (
+      {showSMSModal && smsDocumentor && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={() => setShowSMSModal(false)}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -2043,9 +2043,9 @@ function ContractorsPage() {
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-green-400" />
-                  SMS to {smsContractor.full_name}
+                  SMS to {smsDocumentor.full_name}
                 </h2>
-                <p className="text-white/60 text-sm">{smsContractor.phone}</p>
+                <p className="text-white/60 text-sm">{smsDocumentor.phone}</p>
               </div>
               <button onClick={() => setShowSMSModal(false)} className="text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
@@ -2118,8 +2118,8 @@ function ContractorsPage() {
         </div>
       )}
 
-      {/* Edit Contractor Modal */}
-      {showEditModal && editingContractor && (
+      {/* Edit Documentor Modal */}
+      {showEditModal && editingDocumentor && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={() => setShowEditModal(false)}>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -2130,7 +2130,7 @@ function ContractorsPage() {
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Edit className="w-5 h-5 text-indigo-400" />
-                Edit Contractor
+                Edit Documentor
               </h2>
               <button onClick={() => setShowEditModal(false)} className="text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
@@ -2142,8 +2142,8 @@ function ContractorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Full Name</label>
                 <input
                   type="text"
-                  value={editingContractor.full_name || ''}
-                  onChange={(e) => setEditingContractor({...editingContractor, full_name: e.target.value})}
+                  value={editingDocumentor.full_name || ''}
+                  onChange={(e) => setEditingDocumentor({...editingDocumentor, full_name: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2151,8 +2151,8 @@ function ContractorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Email</label>
                 <input
                   type="email"
-                  value={editingContractor.email || ''}
-                  onChange={(e) => setEditingContractor({...editingContractor, email: e.target.value})}
+                  value={editingDocumentor.email || ''}
+                  onChange={(e) => setEditingDocumentor({...editingDocumentor, email: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2160,8 +2160,8 @@ function ContractorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Phone</label>
                 <input
                   type="tel"
-                  value={editingContractor.phone || ''}
-                  onChange={(e) => setEditingContractor({...editingContractor, phone: e.target.value})}
+                  value={editingDocumentor.phone || ''}
+                  onChange={(e) => setEditingDocumentor({...editingDocumentor, phone: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2169,8 +2169,8 @@ function ContractorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Address</label>
                 <input
                   type="text"
-                  value={editingContractor.address || ''}
-                  onChange={(e) => setEditingContractor({...editingContractor, address: e.target.value})}
+                  value={editingDocumentor.address || ''}
+                  onChange={(e) => setEditingDocumentor({...editingDocumentor, address: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                 />
               </div>
@@ -2178,8 +2178,8 @@ function ContractorsPage() {
                 <label className="block text-white/60 text-sm mb-1">Pay Rate (per stop)</label>
                 <input
                   type="number"
-                  value={editingContractor.pay_rate || ''}
-                  onChange={(e) => setEditingContractor({...editingContractor, pay_rate: parseFloat(e.target.value)})}
+                  value={editingDocumentor.pay_rate || ''}
+                  onChange={(e) => setEditingDocumentor({...editingDocumentor, pay_rate: parseFloat(e.target.value)})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
                   step="0.01"
                 />
@@ -2187,16 +2187,16 @@ function ContractorsPage() {
               <div>
                 <label className="block text-white/60 text-sm mb-1">Notes</label>
                 <textarea
-                  value={editingContractor.notes || ''}
-                  onChange={(e) => setEditingContractor({...editingContractor, notes: e.target.value})}
+                  value={editingDocumentor.notes || ''}
+                  onChange={(e) => setEditingDocumentor({...editingDocumentor, notes: e.target.value})}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white h-20"
                 />
               </div>
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
-                  checked={editingContractor.is_active !== false}
-                  onChange={(e) => setEditingContractor({...editingContractor, is_active: e.target.checked})}
+                  checked={editingDocumentor.is_active !== false}
+                  onChange={(e) => setEditingDocumentor({...editingDocumentor, is_active: e.target.checked})}
                   className="w-5 h-5"
                 />
                 <label className="text-white">Active</label>
@@ -2210,9 +2210,9 @@ function ContractorsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={saveContractorEdit}
+                  onClick={saveDocumentorEdit}
                   className="flex-1 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600"
-                  data-testid="save-contractor-edit-btn"
+                  data-testid="save-documentor-edit-btn"
                 >
                   Save Changes
                 </button>
@@ -2228,7 +2228,7 @@ function ContractorsPage() {
 // Routes Management
 function RoutesPage() {
   const [routes, setRoutes] = useState([]);
-  const [contractors, setContractors] = useState([]);
+  const [documentors, setDocumentors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCombineModal, setShowCombineModal] = useState(false);
@@ -2238,7 +2238,7 @@ function RoutesPage() {
 
   useEffect(() => {
     fetchRoutes();
-    fetchContractors();
+    fetchDocumentors();
   }, []);
 
   const fetchRoutes = async () => {
@@ -2248,7 +2248,7 @@ function RoutesPage() {
       const data = await res.json();
       // Filter out assigned routes (only show pending/unassigned)
       const pendingRoutes = (data.routes || []).filter(r => 
-        !r.assigned_contractor_id && r.status !== 'assigned'
+        !r.assigned_documentor_id && r.status !== 'assigned'
       );
       setRoutes(pendingRoutes);
     } catch (err) {
@@ -2258,14 +2258,14 @@ function RoutesPage() {
     }
   };
 
-  const fetchContractors = async () => {
+  const fetchDocumentors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setContractors(data.contractors || []);
+      setDocumentors(data.documentors || []);
     } catch (err) {
-      console.error('Failed to load contractors');
+      console.error('Failed to load documentors');
     }
   };
 
@@ -2291,12 +2291,12 @@ function RoutesPage() {
     }
   };
 
-  const assignRoute = async (routeId, contractorId) => {
+  const assignRoute = async (routeId, documentorId) => {
     try {
       const res = await fetch(`${API_URL}/api/admin/routes/${routeId}/assign`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ route_id: routeId, contractor_id: contractorId })
+        body: JSON.stringify({ route_id: routeId, documentor_id: documentorId })
       });
       if (!res.ok) throw new Error('Failed to assign');
       toast.success('Route assigned and moved from pending!');
@@ -2434,8 +2434,8 @@ function RoutesPage() {
   }, {});
 
   // Filter only pending (unassigned) routes
-  const pendingRoutes = routes.filter(r => !r.assigned_contractor_id);
-  const assignedRoutes = routes.filter(r => r.assigned_contractor_id);
+  const pendingRoutes = routes.filter(r => !r.assigned_documentor_id);
+  const assignedRoutes = routes.filter(r => r.assigned_documentor_id);
 
   if (loading) return <LoadingSpinner />;
 
@@ -2495,7 +2495,7 @@ function RoutesPage() {
       {/* Info Box */}
       <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 text-blue-200 text-sm">
         <p>📍 Routes are automatically grouped by <strong>zip code</strong> (max 120 bookings per route).</p>
-        <p className="mt-1">💰 Contractor pay: <strong>$11 per stop</strong> | Select routes to combine or delete them.</p>
+        <p className="mt-1">💰 Documentor pay: <strong>$11 per stop</strong> | Select routes to combine or delete them.</p>
         <p className="mt-1">✅ Once assigned, routes automatically move out of this list.</p>
       </div>
 
@@ -2510,7 +2510,7 @@ function RoutesPage() {
           {/* Group by Zip Code */}
           {Object.entries(groupedRoutes)
             .map(([zip, zipRoutes]) => {
-              const pendingInZip = zipRoutes.filter(r => !r.assigned_contractor_id);
+              const pendingInZip = zipRoutes.filter(r => !r.assigned_documentor_id);
               if (pendingInZip.length === 0) return null;
               
               return (
@@ -2550,7 +2550,7 @@ function RoutesPage() {
                                   {route.bookings?.length || 0} / 120 stops
                                 </p>
                                 <p className="text-green-400 text-sm font-bold">
-                                  ${((route.bookings?.length || 0) * 11).toFixed(2)} contractor pay
+                                  ${((route.bookings?.length || 0) * 11).toFixed(2)} documentor pay
                                 </p>
                                 {route.optimized && (
                                   <p className="text-purple-400 text-sm">
@@ -2573,12 +2573,12 @@ function RoutesPage() {
                             <div>
                               <p className="text-white/60 text-sm mb-2">Assign to:</p>
                               <select
-                                value={route.assigned_contractor_id || ''}
+                                value={route.assigned_documentor_id || ''}
                                 onChange={(e) => assignRoute(route.id, e.target.value)}
                                 className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white [&>option]:text-black"
                               >
                                 <option value="">Unassigned</option>
-                                {contractors.map(c => (
+                                {documentors.map(c => (
                                   <option key={c.id} value={c.id}>{c.full_name}</option>
                                 ))}
                               </select>
@@ -2611,23 +2611,23 @@ function RoutesPage() {
           </h2>
           <div className="space-y-3">
             {assignedRoutes.map((route) => {
-              const contractor = contractors.find(c => c.id === route.assigned_contractor_id);
+              const documentor = documentors.find(c => c.id === route.assigned_documentor_id);
               return (
                 <div key={route.id} className="bg-green-500/10 backdrop-blur rounded-2xl p-4 border border-green-500/20">
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="text-lg font-bold text-white">{route.name}</h3>
                       <p className="text-green-400 text-sm">
-                        Assigned to: {contractor?.full_name || 'Unknown'} | {route.bookings?.length || 0} stops
+                        Assigned to: {documentor?.full_name || 'Unknown'} | {route.bookings?.length || 0} stops
                       </p>
                     </div>
                     <select
-                      value={route.assigned_contractor_id || ''}
+                      value={route.assigned_documentor_id || ''}
                       onChange={(e) => assignRoute(route.id, e.target.value)}
                       className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
                     >
                       <option value="">Unassign</option>
-                      {contractors.map(c => (
+                      {documentors.map(c => (
                         <option key={c.id} value={c.id}>{c.full_name}</option>
                       ))}
                     </select>
@@ -2962,9 +2962,9 @@ function SettingsPage() {
       <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
         <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <DollarSign className="text-green-400" />
-          Contractor Pay Rate
+          Documentor Pay Rate
         </h2>
-        <p className="text-white/60 mb-4">Set the amount contractors earn per completed stop.</p>
+        <p className="text-white/60 mb-4">Set the amount documentors earn per completed stop.</p>
         
         <div className="flex items-center gap-4">
           <div className="flex-1 max-w-xs">
@@ -3006,7 +3006,7 @@ function SettingsPage() {
           <Truck className="text-blue-400" />
           Truck Rental Prices
         </h2>
-        <p className="text-white/60 mb-4">Set weekly rental prices for contractor trucks.</p>
+        <p className="text-white/60 mb-4">Set weekly rental prices for documentor trucks.</p>
         
         <div className="grid md:grid-cols-2 gap-6">
           {/* Small Truck */}
@@ -3101,9 +3101,9 @@ function PayrollPage() {
     }
   };
 
-  const processPayroll = async (contractorId) => {
+  const processPayroll = async (documentorId) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/payroll/process/${contractorId}`, {
+      const res = await fetch(`${API_URL}/api/admin/payroll/process/${documentorId}`, {
         method: 'POST',
         headers: getAuthHeaders()
       });
@@ -3125,7 +3125,7 @@ function PayrollPage() {
       });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
-      toast.success(`Processed $${data.total_paid.toFixed(2)} for ${data.processed.length} contractors`);
+      toast.success(`Processed $${data.total_paid.toFixed(2)} for ${data.processed.length} documentors`);
       fetchPayrollData();
     } catch (err) {
       toast.error('Failed to process payroll');
@@ -3144,7 +3144,7 @@ function PayrollPage() {
       const stubData = await res.json();
       setSelectedPayStub({
         id: stubData.paystub_id,
-        contractor_name: stubData.contractor?.name || record.contractor_name,
+        documentor_name: stubData.documentor?.name || record.documentor_name,
         period_start: stubData.pay_period?.start,
         period_end: stubData.pay_period?.end,
         stops_paid: stubData.earnings?.completed_stops || record.stops_paid,
@@ -3167,7 +3167,7 @@ function PayrollPage() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Pay Stub - ${selectedPayStub.contractor_name}</title>
+        <title>Pay Stub - ${selectedPayStub.documentor_name}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
           .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
@@ -3191,7 +3191,7 @@ function PayrollPage() {
         
         <div class="stub-info">
           <div>
-            <strong>Employee:</strong> ${selectedPayStub.contractor_name}<br>
+            <strong>Employee:</strong> ${selectedPayStub.documentor_name}<br>
             <strong>Period:</strong> ${new Date(selectedPayStub.period_start).toLocaleDateString()} - ${new Date(selectedPayStub.period_end).toLocaleDateString()}
           </div>
           <div style="text-align: right;">
@@ -3302,30 +3302,30 @@ function PayrollPage() {
 
       {/* Pending Payments */}
       <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
-        <h2 className="text-lg font-bold text-white mb-4">Pending Contractor Payments</h2>
+        <h2 className="text-lg font-bold text-white mb-4">Pending Documentor Payments</h2>
         {pendingPayroll.length === 0 ? (
           <p className="text-white/60 text-center py-8">No pending payments</p>
         ) : (
           <div className="space-y-3">
-            {pendingPayroll.map((contractor) => (
-              <div key={contractor.contractor_id} className="bg-white/5 rounded-xl p-4 flex justify-between items-center flex-wrap gap-4">
+            {pendingPayroll.map((documentor) => (
+              <div key={documentor.documentor_id} className="bg-white/5 rounded-xl p-4 flex justify-between items-center flex-wrap gap-4">
                 <div>
-                  <p className="text-white font-semibold">{contractor.contractor_name}</p>
-                  <p className="text-white/60 text-sm">{contractor.phone}</p>
+                  <p className="text-white font-semibold">{documentor.documentor_name}</p>
+                  <p className="text-white/60 text-sm">{documentor.phone}</p>
                   <div className="flex gap-4 mt-1 text-sm">
-                    <span className="text-green-400">{contractor.completed_stops} completed</span>
-                    <span className="text-red-400">{contractor.cns_stops} CNS (no pay)</span>
+                    <span className="text-green-400">{documentor.completed_stops} completed</span>
+                    <span className="text-red-400">{documentor.cns_stops} CNS (no pay)</span>
                   </div>
-                  {contractor.last_paid && (
-                    <p className="text-white/40 text-xs mt-1">Last paid: {new Date(contractor.last_paid).toLocaleDateString()}</p>
+                  {documentor.last_paid && (
+                    <p className="text-white/40 text-xs mt-1">Last paid: {new Date(documentor.last_paid).toLocaleDateString()}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-2xl font-bold text-green-400">${contractor.unpaid_amount.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-green-400">${documentor.unpaid_amount.toFixed(2)}</span>
                   <button
-                    onClick={() => processPayroll(contractor.contractor_id)}
+                    onClick={() => processPayroll(documentor.documentor_id)}
                     className="px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600"
-                    data-testid={`pay-contractor-${contractor.contractor_id}`}
+                    data-testid={`pay-documentor-${documentor.documentor_id}`}
                   >
                     Pay Now
                   </button>
@@ -3347,7 +3347,7 @@ function PayrollPage() {
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="py-3 px-4 text-white/60 text-sm">Date</th>
-                  <th className="py-3 px-4 text-white/60 text-sm">Contractor</th>
+                  <th className="py-3 px-4 text-white/60 text-sm">Documentor</th>
                   <th className="py-3 px-4 text-white/60 text-sm">Stops</th>
                   <th className="py-3 px-4 text-white/60 text-sm">Amount</th>
                   <th className="py-3 px-4 text-white/60 text-sm">Pay Stub</th>
@@ -3357,7 +3357,7 @@ function PayrollPage() {
                 {payrollHistory.slice(0, 20).map((record) => (
                   <tr key={record.id} className="border-b border-white/5 hover:bg-white/5">
                     <td className="py-3 px-4 text-white">{new Date(record.paid_at).toLocaleDateString()}</td>
-                    <td className="py-3 px-4 text-white">{record.contractor_name}</td>
+                    <td className="py-3 px-4 text-white">{record.documentor_name}</td>
                     <td className="py-3 px-4 text-white">{record.stops_paid}</td>
                     <td className="py-3 px-4 text-green-400 font-bold">${record.amount.toFixed(2)}</td>
                     <td className="py-3 px-4">
@@ -3417,8 +3417,8 @@ function PayrollPage() {
               {/* Employee & Period Info */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-white/60 text-sm">Contractor</p>
-                  <p className="text-white font-semibold text-lg">{selectedPayStub.contractor_name}</p>
+                  <p className="text-white/60 text-sm">Documentor</p>
+                  <p className="text-white font-semibold text-lg">{selectedPayStub.documentor_name}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-white/60 text-sm">Pay Period</p>
@@ -3671,15 +3671,15 @@ function SMSLogsPage() {
 
 
 
-// Contracts Management Page
+// Documents Management Page
 function DocumentsPage() {
-  const [contracts, setContracts] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
-  const [sendingContract, setSendingContract] = useState(null);
-  const [contractType, setContractType] = useState('weekly');
+  const [sendingDocument, setSendingDocument] = useState(null);
+  const [documentType, setDocumentType] = useState('weekly');
   const [clientEmail, setClientEmail] = useState('');
   const [pricePerService, setPricePerService] = useState('');
   const [bookings, setBookings] = useState([]);
@@ -3687,19 +3687,19 @@ function DocumentsPage() {
   const [newDocContent, setNewDocContent] = useState('');
 
   useEffect(() => {
-    fetchContracts();
+    fetchDocuments();
     fetchBookings();
     fetchDocuments();
   }, []);
 
-  const fetchContracts = async () => {
+  const fetchDocuments = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/contracts`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/documents`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
-      setContracts(data.contracts || []);
+      setDocuments(data.documents || []);
     } catch (err) {
-      toast.error('Failed to load contracts');
+      toast.error('Failed to load documents');
     } finally {
       setLoading(false);
     }
@@ -3707,7 +3707,7 @@ function DocumentsPage() {
 
   const fetchDocuments = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/contracts/documents`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/documents/documents`, { headers: getAuthHeaders() });
       if (!res.ok) return;
       const data = await res.json();
       setDocuments(data.documents || []);
@@ -3734,7 +3734,7 @@ function DocumentsPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/contracts/documents`, {
+      const res = await fetch(`${API_URL}/api/admin/documents/documents`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ title: newDocTitle, content: newDocContent })
@@ -3753,7 +3753,7 @@ function DocumentsPage() {
   const deleteDocument = async (docId) => {
     if (!window.confirm('Delete this document?')) return;
     try {
-      await fetch(`${API_URL}/api/admin/contracts/documents/${docId}`, {
+      await fetch(`${API_URL}/api/admin/documents/documents/${docId}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -3764,31 +3764,31 @@ function DocumentsPage() {
     }
   };
 
-  const sendContract = async () => {
-    if (!sendingContract || !clientEmail) {
+  const sendDocument = async () => {
+    if (!sendingDocument || !clientEmail) {
       toast.error('Please fill in all fields');
       return;
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/quotes/${sendingContract.id}/send-contract`, {
+      const res = await fetch(`${API_URL}/api/admin/quotes/${sendingDocument.id}/send-document`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          booking_id: sendingContract.id,
-          contract_type: contractType,
+          booking_id: sendingDocument.id,
+          document_type: documentType,
           client_email: clientEmail,
-          price_per_service: parseFloat(pricePerService) || sendingContract.total
+          price_per_service: parseFloat(pricePerService) || sendingDocument.total
         })
       });
 
-      if (!res.ok) throw new Error('Failed to send contract');
-      toast.success('Contract sent successfully!');
+      if (!res.ok) throw new Error('Failed to send document');
+      toast.success('Document sent successfully!');
       setShowSendModal(false);
-      setSendingContract(null);
+      setSendingDocument(null);
       setClientEmail('');
       setPricePerService('');
-      fetchContracts();
+      fetchDocuments();
     } catch (err) {
       toast.error(err.message);
     }
@@ -3796,15 +3796,15 @@ function DocumentsPage() {
 
   if (loading) return <LoadingSpinner />;
 
-  const pendingContracts = contracts.filter(c => c.status === 'pending');
-  const signedContracts = contracts.filter(c => c.status === 'signed');
+  const pendingDocuments = documents.filter(c => c.status === 'pending');
+  const signedDocuments = documents.filter(c => c.status === 'signed');
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
           <FileText className="text-purple-400" />
-          Service Contracts
+          Service Documents
         </h1>
         <div className="flex gap-2">
           <button
@@ -3819,7 +3819,7 @@ function DocumentsPage() {
             className="px-4 py-2 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
-            Send New Contract
+            Send New Document
           </button>
         </div>
       </div>
@@ -3827,15 +3827,15 @@ function DocumentsPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white/10 rounded-2xl p-4 text-center">
-          <p className="text-3xl font-bold text-white">{contracts.length}</p>
-          <p className="text-white/60">Total Contracts</p>
+          <p className="text-3xl font-bold text-white">{documents.length}</p>
+          <p className="text-white/60">Total Documents</p>
         </div>
         <div className="bg-yellow-500/20 rounded-2xl p-4 text-center">
-          <p className="text-3xl font-bold text-yellow-400">{pendingContracts.length}</p>
+          <p className="text-3xl font-bold text-yellow-400">{pendingDocuments.length}</p>
           <p className="text-white/60">Pending Signature</p>
         </div>
         <div className="bg-green-500/20 rounded-2xl p-4 text-center">
-          <p className="text-3xl font-bold text-green-400">{signedContracts.length}</p>
+          <p className="text-3xl font-bold text-green-400">{signedDocuments.length}</p>
           <p className="text-white/60">Signed</p>
         </div>
         <div className="bg-blue-500/20 rounded-2xl p-4 text-center">
@@ -3844,10 +3844,10 @@ function DocumentsPage() {
         </div>
       </div>
 
-      {/* Contract Documents */}
+      {/* Document Documents */}
       {documents.length > 0 && (
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-6">
-          <h2 className="text-lg font-bold text-blue-400 mb-4">Contract Documents</h2>
+          <h2 className="text-lg font-bold text-blue-400 mb-4">Document Documents</h2>
           <div className="space-y-3">
             {documents.map((doc) => (
               <div key={doc.id} className="bg-white/5 rounded-xl p-4">
@@ -3870,18 +3870,18 @@ function DocumentsPage() {
         </div>
       )}
 
-      {/* Pending Contracts */}
-      {pendingContracts.length > 0 && (
+      {/* Pending Documents */}
+      {pendingDocuments.length > 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-6">
           <h2 className="text-lg font-bold text-yellow-400 mb-4">Awaiting Signature</h2>
           <div className="space-y-3">
-            {pendingContracts.map((contract) => (
-              <div key={contract.id} className="bg-white/5 rounded-xl p-4">
+            {pendingDocuments.map((document) => (
+              <div key={document.id} className="bg-white/5 rounded-xl p-4">
                 <div className="flex justify-between items-center flex-wrap gap-4">
                   <div>
-                    <p className="text-white font-semibold">{contract.client_name || contract.client_email}</p>
-                    <p className="text-white/60 text-sm">{contract.frequency} Service - ${contract.price_per_service?.toFixed(2)}/visit</p>
-                    <p className="text-white/40 text-xs">Sent: {new Date(contract.sent_at).toLocaleDateString()}</p>
+                    <p className="text-white font-semibold">{document.client_name || document.client_email}</p>
+                    <p className="text-white/60 text-sm">{document.frequency} Service - ${document.price_per_service?.toFixed(2)}/visit</p>
+                    <p className="text-white/40 text-xs">Sent: {new Date(document.sent_at).toLocaleDateString()}</p>
                   </div>
                   <span className="px-3 py-1 bg-yellow-500/30 text-yellow-400 rounded-full text-sm">
                     Pending
@@ -3893,24 +3893,24 @@ function DocumentsPage() {
         </div>
       )}
 
-      {/* Signed Contracts */}
+      {/* Signed Documents */}
       <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
-        <h2 className="text-lg font-bold text-white mb-4">Signed Contracts</h2>
-        {signedContracts.length === 0 ? (
-          <p className="text-white/60 text-center py-8">No signed contracts yet</p>
+        <h2 className="text-lg font-bold text-white mb-4">Signed Documents</h2>
+        {signedDocuments.length === 0 ? (
+          <p className="text-white/60 text-center py-8">No signed documents yet</p>
         ) : (
           <div className="space-y-3">
-            {signedContracts.map((contract) => (
-              <div key={contract.id} className="bg-white/5 rounded-xl p-4">
+            {signedDocuments.map((document) => (
+              <div key={document.id} className="bg-white/5 rounded-xl p-4">
                 <div className="flex justify-between items-center flex-wrap gap-4">
                   <div>
-                    <p className="text-white font-semibold">{contract.client_name || contract.client_email}</p>
-                    <p className="text-white/60 text-sm">{contract.frequency} Service - ${contract.price_per_service?.toFixed(2)}/visit</p>
-                    <p className="text-green-400 text-xs">Signed: {new Date(contract.signed_at).toLocaleDateString()}</p>
+                    <p className="text-white font-semibold">{document.client_name || document.client_email}</p>
+                    <p className="text-white/60 text-sm">{document.frequency} Service - ${document.price_per_service?.toFixed(2)}/visit</p>
+                    <p className="text-green-400 text-xs">Signed: {new Date(document.signed_at).toLocaleDateString()}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    {contract.signature_data && (
-                      <img src={`${API_URL}${contract.signature_data}`} alt="Signature" className="h-10 bg-white rounded" />
+                    {document.signature_data && (
+                      <img src={`${API_URL}${document.signature_data}`} alt="Signature" className="h-10 bg-white rounded" />
                     )}
                     <span className="px-3 py-1 bg-green-500/30 text-green-400 rounded-full text-sm">
                       ✓ Signed
@@ -3923,7 +3923,7 @@ function DocumentsPage() {
         )}
       </div>
 
-      {/* Send Contract Modal */}
+      {/* Send Document Modal */}
       {showSendModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <motion.div
@@ -3933,7 +3933,7 @@ function DocumentsPage() {
           >
             <div className="p-6 border-b border-white/10">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-white">Send Service Contract</h2>
+                <h2 className="text-xl font-bold text-white">Send Service Document</h2>
                 <button onClick={() => setShowSendModal(false)} className="text-white/60 hover:text-white">
                   <X className="w-6 h-6" />
                 </button>
@@ -3944,10 +3944,10 @@ function DocumentsPage() {
               <div>
                 <label className="text-white/60 text-sm mb-1 block">Select Quote/Booking</label>
                 <select
-                  value={sendingContract?.id || ''}
+                  value={sendingDocument?.id || ''}
                   onChange={(e) => {
                     const booking = bookings.find(b => b.id === e.target.value);
-                    setSendingContract(booking);
+                    setSendingDocument(booking);
                     if (booking) {
                       setClientEmail(booking.customer_email || '');
                       setPricePerService(booking.total?.toString() || '');
@@ -3974,19 +3974,19 @@ function DocumentsPage() {
                 />
               </div>
 
-              {/* Contract Type */}
+              {/* Document Type */}
               <div>
                 <label className="text-white/60 text-sm mb-1 block">Service Frequency</label>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setContractType('weekly')}
-                    className={`flex-1 py-3 rounded-xl ${contractType === 'weekly' ? 'bg-purple-500 text-white' : 'bg-white/10 text-white/60'}`}
+                    onClick={() => setDocumentType('weekly')}
+                    className={`flex-1 py-3 rounded-xl ${documentType === 'weekly' ? 'bg-purple-500 text-white' : 'bg-white/10 text-white/60'}`}
                   >
                     Weekly
                   </button>
                   <button
-                    onClick={() => setContractType('biweekly')}
-                    className={`flex-1 py-3 rounded-xl ${contractType === 'biweekly' ? 'bg-purple-500 text-white' : 'bg-white/10 text-white/60'}`}
+                    onClick={() => setDocumentType('biweekly')}
+                    className={`flex-1 py-3 rounded-xl ${documentType === 'biweekly' ? 'bg-purple-500 text-white' : 'bg-white/10 text-white/60'}`}
                   >
                     Bi-Weekly
                   </button>
@@ -4006,12 +4006,12 @@ function DocumentsPage() {
               </div>
 
               <button
-                onClick={sendContract}
-                disabled={!sendingContract || !clientEmail}
+                onClick={sendDocument}
+                disabled={!sendingDocument || !clientEmail}
                 className="w-full py-4 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-600 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Send className="w-5 h-5" />
-                Send Contract
+                Send Document
               </button>
             </div>
           </motion.div>
@@ -4028,14 +4028,14 @@ function DocumentsPage() {
           >
             <div className="p-6 border-b border-white/10">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-white">Add Contract Document</h2>
+                <h2 className="text-xl font-bold text-white">Add Document Document</h2>
                 <button onClick={() => setShowDocModal(false)} className="text-white/60 hover:text-white">
                   <X className="w-6 h-6" />
                 </button>
               </div>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-white/60 text-sm">Copy and paste your contract document content below:</p>
+              <p className="text-white/60 text-sm">Copy and paste your document document content below:</p>
               
               <div>
                 <label className="text-white/60 text-sm mb-1 block">Document Title *</label>
@@ -4053,9 +4053,9 @@ function DocumentsPage() {
                 <textarea
                   value={newDocContent}
                   onChange={(e) => setNewDocContent(e.target.value)}
-                  placeholder="Paste your contract content here..."
+                  placeholder="Paste your document content here..."
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 min-h-[300px] font-mono text-sm"
-                  data-testid="contract-doc-content"
+                  data-testid="document-doc-content"
                 />
               </div>
 
@@ -4084,34 +4084,34 @@ function DocumentsPage() {
 }
 
 
-// Messages Page - 2-Way Admin-Contractor Messaging with Timestamps
+// Messages Page - 2-Way Admin-Documentor Messaging with Timestamps
 function MessagesPage() {
   const [messages, setMessages] = useState([]);
-  const [contractors, setContractors] = useState([]);
+  const [documentors, setDocumentors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
-  const [selectedContractor, setSelectedContractor] = useState(null);
+  const [selectedDocumentor, setSelectedDocumentor] = useState(null);
   const [messageThreads, setMessageThreads] = useState({});
 
   useEffect(() => {
-    fetchContractors();
+    fetchDocumentors();
     fetchAllMessages();
   }, []);
 
   useEffect(() => {
-    if (selectedContractor) {
-      fetchContractorThread(selectedContractor);
+    if (selectedDocumentor) {
+      fetchDocumentorThread(selectedDocumentor);
     }
-  }, [selectedContractor]);
+  }, [selectedDocumentor]);
 
-  const fetchContractors = async () => {
+  const fetchDocumentors = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/documentors`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setContractors(data.contractors || []);
+      setDocumentors(data.documentors || []);
     } catch (err) {
-      console.error('Failed to load contractors');
+      console.error('Failed to load documentors');
     } finally {
       setLoading(false);
     }
@@ -4119,7 +4119,7 @@ function MessagesPage() {
 
   const fetchAllMessages = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/contractors/all`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/sms/documentors/all`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setMessages(data.messages || []);
@@ -4128,39 +4128,39 @@ function MessagesPage() {
     }
   };
 
-  const fetchContractorThread = async (contractorId) => {
+  const fetchDocumentorThread = async (documentorId) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/contractor/history/${contractorId}`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/admin/sms/documentor/history/${documentorId}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setMessageThreads(prev => ({ ...prev, [contractorId]: data.messages || [] }));
+      setMessageThreads(prev => ({ ...prev, [documentorId]: data.messages || [] }));
     } catch (err) {
       console.error('Failed to load thread');
     }
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedContractor) {
-      if (!selectedContractor) toast.error('Please select a contractor');
+    if (!newMessage.trim() || !selectedDocumentor) {
+      if (!selectedDocumentor) toast.error('Please select a documentor');
       return;
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/sms/contractor`, {
+      const res = await fetch(`${API_URL}/api/admin/sms/documentor`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          contractor_id: selectedContractor,
+          documentor_id: selectedDocumentor,
           message: newMessage
         })
       });
       if (!res.ok) throw new Error('Failed to send');
       const data = await res.json();
       setNewMessage('');
-      fetchContractorThread(selectedContractor);
+      fetchDocumentorThread(selectedDocumentor);
       fetchAllMessages();
       if (data.status === 'sent') {
-        toast.success(`SMS sent to ${data.contractor_name}!`);
+        toast.success(`SMS sent to ${data.documentor_name}!`);
       } else {
         toast.info(`Message logged (${data.status})`);
       }
@@ -4181,18 +4181,18 @@ function MessagesPage() {
     });
   };
 
-  const getUnreadCount = (contractorId) => {
+  const getUnreadCount = (documentorId) => {
     return messages.filter(m => 
-      m.sender_id === contractorId && 
-      m.sender_type === 'contractor' && 
+      m.sender_id === documentorId && 
+      m.sender_type === 'documentor' && 
       !m.read
     ).length;
   };
 
   if (loading) return <LoadingSpinner />;
 
-  const currentThread = selectedContractor ? (messageThreads[selectedContractor] || []) : [];
-  const selectedContractorInfo = contractors.find(c => c.id === selectedContractor);
+  const currentThread = selectedDocumentor ? (messageThreads[selectedDocumentor] || []) : [];
+  const selectedDocumentorInfo = documentors.find(c => c.id === selectedDocumentor);
 
   return (
     <div className="space-y-6">
@@ -4202,21 +4202,21 @@ function MessagesPage() {
       </h1>
 
       <div className="grid md:grid-cols-3 gap-6 h-[600px]">
-        {/* Contractor List */}
+        {/* Documentor List */}
         <div className="bg-white/10 rounded-2xl p-4 overflow-y-auto">
-          <h3 className="text-white font-semibold mb-4">Contractors</h3>
+          <h3 className="text-white font-semibold mb-4">Documentors</h3>
           <div className="space-y-2">
-            {contractors.length === 0 ? (
-              <p className="text-white/60 text-sm">No contractors yet</p>
+            {documentors.length === 0 ? (
+              <p className="text-white/60 text-sm">No documentors yet</p>
             ) : (
-              contractors.map(c => {
+              documentors.map(c => {
                 const unread = getUnreadCount(c.id);
                 return (
                   <button
                     key={c.id}
-                    onClick={() => setSelectedContractor(c.id)}
+                    onClick={() => setSelectedDocumentor(c.id)}
                     className={`w-full text-left p-3 rounded-xl transition flex justify-between items-center ${
-                      selectedContractor === c.id ? 'bg-teal-500' : 'bg-white/10 hover:bg-white/20'
+                      selectedDocumentor === c.id ? 'bg-teal-500' : 'bg-white/10 hover:bg-white/20'
                     }`}
                   >
                     <div>
@@ -4237,25 +4237,25 @@ function MessagesPage() {
         <div className="md:col-span-2 bg-white/10 rounded-2xl p-4 flex flex-col">
           {/* Header */}
           <div className="pb-3 border-b border-white/20 mb-3">
-            {selectedContractorInfo ? (
+            {selectedDocumentorInfo ? (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center">
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold">{selectedContractorInfo.full_name}</h3>
-                  <p className="text-white/60 text-sm">{selectedContractorInfo.phone}</p>
+                  <h3 className="text-white font-semibold">{selectedDocumentorInfo.full_name}</h3>
+                  <p className="text-white/60 text-sm">{selectedDocumentorInfo.phone}</p>
                 </div>
               </div>
             ) : (
-              <p className="text-white/60">Select a contractor to start messaging</p>
+              <p className="text-white/60">Select a documentor to start messaging</p>
             )}
           </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-            {!selectedContractor ? (
-              <p className="text-white/60 text-center py-8">Select a contractor to view messages</p>
+            {!selectedDocumentor ? (
+              <p className="text-white/60 text-center py-8">Select a documentor to view messages</p>
             ) : currentThread.length === 0 ? (
               <p className="text-white/60 text-center py-8">No messages yet. Start a conversation!</p>
             ) : (
@@ -4288,7 +4288,7 @@ function MessagesPage() {
           </div>
 
           {/* Input */}
-          {selectedContractor && (
+          {selectedDocumentor && (
             <div className="flex gap-2">
               <input
                 type="text"
@@ -4656,7 +4656,7 @@ function CalendarPage() {
                   <p className="text-white/60 text-sm">{route.area}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-blue-400 text-sm">{route.contractor_name || 'Unassigned'}</p>
+                  <p className="text-blue-400 text-sm">{route.documentor_name || 'Unassigned'}</p>
                   <p className="text-white/60 text-sm">{route.bookings?.length || 0} stops</p>
                 </div>
               </div>
@@ -5721,10 +5721,10 @@ export default function AdminDashboard() {
         // Play URGENT sound if new released route
         if (available > lastReleasedCountRef.current && lastReleasedCountRef.current > 0) {
           playUrgentSound();
-          toast.error('⚠️ URGENT: Route Released by Contractor!', { duration: 10000 });
+          toast.error('⚠️ URGENT: Route Released by Documentor!', { duration: 10000 });
           showBrowserNotification({ 
             sender_name: '⚠️ URGENT', 
-            content: 'A contractor has released a route! Immediate action required.' 
+            content: 'A documentor has released a route! Immediate action required.' 
           });
         }
         lastReleasedCountRef.current = available;
@@ -5739,7 +5739,7 @@ export default function AdminDashboard() {
         const res = await fetch(`${API_URL}/api/admin/routes`, { headers: getAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
-        const pending = (data.routes || []).filter(r => !r.assigned_contractor_id).length;
+        const pending = (data.routes || []).filter(r => !r.assigned_documentor_id).length;
         setPendingRoutesCount(pending);
       } catch (err) {
         console.error('Failed to check pending routes:', err);
@@ -6035,9 +6035,9 @@ export default function AdminDashboard() {
           <Route path="unpaid-subscriptions" element={<UnpaidSubscriptionsPage />} />
           <Route path="revenue" element={<RevenuePage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
-          <Route path="contracts" element={<DocumentsPage />} />
+          <Route path="documents" element={<DocumentsPage />} />
           <Route path="deleted-subscriptions" element={<DeletedSubscriptionsPage />} />
-          <Route path="contractors" element={<ContractorsPage />} />
+          <Route path="documentors" element={<DocumentorsPage />} />
           <Route path="payroll" element={<PayrollPage />} />
           <Route path="sms-logs" element={<SMSLogsPage />} />
           <Route path="pending-routes" element={<RoutesPage />} />
