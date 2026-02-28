@@ -50,9 +50,32 @@ const SERVICES = [
     icon: Trash2,
     color: "bg-green-500",
     pricingType: "tiered",
-    bookingDays: [1, 2, 3], // Mon, Tue, Wed only (1=Mon, 2=Tue, 3=Wed)
+    bookingDays: [1, 2], // Mon, Tue only (1=Mon, 2=Tue)
     needsTime: false,
-    popupMessage: "Please set your recycling bins out the night before your scheduled service!"
+    popupMessage: "Please place your bins on the driveway the night before your scheduled service. We'll clean them during our hours of operation (8am-6pm)."
+  },
+  {
+    id: "trash_bin_cleaning",
+    name: "Trash Bin Cleaning",
+    description: "Power wash trash bins inside and out",
+    icon: Trash2,
+    color: "bg-slate-500",
+    pricingType: "tiered",
+    bookingDays: [1, 2], // Mon, Tue only
+    needsTime: false,
+    popupMessage: "Please place your bins on the driveway the night before your scheduled service. We'll clean them during our hours of operation (8am-6pm)."
+  },
+  {
+    id: "scent_bomb",
+    name: "Scent Bomb",
+    description: "Fresh fragrance for your freshly cleaned bins",
+    icon: Sparkles,
+    color: "bg-pink-500",
+    price: 5,
+    pricingType: "quantity",
+    bookingDays: [0, 1, 2, 3, 4, 5, 6], // Any day
+    needsTime: false,
+    isAddon: true
   },
   {
     id: "patio",
@@ -62,9 +85,9 @@ const SERVICES = [
     color: "bg-blue-500",
     price: 85,
     pricingType: "fixed",
-    bookingDays: [4, 5], // Thu, Fri only (4=Thu, 5=Fri)
+    bookingDays: [3, 4, 5], // Wed, Thu, Fri (3=Wed, 4=Thu, 5=Fri)
     needsTime: true,
-    timeSlots: ["09:00", "12:00", "15:00"] // 3-hour windows: 9am-12pm, 12pm-3pm, 3pm-6pm
+    timeSlots: ["09:00-12:00", "12:00-15:00", "15:00-18:00"] // 3-hour windows
   },
   {
     id: "driveway",
@@ -74,9 +97,9 @@ const SERVICES = [
     color: "bg-orange-500",
     price: 85,
     pricingType: "fixed",
-    bookingDays: [4, 5], // Thu, Fri only
+    bookingDays: [3, 4, 5], // Wed, Thu, Fri
     needsTime: true,
-    timeSlots: ["09:00", "12:00", "15:00"] // 3-hour windows
+    timeSlots: ["09:00-12:00", "12:00-15:00", "15:00-18:00"]
   },
   {
     id: "dumpster",
@@ -85,9 +108,9 @@ const SERVICES = [
     icon: Warehouse,
     color: "bg-purple-500",
     pricingType: "tiered",
-    bookingDays: [4, 5], // Thu, Fri only
+    bookingDays: [3, 4, 5], // Wed, Thu, Fri
     needsTime: true,
-    timeSlots: ["09:00", "12:00", "15:00"] // 3-hour windows
+    timeSlots: ["09:00-12:00", "12:00-15:00", "15:00-18:00"]
   },
   {
     id: "home_powerwash",
@@ -98,7 +121,7 @@ const SERVICES = [
     pricingType: "quote",
     bookingDays: [4, 5], // Thu, Fri only
     needsTime: true,
-    timeSlots: ["09:00", "12:00", "15:00"] // 3-hour windows
+    timeSlots: ["09:00-12:00", "12:00-15:00", "15:00-18:00"]
   },
   {
     id: "construction_cleanup",
@@ -107,8 +130,8 @@ const SERVICES = [
     icon: HardHat,
     color: "bg-amber-500",
     pricingType: "quote",
-    bookingDays: [0, 1, 2, 3, 4], // Any weekday
-    needsTime: false // Day only, no time
+    bookingDays: [4, 5], // Thu, Fri only
+    needsTime: false
   },
   {
     id: "commercial",
@@ -117,8 +140,8 @@ const SERVICES = [
     icon: Building2,
     color: "bg-indigo-500",
     pricingType: "quote",
-    bookingDays: [0, 1, 2, 3, 4], // Any weekday
-    needsTime: false // Day only, no time
+    bookingDays: [4, 5], // Thu, Fri only
+    needsTime: false
   }
 ];
 
