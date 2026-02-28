@@ -1150,7 +1150,7 @@ class ETANotificationAPITester:
     def run_all_tests(self):
         """Run all ETA notification and SMS API tests"""
         print("=" * 80)
-        print("🚀 STARTING ETA NOTIFICATION & SMS API TESTING")
+        print("🚀 STARTING SMS SERVICE & PAYMENT REMINDER TESTING")
         print("=" * 80)
         print(f"Testing Backend URL: {self.base_url}")
         print(f"Admin Credentials: {self.admin_username}")
