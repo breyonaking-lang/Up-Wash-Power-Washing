@@ -490,5 +490,29 @@ Power washing business website with booking system, admin dashboard, contractor 
   - Additional message textarea
   - SMS notification to customer
 
+### Feb 28, 2026 - Session 7 Updates
+
+#### Subscription Auto-Start Date ✅ NEW
+- [x] Removed manual calendar for "When should your subscription begin?"
+- [x] Auto-calculates nearest available date based on selected service days
+- [x] Shows auto-calculated date in green info box
+- [x] Works throughout entire booking platform
+
+#### Message Notification Popups ✅ NEW
+- [x] Admin Messages: Popup notification when contractor sends message
+  - Shows contractor's name (e.g., "New Message from ajb123")
+  - Message preview (first 50 characters)
+  - Click to jump to conversation
+  - Auto-hides after 5 seconds
+  - Sound notification
+- [x] Contractor Messages: Popup notification when admin sends message
+  - Shows "New Message from Admin"
+  - Message preview
+  - Click to view
+  - Auto-hides after 5 seconds
+  - Sound notification
+- [x] Polling every 10 seconds for new messages
+
 #### Still TODO (Next Session):
 - [ ] Admin dashboard "All" tabs clickable with filterable lists
+- [ ] Resend email integration for quote responses (user to provide API key)
