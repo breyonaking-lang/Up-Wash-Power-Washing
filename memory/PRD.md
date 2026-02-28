@@ -260,3 +260,11 @@ Power washing business website with booking system, admin dashboard, contractor 
 - POST /api/admin/payroll/process/{contractor_id} - Process single payment
 - POST /api/admin/payroll/process-all - Process all payments
 - GET /api/admin/payroll/{id}/paystub - Get pay stub details
+
+### Admin-Contractor SMS (NEW)
+- POST /api/admin/sms/contractor - Send SMS to contractor
+- POST /api/admin/sms/contractor/login - Send login credentials via SMS
+- POST /api/admin/contractors/create-and-notify - Create contractor + send welcome SMS
+- POST /api/contractor/sms/admin - Contractor reply to admin
+- GET /api/admin/sms/contractor/history/{contractor_id} - SMS conversation history
+- GET /api/admin/sms/contractors/all - All admin-contractor messages
