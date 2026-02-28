@@ -2626,6 +2626,63 @@ async def combine_routes(combine: RouteCombine, current_user: dict = Depends(get
         "total_stops": len(all_bookings)
     }
 
+class RouteReassign(BaseModel):
+    new_contractor_id: str
+
+@api_router.post("/admin/routes/{route_id}/reassign")
+async def reassign_route(route_id: str, reassign: RouteReassign, current_user: dict = Depends(get_admin_user)):
+    """Reassign a route from one contractor to another"""
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    # Get new contractor info
+    new_contractor = await db.users.find_one(
+        {"id": reassign.new_contractor_id, "role": "contractor"},
+        {"_id": 0, "password_hash": 0}
+    )
+    if not new_contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    
+    old_contractor_id = route.get("assigned_contractor_id")
+    old_contractor_name = "Unassigned"
+    if old_contractor_id:
+        old_contractor = await db.users.find_one({"id": old_contractor_id}, {"_id": 0})
+        if old_contractor:
+            old_contractor_name = old_contractor.get("full_name", old_contractor.get("username"))
+    
+    # Update route assignment
+    await db.routes.update_one(
+        {"id": route_id},
+        {"$set": {
+            "assigned_contractor_id": reassign.new_contractor_id,
+            "assigned_contractor_name": new_contractor.get("full_name", new_contractor.get("username")),
+            "reassigned_at": datetime.now(timezone.utc).isoformat(),
+            "reassigned_from": old_contractor_id
+        }}
+    )
+    
+    # Send SMS notification to new contractor
+    new_phone = new_contractor.get("phone")
+    if new_phone:
+        sms_message = f"Hi {new_contractor.get('full_name', 'Contractor')}, you have been assigned a new route: {route.get('name')} with {len(route.get('bookings', []))} stops. Check your portal for details."
+        await send_sms(new_phone, sms_message)
+    
+    # Notify old contractor if there was one
+    if old_contractor_id:
+        old_contractor_doc = await db.users.find_one({"id": old_contractor_id}, {"_id": 0})
+        if old_contractor_doc and old_contractor_doc.get("phone"):
+            sms_message = f"Hi {old_contractor_doc.get('full_name', 'Contractor')}, route {route.get('name')} has been reassigned. Please check your portal for your updated route list."
+            await send_sms(old_contractor_doc.get("phone"), sms_message)
+    
+    return {
+        "message": "Route reassigned successfully",
+        "route_id": route_id,
+        "old_contractor": old_contractor_name,
+        "new_contractor_name": new_contractor.get("full_name", new_contractor.get("username")),
+        "new_contractor_id": reassign.new_contractor_id
+    }
+
 @api_router.post("/admin/routes/{route_id}/bookings")
 async def add_bookings_to_route(route_id: str, booking_ids: List[str], current_user: dict = Depends(get_admin_user)):
     await db.routes.update_one(
