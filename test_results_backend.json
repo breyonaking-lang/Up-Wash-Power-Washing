@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-02-27T06:26:51.960011",
+  "total_tests": 11,
+  "passed_tests": 11,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "detailed_results": [
+    {
+      "test": "Basic API connectivity",
+      "status": "PASS",
+      "details": "API accessible and responding correctly",
+      "timestamp": "2026-02-27T06:26:50.661428"
+    },
+    {
+      "test": "Services endpoint shows 8.25% tax rate",
+      "status": "PASS",
+      "details": "Tax rate: 0.0825",
+      "timestamp": "2026-02-27T06:26:50.818255"
+    },
+    {
+      "test": "Services data available",
+      "status": "PASS",
+      "details": "Found 8 services",
+      "timestamp": "2026-02-27T06:26:50.818280"
+    },
+    {
+      "test": "Admin login",
+      "status": "PASS",
+      "details": "Admin logged in successfully, username: Hughes0108",
+      "timestamp": "2026-02-27T06:26:50.931848"
+    },
+    {
+      "test": "Contractor login",
+      "status": "PASS",
+      "details": "Contractor logged in successfully, username: ajb123",
+      "timestamp": "2026-02-27T06:26:51.276201"
+    },
+    {
+      "test": "/api/admin/subscriptions endpoint exists",
+      "status": "PASS",
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-27T06:26:51.394570"
+    },
+    {
+      "test": "/api/admin/deleted-subscriptions endpoint exists",
+      "status": "PASS",
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-27T06:26:51.524639"
+    },
+    {
+      "test": "/api/admin/released-routes endpoint exists",
+      "status": "PASS",
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-27T06:26:51.629902"
+    },
+    {
+      "test": "Admin dashboard statistics",
+      "status": "PASS",
+      "details": "All required stats available: ['total_bookings', 'pending', 'confirmed', 'completed', 'scent_bomb_orders', 'total_revenue', 'contractor_count', 'route_count']",
+      "timestamp": "2026-02-27T06:26:51.741047"
+    },
+    {
+      "test": "Contractor dashboard shows 'My Routes' page",
+      "status": "PASS",
+      "details": "Routes endpoint working, found 0 routes",
+      "timestamp": "2026-02-27T06:26:51.847701"
+    },
+    {
+      "test": "/api/contractor/routes/{route_id}/release endpoint exists",
+      "status": "PASS",
+      "details": "Endpoint accessible (expected 404 for test route)",
+      "timestamp": "2026-02-27T06:26:51.959051"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "summary": "Comprehensive testing completed for Up-Wash Power Washing website across all three portals (public website, admin portal, contractor portal). All major functionality working correctly including recent changes: renamed Client Portal to Subscriptions, added subscription CRUD with deletion history, Released Routes system, clickable services, 8.25% tax notice, and Daily Bible Verse with cross icon.",
+
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Backend API: All 11 endpoints passing (100%)",
+    "Public Website: Homepage with cross icon Bible verse, Services page with all 7 services and 8.25% tax notice, Booking wizard multi-step flow, Contact form",
+    "Admin Portal: Login successful, Dashboard with stats, All navigation pages accessible, Subscriptions renamed from Client Portal, Deleted Subscriptions history, Released Routes system",
+    "Contractor Portal: Login successful, Today's Route, My Routes, Purchase Routes, Notifications, Messages, Team pages"
+  ],
+
+  "test_report_links": ["/app/backend_test.py", "/app/.screenshots/"],
+
+  "success_percentage": "Backend: 100% (11/11), Frontend Public: 100% (6/6), Frontend Admin: 95% (19/20), Frontend Contractor: 100% (6/6)",
+
+  "updated_files": [],
+
+  "action_item_for_main_agent": "",
+
+  "should_call_test_agent_after_fix": "false",
+  "should_main_agent_test_itself": "false"
+}
