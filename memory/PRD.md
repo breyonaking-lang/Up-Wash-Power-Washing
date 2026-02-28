@@ -361,3 +361,44 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] "Send Payment Reminders" button in SMS Logs page
 - [x] Respects SMS opt-out list
 - [x] Marks bookings as reminded to prevent duplicates
+
+### Feb 28, 2026 - Session 3 Updates
+
+#### 2-Way Admin-Contractor Messaging ✅
+- [x] Proper message threads per contractor
+- [x] Timestamps on all messages (formatted as "Jan 28, 2:30 PM")
+- [x] Unread count badges per contractor
+- [x] Messages sent via SMS to contractor phone
+
+#### Renamed Contracts to Documents ✅
+- [x] Admin dashboard tab renamed
+- [x] Client portal section renamed
+
+#### SMS to Contractors ✅
+- [x] Fixed phone number formatting
+- [x] Added ADMIN_PHONE to .env
+
+#### Bible Verses ✅
+- [x] Expanded from 10 to 30 verses
+
+#### Booking Flow Updates ✅
+- [x] Recycling/Trash bins: Mon-Tue only, no time slots
+- [x] Patio/Driveway/Dumpster: Wed-Fri with 3-hour windows
+- [x] Quote services (Home, Construction, Commercial): Thu-Fri only
+- [x] Service availability days shown on services page
+- [x] Scent bomb upsell popup during checkout
+
+#### New Services ✅
+- [x] Trash Bin Cleaning (separate from recycling)
+- [x] Scent Bomb (as addon service)
+
+#### Day-Before Reminders ✅
+- [x] POST /api/cron/bin-placement-reminders - Send at 4pm day before
+- [x] Reminds customers to place bins on driveway
+
+#### Still TODO (Next Session):
+- [ ] Admin dashboard tabs clickable with route management
+- [ ] Route combining and assignment by city/state/zip
+- [ ] Subscription auto-populate nearest day
+- [ ] Allow customers to go back during booking
+- [ ] Quote service click-through to quote form
