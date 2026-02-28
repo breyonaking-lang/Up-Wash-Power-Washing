@@ -164,10 +164,76 @@ function TodayRoute() {
   const [cnsPhotoPreview, setCnsPhotoPreview] = useState(null);
   const [processingStop, setProcessingStop] = useState(null);
   const fileInputRef = useRef(null);
+  const [autoETAEnabled, setAutoETAEnabled] = useState(true);
+  const [myLocation, setMyLocation] = useState(null);
+  const etaCheckIntervalRef = useRef(null);
 
   useEffect(() => {
     fetchTodayTasks();
+    startAutoETATracking();
+    
+    return () => {
+      if (etaCheckIntervalRef.current) {
+        clearInterval(etaCheckIntervalRef.current);
+      }
+    };
   }, []);
+
+  // Auto ETA Tracking - checks proximity to upcoming stops
+  const startAutoETATracking = () => {
+    if ('geolocation' in navigator && autoETAEnabled) {
+      // Check every 30 seconds
+      etaCheckIntervalRef.current = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            setMyLocation({ lat, lng });
+            
+            // Check proximity for each incomplete task
+            for (const task of tasks.filter(t => !t.status || t.status === 'pending')) {
+              if (!task.eta_notified && task.customer_phone) {
+                try {
+                  const res = await fetch(`${API_URL}/api/contractor/check-proximity`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                      booking_id: task.id,
+                      contractor_lat: lat,
+                      contractor_lng: lng
+                    })
+                  });
+                  const data = await res.json();
+                  
+                  if (data.should_notify) {
+                    // Auto-send ETA notification
+                    const etaRes = await fetch(`${API_URL}/api/contractor/sms/eta-alert`, {
+                      method: 'POST',
+                      headers: getAuthHeaders(),
+                      body: JSON.stringify({
+                        booking_id: task.id,
+                        contractor_lat: lat,
+                        contractor_lng: lng
+                      })
+                    });
+                    const etaData = await etaRes.json();
+                    if (etaData.status === 'sent' || etaData.status === 'demo_logged') {
+                      toast.success(`📍 Auto ETA sent to ${task.customer_name} (${etaData.eta_minutes} min away)`);
+                      fetchTodayTasks(); // Refresh to update eta_notified status
+                    }
+                  }
+                } catch (err) {
+                  console.error('ETA check error:', err);
+                }
+              }
+            }
+          },
+          (err) => console.error('Location error:', err),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }, 30000); // Every 30 seconds
+    }
+  };
 
   const fetchTodayTasks = async () => {
     try {
