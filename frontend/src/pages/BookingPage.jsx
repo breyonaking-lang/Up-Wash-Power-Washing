@@ -1429,6 +1429,76 @@ const BookingPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Scent Bomb Upsell Popup */}
+      {showScentBombUpsell && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+          >
+            <div className="text-center">
+              <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-10 h-10 text-pink-500" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">Add Fresh Scent?</h3>
+              <p className="text-slate-600 mb-6">
+                Keep your freshly cleaned bins smelling amazing with our Scent Bombs!
+              </p>
+              
+              <div className="bg-pink-50 rounded-2xl p-4 mb-6">
+                <p className="text-pink-900 font-bold text-xl mb-2">$5 each</p>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setUpsellScentBombs(Math.max(0, upsellScentBombs - 1))}
+                    className="w-10 h-10 rounded-full bg-white border border-pink-300 flex items-center justify-center hover:bg-pink-100"
+                  >
+                    <Minus size={18} />
+                  </button>
+                  <span className="text-3xl font-bold text-pink-600 w-12">{upsellScentBombs}</span>
+                  <button
+                    onClick={() => setUpsellScentBombs(upsellScentBombs + 1)}
+                    className="w-10 h-10 rounded-full bg-white border border-pink-300 flex items-center justify-center hover:bg-pink-100"
+                  >
+                    <Plus size={18} />
+                  </button>
+                </div>
+                {upsellScentBombs > 0 && (
+                  <p className="text-pink-600 mt-2 font-medium">
+                    Total: ${(upsellScentBombs * 5).toFixed(2)}
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => {
+                    setShowScentBombUpsell(false);
+                    setStep(4);
+                  }}
+                  variant="outline"
+                  className="flex-1 rounded-full"
+                >
+                  Skip
+                </Button>
+                <Button
+                  onClick={() => {
+                    setScentBombs(prev => prev + upsellScentBombs);
+                    setShowScentBombUpsell(false);
+                    setStep(4);
+                    toast.success(`Added ${upsellScentBombs} Scent Bomb${upsellScentBombs > 1 ? 's' : ''} to your order!`);
+                  }}
+                  disabled={upsellScentBombs === 0}
+                  className="flex-1 bg-pink-500 hover:bg-pink-600 text-white rounded-full"
+                >
+                  Yes! Add ${(upsellScentBombs * 5).toFixed(2)}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
