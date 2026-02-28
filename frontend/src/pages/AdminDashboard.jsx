@@ -2537,6 +2537,39 @@ function RoutesPage() {
         <p className="mt-1">✅ Once assigned, routes automatically move out of this list.</p>
       </div>
 
+      {/* Search and Group Controls */}
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search routes, addresses, customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-500"
+            data-testid="route-search-input"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white/60 text-sm">Group by:</span>
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value)}
+            className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white [&>option]:text-black"
+            data-testid="route-group-select"
+          >
+            <option value="zip">Zip Code</option>
+            <option value="city">City</option>
+            <option value="state">State</option>
+          </select>
+        </div>
+        {searchQuery && (
+          <span className="text-white/60 text-sm">
+            Found {filteredRoutes.length} route{filteredRoutes.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
       {routes.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
           <RouteIcon className="w-12 h-12 text-white/40 mx-auto mb-4" />
