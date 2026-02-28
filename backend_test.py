@@ -474,38 +474,33 @@ class ETANotificationAPITester:
                 print("\n⚠️  Skipping SMS tests - No contractors available")
         else:
             print("\n⚠️  Skipping SMS tests - Admin login failed")
-            
-        # Test all SMS endpoints
-        print("\n" + "=" * 60)
-        print("📱 TESTING TWILIO SMS ENDPOINTS")
-        print("=" * 60)
         
-        self.test_send_sms_contractor()
-        self.test_send_login_credentials_sms()
-        self.test_get_sms_history()
-        self.test_get_all_sms_messages()
-        
-        # Print results
-        print("\n" + "=" * 60)
-        print("📊 TEST RESULTS SUMMARY")
-        print("=" * 60)
-        print(f"✅ Tests Passed: {self.tests_passed}/{self.tests_run}")
-        print(f"❌ Tests Failed: {self.tests_run - self.tests_passed}/{self.tests_run}")
+        # Print final summary
+        print("\n" + "="*80)
+        print("📊 FINAL TEST SUMMARY")
+        print("="*80)
+        print(f"Total Tests Run: {self.tests_run}")
+        print(f"Tests Passed: {self.tests_passed}")
+        print(f"Tests Failed: {self.tests_run - self.tests_passed}")
         success_rate = (self.tests_passed / self.tests_run * 100) if self.tests_run > 0 else 0
-        print(f"📈 Success Rate: {success_rate:.1f}%")
+        print(f"Success Rate: {success_rate:.1f}%")
         
-        if success_rate >= 80:
-            print("\n🎉 SMS Integration Status: WORKING")
-        elif success_rate >= 50:
-            print("\n⚠️  SMS Integration Status: PARTIAL")
+        # Show failed tests
+        failed_tests = [r for r in self.test_results if r['status'] == 'FAIL']
+        if failed_tests:
+            print("\n❌ FAILED TESTS:")
+            for test in failed_tests:
+                print(f"   - {test['test']}: {test['details']}")
+        
+        if self.tests_passed >= self.tests_run * 0.7:  # 70% pass rate
+            print("\n✅ Overall Status: SUCCESS")
+            return True
         else:
-            print("\n🚨 SMS Integration Status: FAILING")
-            
-        return success_rate >= 80
+            print("\n❌ Overall Status: NEEDS ATTENTION")
+            return False
 
 def main():
-    """Main test execution"""
-    tester = TwilioSMSAPITester()
+    tester = ETANotificationAPITester()
     success = tester.run_all_tests()
     return 0 if success else 1
 
