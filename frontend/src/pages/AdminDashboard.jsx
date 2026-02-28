@@ -1711,6 +1711,14 @@ function ContractorsPage() {
                       <Eye className="w-5 h-5" />
                     </button>
                     <button
+                      onClick={() => openEditContractor(contractor)}
+                      className="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30"
+                      title="Edit Contractor"
+                      data-testid={`edit-contractor-${contractor.id}`}
+                    >
+                      <Edit className="w-5 h-5" />
+                    </button>
+                    <button
                       onClick={() => sendNotification(contractor)}
                       className="p-2 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30"
                       title="Send Notification"
