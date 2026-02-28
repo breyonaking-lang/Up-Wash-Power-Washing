@@ -266,25 +266,296 @@ class ETANotificationAPITester:
         except Exception as e:
             self.log_test("Proximity Check Validation", False, f"Error: {str(e)}")
 
+    def test_sms_templates_endpoint(self):
+        """Test GET /api/contractor/sms/templates - Returns 12 SMS templates"""
+        print(f"\n🔍 Testing SMS Templates Endpoint...")
+        
+        if not self.contractor_token:
+            self.log_test("SMS Templates Test", False, "No contractor token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/contractor/sms/templates",
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                templates = data.get('templates', [])
+                if len(templates) == 12:
+                    self.log_test("SMS Templates Endpoint", True, f"Status: {response.status_code}, Found {len(templates)} templates")
+                    return True
+                else:
+                    self.log_test("SMS Templates Endpoint", False, f"Expected 12 templates, got {len(templates)}")
+                    return False
+            else:
+                self.log_test("SMS Templates Endpoint", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("SMS Templates Endpoint", False, f"Error: {str(e)}")
+            return False
+
+    def test_send_template_sms_endpoint(self):
+        """Test POST /api/contractor/sms/send-template - Send templated SMS"""
+        print(f"\n🔍 Testing Send Template SMS Endpoint...")
+        
+        if not self.contractor_token:
+            self.log_test("Send Template SMS Test", False, "No contractor token available")
+            return False
+
+        # Test data
+        template_data = {
+            "phone": "+15551234567",
+            "template_id": "arrival",
+            "customer_name": "Test Customer"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/sms/send-template",
+                json=template_data,
+                headers=self.get_contractor_headers()
+            )
+            
+            # Expecting success or demo mode (since we're using test phone)
+            if response.status_code in [200, 201]:
+                data = response.json()
+                status = data.get('status', 'unknown')
+                self.log_test("Send Template SMS Endpoint", True, f"Status: {response.status_code}, SMS Status: {status}")
+                return True
+            elif response.status_code == 401:
+                self.log_test("Send Template SMS Endpoint", False, "Authentication failed")
+                return False
+            else:
+                self.log_test("Send Template SMS Endpoint", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Send Template SMS Endpoint", False, f"Error: {str(e)}")
+            return False
+
+    def test_twilio_incoming_webhook(self):
+        """Test POST /api/webhooks/twilio/incoming - Incoming SMS webhook"""
+        print(f"\n🔍 Testing Twilio Incoming SMS Webhook...")
+        
+        # Simulate Twilio webhook data
+        webhook_data = {
+            "From": "+15551234567",
+            "To": "+15559876543", 
+            "Body": "Test incoming SMS message",
+            "MessageSid": "SM12345678901234567890123456789012"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/webhooks/twilio/incoming",
+                data=webhook_data,  # Twilio sends form data, not JSON
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            
+            if response.status_code in [200, 201]:
+                self.log_test("Twilio Incoming Webhook", True, f"Status: {response.status_code}")
+                return True
+            else:
+                self.log_test("Twilio Incoming Webhook", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Twilio Incoming Webhook", False, f"Error: {str(e)}")
+            return False
+
+    def test_contractor_sms_inbox(self):
+        """Test GET /api/contractor/sms/inbox - Contractor incoming messages"""
+        print(f"\n🔍 Testing Contractor SMS Inbox...")
+        
+        if not self.contractor_token:
+            self.log_test("Contractor SMS Inbox Test", False, "No contractor token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/contractor/sms/inbox",
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                messages = data.get('messages', [])
+                self.log_test("Contractor SMS Inbox", True, f"Status: {response.status_code}, Found {len(messages)} messages")
+                return True
+            else:
+                self.log_test("Contractor SMS Inbox", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Contractor SMS Inbox", False, f"Error: {str(e)}")
+            return False
+
+    def test_admin_sms_inbox(self):
+        """Test GET /api/admin/sms/inbox - Admin incoming messages"""
+        print(f"\n🔍 Testing Admin SMS Inbox...")
+        
+        if not self.admin_token:
+            self.log_test("Admin SMS Inbox Test", False, "No admin token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/sms/inbox",
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                messages = data.get('messages', [])
+                self.log_test("Admin SMS Inbox", True, f"Status: {response.status_code}, Found {len(messages)} messages")
+                return True
+            else:
+                self.log_test("Admin SMS Inbox", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Admin SMS Inbox", False, f"Error: {str(e)}")
+            return False
+
     def test_send_sms(self):
         """Test basic SMS sending functionality"""
-        print(f"\n🔍 Testing SMS Send...")
-        self.log_test("SMS Send Functionality", True, "SMS tests skipped - focusing on ETA features")
+        print(f"\n🔍 Testing Basic SMS Send...")
+        
+        if not self.contractor_token:
+            self.log_test("Basic SMS Send Test", False, "No contractor token available")
+            return False
+
+        # Test data for direct SMS
+        sms_data = {
+            "phone": "+15551234567",
+            "message": "Test direct SMS from contractor",
+            "booking_id": "test-booking-123"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/sms/send",
+                json=sms_data,
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                status = data.get('status', 'unknown')
+                self.log_test("Basic SMS Send", True, f"Status: {response.status_code}, SMS Status: {status}")
+                return True
+            else:
+                self.log_test("Basic SMS Send", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Basic SMS Send", False, f"Error: {str(e)}")
+            return False
 
     def test_sms_validation(self):
         """Test SMS validation"""
         print(f"\n🔍 Testing SMS Validation...")
-        self.log_test("SMS Validation", True, "SMS validation tests skipped - focusing on ETA features")
+        
+        if not self.contractor_token:
+            self.log_test("SMS Validation Test", False, "No contractor token available")
+            return False
+
+        # Test missing phone number
+        invalid_data = {
+            "message": "Test message without phone"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/sms/send",
+                json=invalid_data,
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code == 422:  # Validation error
+                self.log_test("SMS Validation - Missing Phone", True, "Correctly rejected missing phone")
+            else:
+                self.log_test("SMS Validation - Missing Phone", False, f"Expected 422, got {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("SMS Validation - Missing Phone", False, f"Error: {str(e)}")
+
+        # Test empty message
+        invalid_message = {
+            "phone": "+15551234567",
+            "message": ""
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/sms/send",
+                json=invalid_message,
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code == 422:  # Validation error
+                self.log_test("SMS Validation - Empty Message", True, "Correctly rejected empty message")
+            else:
+                self.log_test("SMS Validation - Empty Message", False, f"Expected 422, got {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("SMS Validation - Empty Message", False, f"Error: {str(e)}")
 
     def test_sms_logs(self):
-        """Test SMS logs"""
+        """Test SMS logs endpoints"""
         print(f"\n🔍 Testing SMS Logs...")
-        self.log_test("SMS Logs", True, "SMS logs tests skipped - focusing on ETA features")
+        
+        if not self.admin_token:
+            self.log_test("SMS Logs Test", False, "No admin token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/sms/logs",
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                logs = data.get('logs', [])
+                self.log_test("SMS Logs", True, f"Status: {response.status_code}, Found {len(logs)} log entries")
+                return True
+            else:
+                self.log_test("SMS Logs", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("SMS Logs", False, f"Error: {str(e)}")
+            return False
 
     def test_sms_stats(self):
-        """Test SMS stats"""
+        """Test SMS stats endpoints"""
         print(f"\n🔍 Testing SMS Stats...")
-        self.log_test("SMS Stats", True, "SMS stats tests skipped - focusing on ETA features")
+        
+        if not self.admin_token:
+            self.log_test("SMS Stats Test", False, "No admin token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/sms/stats",
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.log_test("SMS Stats", True, f"Status: {response.status_code}, Stats available")
+                return True
+            else:
+                self.log_test("SMS Stats", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("SMS Stats", False, f"Error: {str(e)}")
+            return False
     def get_auth_headers(self):
         """Get headers with auth token"""
         return {
