@@ -200,13 +200,6 @@ const ServicesPage = () => {
                     ))}
                   </div>
 
-                  {/* Available Days */}
-                  {service.availableDays && (
-                    <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm">
-                      <span className="font-medium">Available:</span> {service.availableDays}
-                    </div>
-                  )}
-                  
                   {/* Click to Book indicator */}
                   <div className="mt-6 flex items-center gap-2 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
                     <ArrowRight size={16} />
