@@ -2235,6 +2235,8 @@ function RoutesPage() {
   const [selectedRoutes, setSelectedRoutes] = useState([]);
   const [newRoute, setNewRoute] = useState({ name: '', description: '', area: '', price: 350 });
   const [deleting, setDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [groupBy, setGroupBy] = useState('zip'); // 'zip', 'city', 'state'
 
   useEffect(() => {
     fetchRoutes();
