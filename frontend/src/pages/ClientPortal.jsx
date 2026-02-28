@@ -3,7 +3,8 @@ import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion';
 import { 
   User, Settings, Calendar, CreditCard, FileText, Bell,
-  LogOut, Menu, X, Droplets, Mail, Phone, MapPin, Clock
+  LogOut, Menu, X, Droplets, Mail, Phone, MapPin, Clock,
+  Check, Play, Pause, Edit
 } from 'lucide-react';
 import { toast } from 'sonner';
 
