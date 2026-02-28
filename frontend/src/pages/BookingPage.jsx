@@ -139,11 +139,16 @@ const BookingPage = () => {
   
   // Single booking date
   const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   
   // Monthly subscription - days of the month (1-31)
   const [monthlyServiceDays, setMonthlyServiceDays] = useState([]); // e.g., [1, 15] for 1st and 15th
   const [serviceDaysPerMonth, setServiceDaysPerMonth] = useState(2); // How many days per month
   const [monthlyStartDate, setMonthlyStartDate] = useState(null);
+
+  // Scent Bomb Upsell
+  const [showScentBombUpsell, setShowScentBombUpsell] = useState(false);
+  const [upsellScentBombs, setUpsellScentBombs] = useState(0);
 
   // Service selections
   const [selectedServices, setSelectedServices] = useState({});
