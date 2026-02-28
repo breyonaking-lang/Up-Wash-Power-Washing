@@ -5995,7 +5995,23 @@ async def login_client(login: ClientLogin):
     if not client:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    if not bcrypt.checkpw(login.password.encode(), client["password_hash"].encode()):
+    # Support both bcrypt and sha256 password hashes
+    password_valid = False
+    stored_hash = client.get("password_hash", "")
+    
+    if stored_hash.startswith("$2"):
+        # bcrypt hash
+        try:
+            password_valid = bcrypt.checkpw(login.password.encode(), stored_hash.encode())
+        except:
+            password_valid = False
+    else:
+        # sha256 hash (legacy)
+        import hashlib
+        sha256_hash = hashlib.sha256(login.password.encode()).hexdigest()
+        password_valid = (sha256_hash == stored_hash)
+    
+    if not password_valid:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     token = jwt.encode({
@@ -6006,13 +6022,13 @@ async def login_client(login: ClientLogin):
     }, JWT_SECRET, algorithm="HS256")
     
     return {
-        "access_token": token,
+        "token": token,
         "client": {
             "id": client["id"],
             "name": client["name"],
             "email": client["email"],
-            "phone": client["phone"],
-            "address": client["address"]
+            "phone": client.get("phone", ""),
+            "address": client.get("address", "")
         }
     }
 
