@@ -306,6 +306,57 @@ const BookingPage = () => {
     }
   }, [serviceDaysPerMonth]);
 
+  // Auto-populate nearest available days for monthly subscription
+  const autoPopulateMonthlyDays = () => {
+    // Get allowed days of week based on selected services
+    const selectedServiceIds = Object.keys(selectedServices).filter(id => selectedServices[id]);
+    let allowedDays = new Set([0, 1, 2, 3, 4, 5, 6]); // All days initially
+    
+    selectedServiceIds.forEach(serviceId => {
+      const service = SERVICES.find(s => s.id === serviceId);
+      if (service && service.bookingDays) {
+        allowedDays = new Set([...allowedDays].filter(d => service.bookingDays.includes(d)));
+      }
+    });
+    
+    // Convert to day of week names (0=Sun, 1=Mon, etc.)
+    const allowedDayNumbers = Array.from(allowedDays);
+    
+    // Get today's date info
+    const today = new Date();
+    const currentDayOfMonth = today.getDate();
+    const currentDayOfWeek = today.getDay();
+    
+    // Find nearest available days of the month
+    const suggestedDays = [];
+    for (let i = 0; i < 31 && suggestedDays.length < serviceDaysPerMonth; i++) {
+      const checkDay = ((currentDayOfMonth - 1 + i) % 31) + 1;
+      
+      // Check if this day falls on an allowed day of week
+      // We'll use a simple approximation: check day number mod 7 against allowed days
+      const testDate = new Date(today.getFullYear(), today.getMonth(), checkDay);
+      const testDayOfWeek = testDate.getDay();
+      
+      if (allowedDayNumbers.includes(testDayOfWeek) && !suggestedDays.includes(checkDay)) {
+        suggestedDays.push(checkDay);
+      }
+    }
+    
+    // Fill remaining with evenly spaced days if needed
+    if (suggestedDays.length < serviceDaysPerMonth) {
+      const interval = Math.floor(31 / serviceDaysPerMonth);
+      for (let i = 0; suggestedDays.length < serviceDaysPerMonth && i < 31; i++) {
+        const day = ((interval * suggestedDays.length) % 31) + 1;
+        if (!suggestedDays.includes(day)) {
+          suggestedDays.push(day);
+        }
+      }
+    }
+    
+    setMonthlyServiceDays(suggestedDays.slice(0, serviceDaysPerMonth).sort((a, b) => a - b));
+    toast.success(`Auto-selected ${serviceDaysPerMonth} service day${serviceDaysPerMonth > 1 ? 's' : ''}`);
+  };
+
   // Calculate distance when address changes
   const calculateDistanceFromAddress = async (address) => {
     if (!address || address.length < 10) {
