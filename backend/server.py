@@ -3738,6 +3738,138 @@ async def send_en_route_sms(booking_id: str, current_user: dict = Depends(get_co
     
     return {"message": "En-route notification sent", "status": result["status"]}
 
+class ETANotification(BaseModel):
+    booking_id: str
+    contractor_lat: float
+    contractor_lng: float
+
+@api_router.post("/contractor/sms/eta-alert")
+async def send_eta_alert(eta_data: ETANotification, current_user: dict = Depends(get_contractor_user)):
+    """Send automated SMS when contractor is within ~10 minutes of customer location"""
+    booking = await db.bookings.find_one({"id": eta_data.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    # Check if already notified for this booking
+    if booking.get("eta_notified"):
+        return {"message": "ETA notification already sent", "status": "already_sent"}
+    
+    customer_phone = booking.get("customer_phone")
+    customer_name = booking.get("customer_name", "Valued Customer")
+    customer_address = booking.get("customer_address", "")
+    
+    if not customer_phone:
+        raise HTTPException(status_code=400, detail="No phone number for customer")
+    
+    # Get contractor info
+    contractor = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
+    contractor_name = contractor.get("full_name", "Your technician")
+    
+    # Calculate ETA using Google Maps Distance Matrix API
+    eta_minutes = 10  # Default
+    if google_maps_api_key and customer_address:
+        try:
+            origin = f"{eta_data.contractor_lat},{eta_data.contractor_lng}"
+            destination = customer_address
+            url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origin}&destinations={destination}&key={google_maps_api_key}"
+            response = requests.get(url)
+            data = response.json()
+            
+            if data.get("status") == "OK":
+                elements = data.get("rows", [{}])[0].get("elements", [{}])[0]
+                if elements.get("status") == "OK":
+                    duration_seconds = elements.get("duration", {}).get("value", 600)
+                    eta_minutes = max(1, round(duration_seconds / 60))
+        except Exception as e:
+            logging.error(f"Google Maps ETA calculation error: {e}")
+    
+    # Only send if within 15 minutes
+    if eta_minutes > 15:
+        return {"message": "Contractor not close enough yet", "eta_minutes": eta_minutes, "status": "too_far"}
+    
+    # Send SMS with ETA
+    message = f"Hi {customer_name}! Your Up-Wash technician {contractor_name} is approximately {eta_minutes} minutes away. Please ensure the area is accessible for service. Thank you!"
+    
+    result = await send_sms(customer_phone, message, current_user["user_id"])
+    
+    # Mark as notified
+    await db.bookings.update_one(
+        {"id": eta_data.booking_id},
+        {"$set": {
+            "eta_notified": True,
+            "eta_notified_at": datetime.now(timezone.utc).isoformat(),
+            "eta_minutes": eta_minutes
+        }}
+    )
+    
+    # Also create in-app notification for customer
+    notification = {
+        "id": str(uuid.uuid4()),
+        "booking_id": eta_data.booking_id,
+        "customer_phone": customer_phone,
+        "type": "eta_alert",
+        "title": "Technician Arriving Soon",
+        "message": message,
+        "eta_minutes": eta_minutes,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.customer_messages.insert_one(notification)
+    
+    return {
+        "message": "ETA notification sent",
+        "status": result["status"],
+        "eta_minutes": eta_minutes,
+        "customer_name": customer_name
+    }
+
+@api_router.post("/contractor/check-proximity")
+async def check_customer_proximity(eta_data: ETANotification, current_user: dict = Depends(get_contractor_user)):
+    """Check if contractor is close to customer and auto-send ETA if within range"""
+    booking = await db.bookings.find_one({"id": eta_data.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    # Already notified?
+    if booking.get("eta_notified"):
+        return {"should_notify": False, "reason": "already_notified"}
+    
+    customer_address = booking.get("customer_address", "")
+    if not customer_address or not google_maps_api_key:
+        return {"should_notify": False, "reason": "no_address_or_api_key"}
+    
+    # Calculate distance/ETA
+    try:
+        origin = f"{eta_data.contractor_lat},{eta_data.contractor_lng}"
+        url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origin}&destinations={customer_address}&key={google_maps_api_key}"
+        response = requests.get(url)
+        data = response.json()
+        
+        if data.get("status") == "OK":
+            elements = data.get("rows", [{}])[0].get("elements", [{}])[0]
+            if elements.get("status") == "OK":
+                duration_seconds = elements.get("duration", {}).get("value", 600)
+                eta_minutes = max(1, round(duration_seconds / 60))
+                
+                # Auto-notify if within 10 minutes
+                if eta_minutes <= 10:
+                    return {
+                        "should_notify": True,
+                        "eta_minutes": eta_minutes,
+                        "reason": "within_range"
+                    }
+                else:
+                    return {
+                        "should_notify": False,
+                        "eta_minutes": eta_minutes,
+                        "reason": "too_far"
+                    }
+    except Exception as e:
+        logging.error(f"Proximity check error: {e}")
+        return {"should_notify": False, "reason": "api_error"}
+    
+    return {"should_notify": False, "reason": "unknown"}
+
 @api_router.post("/contractor/sms/completed/{booking_id}")
 async def send_completion_sms(booking_id: str, current_user: dict = Depends(get_contractor_user)):
     """Send auto-text when job is completed"""
