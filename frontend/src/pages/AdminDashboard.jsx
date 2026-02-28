@@ -111,19 +111,19 @@ function DashboardOverview() {
       {/* Daily Bible Verse */}
       <DailyBibleVerse />
       
-      {/* Documentor Portal Link Card */}
+      {/* Contractor Portal Link Card */}
       <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 backdrop-blur rounded-2xl p-6 border border-indigo-500/30">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h3 className="text-lg font-bold text-white mb-1">Documentor Portal Link</h3>
-            <p className="text-white/60 text-sm mb-2">Share this link with new documentors</p>
+            <h3 className="text-lg font-bold text-white mb-1">Contractor Portal Link</h3>
+            <p className="text-white/60 text-sm mb-2">Share this link with new contractors</p>
             <code className="bg-black/30 px-3 py-1 rounded text-indigo-300 text-sm break-all">{CONTRACTOR_PORTAL_URL}</code>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={copyDocumentorLink}
+              onClick={copyContractorLink}
               className="px-4 py-2 bg-indigo-500 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-600"
-              data-testid="copy-documentor-link"
+              data-testid="copy-contractor-link"
             >
               <Copy className="w-4 h-4" />
               Copy Link
