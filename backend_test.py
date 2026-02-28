@@ -1232,6 +1232,16 @@ class ETANotificationAPITester:
                 # Test SMS logs and stats
                 self.test_sms_logs()
                 self.test_sms_stats()
+                
+                # Test Payment Reminder System
+                print("\n" + "="*50)
+                print("💳 TESTING PAYMENT REMINDER SYSTEM")
+                print("="*50)
+                self.test_payment_reminder_preview()
+                self.test_send_payment_reminders() 
+                self.test_cron_payment_reminders()
+                self.test_sms_phone_validation()
+                self.test_sms_message_validation()
             else:
                 print("\n⚠️  Skipping SMS tests - No contractors available")
         else:
