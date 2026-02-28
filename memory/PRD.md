@@ -170,6 +170,20 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] Admin SMS Logs page to view all messages
 - [x] Ready for Twilio integration when credentials provided
 
+### Feb 28, 2026 - Twilio SMS Integration
+
+#### Admin-Contractor SMS Communication ✅ NEW
+- [x] POST /api/admin/sms/contractor - Admin sends SMS to contractor via Twilio
+- [x] POST /api/admin/sms/contractor/login - Admin sends contractor login credentials via SMS
+- [x] POST /api/admin/contractors/create-and-notify - Create contractor and send welcome SMS
+- [x] POST /api/contractor/sms/admin - Contractor replies to admin (in-app + optional SMS)
+- [x] GET /api/admin/sms/contractor/history/{id} - Get conversation history
+- [x] GET /api/admin/sms/contractors/all - Get all admin-contractor messages
+- [x] SMS Modal in Admin Contractors page with conversation view
+- [x] Send Login Credentials button in modal
+- [x] Real-time SMS status tracking (sent/failed/pending)
+- [x] Twilio credentials configured and tested
+
 #### Automated Payroll System
 - [x] Admin Payroll page with pending payments dashboard
 - [x] Shows dynamic pay rate from settings
