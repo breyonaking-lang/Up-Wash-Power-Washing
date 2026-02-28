@@ -1114,6 +1114,90 @@ async def list_all_clients(current_user: dict = Depends(get_admin_user)):
     
     return {"clients": all_clients, "total": len(all_clients)}
 
+# ===================== BOOKING PRICE MODIFICATION =====================
+
+class BookingPriceUpdate(BaseModel):
+    subtotal: Optional[float] = None
+    travel_fee: Optional[float] = None
+    tax: Optional[float] = None
+    discount: Optional[float] = None
+    total: Optional[float] = None
+    price_notes: Optional[str] = None
+
+@api_router.put("/admin/bookings/{booking_id}/price")
+async def update_booking_price(booking_id: str, price: BookingPriceUpdate, current_user: dict = Depends(get_admin_user)):
+    """Update booking price (for custom quotes, discounts, etc.)"""
+    update_data = {k: v for k, v in price.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No price fields to update")
+    
+    update_data["price_modified_by"] = current_user["user_id"]
+    update_data["price_modified_at"] = datetime.now(timezone.utc).isoformat()
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    return {"message": "Booking price updated"}
+
+class PaymentLinkRequest(BaseModel):
+    booking_id: str
+    custom_amount: Optional[float] = None
+    message: Optional[str] = None
+
+@api_router.post("/admin/bookings/send-payment-link")
+async def send_payment_link(req: PaymentLinkRequest, current_user: dict = Depends(get_admin_user)):
+    """Send payment link to customer via SMS"""
+    booking = await db.bookings.find_one({"id": req.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    phone = booking.get("customer_phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="No phone number for customer")
+    
+    # Check if opted out
+    optout = await db.sms_optouts.find_one({"phone": phone, "opted_out": True})
+    if optout:
+        raise HTTPException(status_code=400, detail="Customer has opted out of SMS")
+    
+    customer_name = booking.get("customer_name", "Valued Customer")
+    amount = req.custom_amount or booking.get("total", 0)
+    
+    # Generate payment token
+    payment_token = str(uuid.uuid4())[:8]
+    
+    # Store payment link data
+    await db.payment_links.insert_one({
+        "id": str(uuid.uuid4()),
+        "token": payment_token,
+        "booking_id": req.booking_id,
+        "amount": amount,
+        "customer_phone": phone,
+        "customer_name": customer_name,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    payment_url = f"https://2d2346dc-8745-4260-8e34-088886d923bd.preview.emergentagent.com/pay/{payment_token}"
+    
+    custom_message = req.message or f"Your Up-Wash service is ready for payment."
+    sms_message = f"Hi {customer_name}! {custom_message}\n\nAmount Due: ${amount:.2f}\n\nPay Now: {payment_url}\n\nReply STOP to opt out."
+    
+    result = await send_sms(phone, sms_message)
+    
+    return {
+        "message": "Payment link sent",
+        "status": result["status"],
+        "payment_url": payment_url,
+        "amount": amount
+    }
+
 # ===================== PAYMENT ROUTES =====================
 
 @api_router.post("/payments/process")
