@@ -1272,7 +1272,7 @@ class SMSPaymentReminderAPITester:
             return False
 
 def main():
-    tester = ETANotificationAPITester()
+    tester = SMSPaymentReminderAPITester()
     success = tester.run_all_tests()
     return 0 if success else 1
 
