@@ -194,6 +194,25 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] Google Maps Distance Matrix API integration for accurate ETA
 - [x] Customer receives SMS: "Your technician is approximately X minutes away"
 
+#### Automated Customer SMS Notifications ✅ NEW
+- [x] Booking confirmation SMS when payment is successful
+- [x] Reschedule notification SMS (via Twilio)
+- [x] Subscription payment failed SMS notification
+- [x] Subscription cancelled due to non-payment SMS
+- [x] All auto-texts stored in customer_messages for history
+
+#### Two-Way SMS (Twilio Webhook) ✅ NEW
+- [x] POST /api/webhooks/twilio/incoming - Receive customer SMS replies
+- [x] GET /api/contractor/sms/inbox - Contractor incoming messages
+- [x] GET /api/admin/sms/inbox - Admin incoming messages
+- [x] Customer replies create notifications for contractor & admin
+
+#### SMS Templates for Contractors ✅ NEW
+- [x] GET /api/contractor/sms/templates - 12 pre-populated templates
+- [x] POST /api/contractor/sms/send-template - Send with auto-filled customer info
+- [x] Templates: On my way, Arrived, Running late, Weather delay, Need access, Gate code, Bins not out, Job complete, Unable to complete, Follow-up, Review request, Payment reminder
+- [x] Enhanced SMS modal with categorized quick templates (Arrival, Delays, Access, Completion, Follow-up)
+
 #### Automated Payroll System
 - [x] Admin Payroll page with pending payments dashboard
 - [x] Shows dynamic pay rate from settings
