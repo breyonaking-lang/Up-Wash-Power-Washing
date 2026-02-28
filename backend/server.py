@@ -2070,7 +2070,7 @@ async def process_subscription_payments(current_user: dict = Depends(get_admin_u
 
 @api_router.post("/admin/mark-payment-failed/{booking_id}")
 async def mark_subscription_payment_failed(booking_id: str, current_user: dict = Depends(get_admin_user)):
-    """Mark a subscription payment as failed and notify customer"""
+    """Mark a subscription payment as failed and notify customer via SMS"""
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -2084,20 +2084,44 @@ async def mark_subscription_payment_failed(booking_id: str, current_user: dict =
         }}
     )
     
-    # Create notification for customer
+    # Send SMS notification
+    customer_phone = booking.get("customer_phone")
+    customer_name = booking.get("customer_name", "Valued Customer")
+    sms_sent = False
+    
+    if customer_phone:
+        sms_message = f"Hi {customer_name}, your Up-Wash subscription payment could not be processed. Please update your payment method at upwash.com or call us to avoid service interruption. Thank you!"
+        await send_sms(customer_phone, sms_message)
+        sms_sent = True
+        
+        # Store message
+        msg_record = {
+            "id": str(uuid.uuid4()),
+            "booking_id": booking_id,
+            "customer_phone": customer_phone,
+            "customer_name": customer_name,
+            "type": "payment_failed",
+            "message": sms_message,
+            "message_type": "payment_failed",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.customer_messages.insert_one(msg_record)
+    
+    # Create notification for customer (in-app)
     notification = {
         "id": str(uuid.uuid4()),
         "booking_id": booking_id,
-        "customer_phone": booking.get("customer_phone"),
+        "customer_phone": customer_phone,
         "customer_email": booking.get("customer_email"),
         "type": "payment_failed",
         "message": "Your subscription payment failed. Please update your payment method to avoid service interruption.",
-        "sent": False,
+        "sent": sms_sent,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.customer_notifications.insert_one(notification)
     
-    return {"message": "Payment marked as failed and customer notified"}
+    return {"message": "Payment marked as failed and customer notified", "sms_sent": sms_sent}
 
 # ===================== IN-HOUSE MESSAGING SYSTEM =====================
 
