@@ -6987,6 +6987,624 @@ async def respond_to_quote(quote_id: str, request: Request, current_user: dict =
     
     return {"message": "Quote response sent"}
 
+# ===================== ENHANCED SUBSCRIPTION PAYMENT SYSTEM =====================
+
+@api_router.post("/subscriptions/process-initial-payment")
+async def process_initial_subscription_payment(booking_id: str):
+    """Process initial payment for first subscription service day"""
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if not booking.get("is_monthly"):
+        raise HTTPException(status_code=400, detail="Not a subscription booking")
+    
+    # In production, charge the card here
+    # For now, simulate success and add to pending routes
+    payment_success = True  # This would be actual Square charge result
+    
+    if payment_success:
+        # Calculate next service dates based on selected days
+        monthly_days = booking.get("monthly_service_days", [])
+        today = datetime.now(timezone.utc)
+        
+        # Find next service date
+        next_dates = []
+        for day in sorted(monthly_days):
+            if day > today.day:
+                next_date = today.replace(day=day)
+                next_dates.append(next_date)
+        
+        if not next_dates:
+            # Roll to next month
+            next_month = today.month + 1 if today.month < 12 else 1
+            next_year = today.year if today.month < 12 else today.year + 1
+            for day in sorted(monthly_days):
+                try:
+                    next_date = today.replace(year=next_year, month=next_month, day=day)
+                    next_dates.append(next_date)
+                except ValueError:
+                    pass
+        
+        first_service_date = next_dates[0] if next_dates else today + timedelta(days=7)
+        next_payment_date = (first_service_date - timedelta(days=3)).strftime("%Y-%m-%d")
+        
+        # Update booking with payment info
+        await db.bookings.update_one(
+            {"id": booking_id},
+            {"$set": {
+                "subscription_status": "active",
+                "first_payment_processed": True,
+                "first_payment_date": datetime.now(timezone.utc).isoformat(),
+                "next_service_date": first_service_date.strftime("%Y-%m-%d"),
+                "next_payment_date": next_payment_date,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Add to pending routes
+        await add_booking_to_route(booking_id, first_service_date.strftime("%Y-%m-%d"))
+        
+        return {
+            "status": "success",
+            "message": "Initial payment processed",
+            "next_service_date": first_service_date.strftime("%Y-%m-%d"),
+            "next_payment_date": next_payment_date
+        }
+    else:
+        # Payment failed
+        await db.bookings.update_one(
+            {"id": booking_id},
+            {"$set": {
+                "subscription_status": "payment_failed",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Send SMS notification
+        customer_phone = booking.get("customer_phone")
+        if customer_phone:
+            sms_message = f"Hi {booking.get('customer_name', 'Customer')}, your Up-Wash payment could not be processed. Please update your payment method to start your subscription."
+            await send_sms(customer_phone, sms_message)
+        
+        raise HTTPException(status_code=402, detail="Payment failed")
+
+async def add_booking_to_route(booking_id: str, service_date: str):
+    """Add a booking to the appropriate route based on zip code"""
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        return
+    
+    # Extract zip from address
+    address = booking.get("customer_address", "")
+    zip_code = ""
+    parts = address.split()
+    for part in parts:
+        if len(part) == 5 and part.isdigit():
+            zip_code = part
+            break
+    
+    if not zip_code:
+        zip_code = "00000"
+    
+    # Find or create route for this zip and date
+    route = await db.routes.find_one({
+        "zip_code": zip_code,
+        "service_date": service_date,
+        "status": {"$ne": "completed"}
+    }, {"_id": 0})
+    
+    if route:
+        # Add to existing route
+        await db.routes.update_one(
+            {"id": route["id"]},
+            {"$push": {"bookings": {
+                "booking_id": booking_id,
+                "customer_name": booking.get("customer_name"),
+                "customer_address": booking.get("customer_address"),
+                "customer_phone": booking.get("customer_phone"),
+                "services": booking.get("services", [])
+            }}}
+        )
+    else:
+        # Create new route
+        new_route = {
+            "id": str(uuid.uuid4()),
+            "name": f"Route {zip_code} - {service_date}",
+            "zip_code": zip_code,
+            "service_date": service_date,
+            "status": "pending",
+            "bookings": [{
+                "booking_id": booking_id,
+                "customer_name": booking.get("customer_name"),
+                "customer_address": booking.get("customer_address"),
+                "customer_phone": booking.get("customer_phone"),
+                "services": booking.get("services", [])
+            }],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.routes.insert_one(new_route)
+    
+    # Update booking with route info
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {"in_pending_route": True, "service_date": service_date}}
+    )
+
+@api_router.post("/cron/process-advance-payments")
+async def process_advance_payments():
+    """CRON JOB: Process payments 3 days before service (run daily)"""
+    today = datetime.now(timezone.utc)
+    target_payment_date = today.strftime("%Y-%m-%d")
+    
+    # Find subscriptions due for payment today (3 days before their next service)
+    subscriptions = await db.bookings.find({
+        "is_monthly": True,
+        "subscription_status": "active",
+        "next_payment_date": target_payment_date
+    }, {"_id": 0}).to_list(500)
+    
+    results = {"processed": 0, "failed": 0, "reminders_sent": 0}
+    
+    for sub in subscriptions:
+        # In production, attempt Square charge here
+        payment_success = True  # Simulated
+        
+        if payment_success:
+            # Calculate next service date and payment date
+            monthly_days = sub.get("monthly_service_days", [])
+            current_service_date = sub.get("next_service_date")
+            
+            # Find next service date after current one
+            next_service_date = calculate_next_service_date(monthly_days, current_service_date)
+            next_payment_date = (datetime.strptime(next_service_date, "%Y-%m-%d") - timedelta(days=3)).strftime("%Y-%m-%d")
+            
+            # Add to pending routes
+            await add_booking_to_route(sub["id"], sub.get("next_service_date"))
+            
+            # Update subscription
+            await db.bookings.update_one(
+                {"id": sub["id"]},
+                {"$set": {
+                    "last_payment_date": today.isoformat(),
+                    "next_service_date": next_service_date,
+                    "next_payment_date": next_payment_date,
+                    "payment_retry_count": 0,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            results["processed"] += 1
+        else:
+            # Payment failed - send reminder
+            await db.bookings.update_one(
+                {"id": sub["id"]},
+                {"$set": {
+                    "subscription_status": "payment_failed",
+                    "payment_failed_date": today.isoformat(),
+                    "payment_retry_count": 0,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Send SMS reminder
+            customer_phone = sub.get("customer_phone")
+            if customer_phone:
+                sms_message = f"Hi {sub.get('customer_name', 'Customer')}, your Up-Wash payment could not be processed. We'll retry on your service day. Please update your payment method at upwash.com"
+                await send_sms(customer_phone, sms_message)
+                results["reminders_sent"] += 1
+            
+            results["failed"] += 1
+    
+    return results
+
+@api_router.post("/cron/retry-failed-payments")
+async def retry_failed_payments():
+    """CRON JOB: Retry failed payments at 8am on service day (run at 8am daily)"""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Find failed subscriptions with service today
+    failed_subs = await db.bookings.find({
+        "is_monthly": True,
+        "subscription_status": "payment_failed",
+        "next_service_date": today
+    }, {"_id": 0}).to_list(500)
+    
+    results = {"retried": 0, "success": 0, "removed_from_schedule": 0}
+    
+    for sub in failed_subs:
+        results["retried"] += 1
+        
+        # In production, retry Square charge here
+        payment_success = False  # Simulated as failed for demo
+        
+        if payment_success:
+            # Payment succeeded on retry
+            monthly_days = sub.get("monthly_service_days", [])
+            next_service_date = calculate_next_service_date(monthly_days, today)
+            next_payment_date = (datetime.strptime(next_service_date, "%Y-%m-%d") - timedelta(days=3)).strftime("%Y-%m-%d")
+            
+            await db.bookings.update_one(
+                {"id": sub["id"]},
+                {"$set": {
+                    "subscription_status": "active",
+                    "last_payment_date": datetime.now(timezone.utc).isoformat(),
+                    "next_service_date": next_service_date,
+                    "next_payment_date": next_payment_date,
+                    "payment_retry_count": 0,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            results["success"] += 1
+        else:
+            # Payment retry failed - remove from today's schedule
+            await remove_booking_from_routes(sub["id"], today)
+            
+            # Calculate next service date and set next payment attempt 3 days before
+            monthly_days = sub.get("monthly_service_days", [])
+            next_service_date = calculate_next_service_date(monthly_days, today)
+            next_payment_date = (datetime.strptime(next_service_date, "%Y-%m-%d") - timedelta(days=3)).strftime("%Y-%m-%d")
+            
+            # Update subscription - DON'T cancel, just skip this service
+            await db.bookings.update_one(
+                {"id": sub["id"]},
+                {"$set": {
+                    "subscription_status": "active",  # Keep active, just skipped this service
+                    "next_service_date": next_service_date,
+                    "next_payment_date": next_payment_date,
+                    "services_skipped": (sub.get("services_skipped", 0) + 1),
+                    "last_skipped_date": today,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Send SMS about skipped service
+            customer_phone = sub.get("customer_phone")
+            if customer_phone:
+                sms_message = f"Hi {sub.get('customer_name', 'Customer')}, your Up-Wash service for today has been skipped due to payment issues. Your subscription remains active and we'll try again before your next service date ({next_service_date}). Please update your payment method."
+                await send_sms(customer_phone, sms_message)
+            
+            results["removed_from_schedule"] += 1
+    
+    return results
+
+async def remove_booking_from_routes(booking_id: str, service_date: str):
+    """Remove a booking from pending routes and contractor assignments"""
+    # Remove from pending routes
+    await db.routes.update_many(
+        {"service_date": service_date},
+        {"$pull": {"bookings": {"booking_id": booking_id}}}
+    )
+    
+    # Update booking
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {"in_pending_route": False}}
+    )
+
+def calculate_next_service_date(monthly_days: list, after_date: str) -> str:
+    """Calculate the next service date from monthly_days after the given date"""
+    if not monthly_days:
+        return (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
+    
+    after = datetime.strptime(after_date, "%Y-%m-%d")
+    
+    # Check remaining days in current month
+    for day in sorted(monthly_days):
+        if day > after.day:
+            try:
+                return after.replace(day=day).strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+    
+    # Move to next month
+    next_month = after.month + 1 if after.month < 12 else 1
+    next_year = after.year if after.month < 12 else after.year + 1
+    
+    for day in sorted(monthly_days):
+        try:
+            return after.replace(year=next_year, month=next_month, day=day).strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+    
+    return (after + timedelta(days=30)).strftime("%Y-%m-%d")
+
+# ===================== IN-APP MESSAGING SYSTEM (Client ↔ Admin ↔ Contractor) =====================
+
+class InAppMessage(BaseModel):
+    content: str
+    recipient_id: Optional[str] = None  # client_id, contractor_id, or None for admin
+    recipient_type: str  # "admin", "client", "contractor"
+
+@api_router.post("/messages/send")
+async def send_in_app_message(msg: InAppMessage, request: Request):
+    """Send an in-app message between any two parties"""
+    # Get sender info from token
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        sender_id = payload.get("user_id") or payload.get("sub")
+        sender_role = payload.get("role", "client")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Get sender name
+    if sender_role == "admin":
+        sender_name = "Admin"
+        sender_id = "admin"
+    elif sender_role == "contractor":
+        contractor = await db.users.find_one({"id": sender_id, "role": "contractor"}, {"_id": 0})
+        sender_name = contractor.get("full_name", contractor.get("username", "Contractor")) if contractor else "Contractor"
+    else:
+        client = await db.clients.find_one({"id": sender_id}, {"_id": 0})
+        if not client:
+            client = await db.bookings.find_one({"client_id": sender_id}, {"_id": 0})
+        sender_name = client.get("customer_name", client.get("name", "Customer")) if client else "Customer"
+    
+    message_doc = {
+        "id": str(uuid.uuid4()),
+        "sender_id": sender_id,
+        "sender_name": sender_name,
+        "sender_type": sender_role,
+        "recipient_id": msg.recipient_id or "admin",
+        "recipient_type": msg.recipient_type,
+        "content": msg.content,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.in_app_messages.insert_one(message_doc)
+    
+    # Create notification for recipient
+    notification = {
+        "id": str(uuid.uuid4()),
+        "user_id": msg.recipient_id or "admin",
+        "user_type": msg.recipient_type,
+        "type": "new_message",
+        "title": f"New message from {sender_name}",
+        "message": msg.content[:100] + ("..." if len(msg.content) > 100 else ""),
+        "sender_id": sender_id,
+        "sender_name": sender_name,
+        "message_id": message_doc["id"],
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.message_notifications.insert_one(notification)
+    
+    return {
+        "status": "sent",
+        "message_id": message_doc["id"],
+        "recipient": msg.recipient_type
+    }
+
+@api_router.get("/messages/inbox")
+async def get_inbox_messages(request: Request):
+    """Get all messages for the current user"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id") or payload.get("sub")
+        user_role = payload.get("role", "client")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    if user_role == "admin":
+        user_id = "admin"
+    
+    # Get messages where user is recipient
+    messages = await db.in_app_messages.find({
+        "$or": [
+            {"recipient_id": user_id},
+            {"sender_id": user_id}
+        ]
+    }, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    return {"messages": messages}
+
+@api_router.get("/messages/thread/{other_user_id}")
+async def get_message_thread(other_user_id: str, request: Request):
+    """Get conversation thread with another user"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id") or payload.get("sub")
+        user_role = payload.get("role", "client")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    if user_role == "admin":
+        user_id = "admin"
+    
+    # Get messages between these two users
+    messages = await db.in_app_messages.find({
+        "$or": [
+            {"sender_id": user_id, "recipient_id": other_user_id},
+            {"sender_id": other_user_id, "recipient_id": user_id}
+        ]
+    }, {"_id": 0}).sort("created_at", 1).to_list(500)
+    
+    # Mark as read
+    await db.in_app_messages.update_many(
+        {"sender_id": other_user_id, "recipient_id": user_id, "read": False},
+        {"$set": {"read": True}}
+    )
+    
+    return {"messages": messages, "other_user_id": other_user_id}
+
+@api_router.get("/messages/notifications")
+async def get_message_notifications(request: Request):
+    """Get unread message notifications for current user"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id") or payload.get("sub")
+        user_role = payload.get("role", "client")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    if user_role == "admin":
+        user_id = "admin"
+    
+    notifications = await db.message_notifications.find({
+        "user_id": user_id,
+        "read": False
+    }, {"_id": 0}).sort("created_at", -1).to_list(50)
+    
+    return {"notifications": notifications, "count": len(notifications)}
+
+@api_router.post("/messages/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, request: Request):
+    """Mark a notification as read"""
+    await db.message_notifications.update_one(
+        {"id": notification_id},
+        {"$set": {"read": True}}
+    )
+    return {"status": "ok"}
+
+@api_router.get("/messages/contacts")
+async def get_message_contacts(request: Request):
+    """Get list of contacts the user can message"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id") or payload.get("sub")
+        user_role = payload.get("role", "client")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    contacts = []
+    
+    # Everyone can message admin
+    contacts.append({
+        "id": "admin",
+        "name": "Up-Wash Admin",
+        "type": "admin",
+        "avatar": None
+    })
+    
+    if user_role == "admin":
+        # Admin can message all clients and contractors
+        clients = await db.clients.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1}).to_list(100)
+        for c in clients:
+            contacts.append({
+                "id": c["id"],
+                "name": c.get("name", c.get("email", "Client")),
+                "type": "client"
+            })
+        
+        contractors = await db.users.find({"role": "contractor"}, {"_id": 0, "id": 1, "full_name": 1, "username": 1}).to_list(100)
+        for c in contractors:
+            contacts.append({
+                "id": c["id"],
+                "name": c.get("full_name", c.get("username", "Contractor")),
+                "type": "contractor"
+            })
+    
+    elif user_role == "contractor":
+        # Contractors can message admin and clients they're assigned to
+        # For now, allow messaging all other contractors too
+        contractors = await db.users.find({"role": "contractor", "id": {"$ne": user_id}}, {"_id": 0, "id": 1, "full_name": 1, "username": 1}).to_list(100)
+        for c in contractors:
+            contacts.append({
+                "id": c["id"],
+                "name": c.get("full_name", c.get("username", "Contractor")),
+                "type": "contractor"
+            })
+    
+    else:  # client
+        # Clients can message admin and contractors assigned to their bookings
+        bookings = await db.bookings.find({"client_id": user_id}, {"_id": 0, "assigned_contractor_id": 1}).to_list(100)
+        contractor_ids = set()
+        for b in bookings:
+            if b.get("assigned_contractor_id"):
+                contractor_ids.add(b["assigned_contractor_id"])
+        
+        for cid in contractor_ids:
+            contractor = await db.users.find_one({"id": cid, "role": "contractor"}, {"_id": 0})
+            if contractor:
+                contacts.append({
+                    "id": contractor["id"],
+                    "name": contractor.get("full_name", contractor.get("username", "Contractor")),
+                    "type": "contractor"
+                })
+    
+    return {"contacts": contacts}
+
+# ===================== PUSH NOTIFICATION SUBSCRIPTION =====================
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: dict
+
+@api_router.post("/push/subscribe")
+async def subscribe_to_push(subscription: PushSubscription, request: Request):
+    """Store push notification subscription for a user"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id") or payload.get("sub")
+        user_role = payload.get("role", "client")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    sub_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "user_type": user_role,
+        "endpoint": subscription.endpoint,
+        "keys": subscription.keys,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Remove old subscriptions for this user
+    await db.push_subscriptions.delete_many({"user_id": user_id})
+    
+    # Add new subscription
+    await db.push_subscriptions.insert_one(sub_doc)
+    
+    return {"status": "subscribed"}
+
+@api_router.delete("/push/unsubscribe")
+async def unsubscribe_from_push(request: Request):
+    """Remove push notification subscription"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id") or payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    await db.push_subscriptions.delete_many({"user_id": user_id})
+    
+    return {"status": "unsubscribed"}
+
 # Include the router
 app.include_router(api_router)
 
