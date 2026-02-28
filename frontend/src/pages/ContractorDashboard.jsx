@@ -1065,13 +1065,13 @@ function MyRoutes() {
           {routes.map((route) => (
             <div key={route.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20">
               <div className="flex justify-between items-start">
-                <div>
+                <div className="flex-1">
                   <h3 className="text-xl font-bold text-white">{route.name}</h3>
                   <p className="text-white/60">{route.description || 'No description'}</p>
-                  <p className="text-white/60">Area: {route.area || 'Not specified'}</p>
+                  <p className="text-white/60">Area: {route.area || route.zip_code || 'Not specified'}</p>
                   <p className="text-emerald-400 mt-2">{route.bookings?.length || 0} clients</p>
                   <p className="text-green-400 text-sm mt-1">
-                    Potential earnings: ${((route.bookings?.length || 0) * 10).toFixed(2)} ($10/stop)
+                    Potential earnings: ${((route.bookings?.length || 0) * 11).toFixed(2)} ($11/stop)
                   </p>
                 </div>
                 <button
@@ -1082,6 +1082,54 @@ function MyRoutes() {
                   Release Route
                 </button>
               </div>
+              
+              {/* Client Details */}
+              {route.bookings && route.bookings.length > 0 && (
+                <div className="mt-4 border-t border-white/10 pt-4">
+                  <p className="text-white/70 text-sm font-semibold mb-3">Client Details:</p>
+                  <div className="space-y-3">
+                    {route.bookings.map((booking, idx) => (
+                      <div key={idx} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="text-white font-semibold">{booking.customer_name}</p>
+                            <p className="text-white/60 text-sm flex items-center gap-2 mt-1">
+                              <MapPin className="w-3 h-3" /> {booking.customer_address}
+                            </p>
+                            {booking.customer_phone && (
+                              <p className="text-white/60 text-sm flex items-center gap-2 mt-1">
+                                <Phone className="w-3 h-3" /> {booking.customer_phone}
+                              </p>
+                            )}
+                            {booking.customer_email && (
+                              <p className="text-white/60 text-sm flex items-center gap-2 mt-1">
+                                <Mail className="w-3 h-3" /> {booking.customer_email}
+                              </p>
+                            )}
+                            {booking.services && booking.services.length > 0 && (
+                              <div className="flex gap-1 mt-2 flex-wrap">
+                                {booking.services.map((svc, i) => (
+                                  <span key={i} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
+                                    {svc.name || svc.service_id} {svc.quantity > 1 ? `x${svc.quantity}` : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <a
+                            href={`tel:${booking.customer_phone}`}
+                            className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Phone className="w-4 h-4" />
+                            Call
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
