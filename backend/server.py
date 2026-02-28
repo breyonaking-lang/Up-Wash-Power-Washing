@@ -6025,6 +6025,213 @@ async def get_client_subscription(current_client: dict = Depends(get_client_user
     )
     return {"subscription": subscription}
 
+@api_router.get("/client/booking-history")
+async def get_client_booking_history(current_client: dict = Depends(get_client_user)):
+    """Get client's past completed services"""
+    # Get all bookings for this client
+    bookings = await db.bookings.find(
+        {"customer_email": current_client["email"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Get completed stops for these bookings
+    completed_services = []
+    for booking in bookings:
+        completions = await db.stop_completions.find(
+            {"booking_id": booking["id"], "status": "completed"},
+            {"_id": 0}
+        ).to_list(50)
+        
+        for completion in completions:
+            completed_services.append({
+                "id": completion.get("id"),
+                "booking_id": booking["id"],
+                "service_date": completion.get("completed_at"),
+                "services": booking.get("services", []),
+                "address": booking.get("customer_address"),
+                "total": booking.get("total", 0),
+                "status": "completed",
+                "contractor_notes": completion.get("notes"),
+                "photos": completion.get("photos", [])
+            })
+    
+    # Also add bookings that have passed dates
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    for booking in bookings:
+        for date in booking.get("booking_dates", []):
+            if date < today:
+                # Check if not already in completed list
+                exists = any(s.get("service_date", "").startswith(date) for s in completed_services)
+                if not exists:
+                    completed_services.append({
+                        "id": f"{booking['id']}-{date}",
+                        "booking_id": booking["id"],
+                        "service_date": date,
+                        "services": booking.get("services", []),
+                        "address": booking.get("customer_address"),
+                        "total": booking.get("total", 0),
+                        "status": booking.get("payment_status", "pending")
+                    })
+    
+    # Sort by date descending
+    completed_services.sort(key=lambda x: x.get("service_date", ""), reverse=True)
+    
+    return {"bookings": completed_services[:50]}
+
+@api_router.get("/client/upcoming-services")
+async def get_client_upcoming_services(current_client: dict = Depends(get_client_user)):
+    """Get client's upcoming scheduled services"""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Get all active bookings for this client
+    bookings = await db.bookings.find(
+        {
+            "customer_email": current_client["email"],
+            "subscription_status": {"$ne": "cancelled"}
+        },
+        {"_id": 0}
+    ).to_list(50)
+    
+    upcoming = []
+    for booking in bookings:
+        # Check booking dates
+        for date in booking.get("booking_dates", []):
+            if date >= today:
+                upcoming.append({
+                    "id": f"{booking['id']}-{date}",
+                    "booking_id": booking["id"],
+                    "date": date,
+                    "services": booking.get("services", []),
+                    "address": booking.get("customer_address"),
+                    "total": booking.get("total", 0),
+                    "is_monthly": booking.get("is_monthly", False),
+                    "status": "scheduled"
+                })
+        
+        # For monthly subscriptions, generate next service dates
+        if booking.get("is_monthly") and booking.get("monthly_service_days"):
+            from calendar import monthrange
+            now = datetime.now(timezone.utc)
+            
+            for day in booking.get("monthly_service_days", []):
+                # This month
+                try:
+                    service_date = now.replace(day=day).strftime("%Y-%m-%d")
+                    if service_date >= today:
+                        exists = any(s.get("date") == service_date for s in upcoming)
+                        if not exists:
+                            upcoming.append({
+                                "id": f"{booking['id']}-{service_date}",
+                                "booking_id": booking["id"],
+                                "date": service_date,
+                                "services": booking.get("services", []),
+                                "address": booking.get("customer_address"),
+                                "total": booking.get("total", 0),
+                                "is_monthly": True,
+                                "status": "scheduled"
+                            })
+                except ValueError:
+                    pass
+                
+                # Next month
+                try:
+                    next_month = now.replace(day=1) + timedelta(days=32)
+                    next_month = next_month.replace(day=day)
+                    service_date = next_month.strftime("%Y-%m-%d")
+                    exists = any(s.get("date") == service_date for s in upcoming)
+                    if not exists:
+                        upcoming.append({
+                            "id": f"{booking['id']}-{service_date}",
+                            "booking_id": booking["id"],
+                            "date": service_date,
+                            "services": booking.get("services", []),
+                            "address": booking.get("customer_address"),
+                            "total": booking.get("total", 0),
+                            "is_monthly": True,
+                            "status": "scheduled"
+                        })
+                except ValueError:
+                    pass
+    
+    # Sort by date ascending
+    upcoming.sort(key=lambda x: x.get("date", ""))
+    
+    return {"services": upcoming[:20]}
+
+class SubscriptionCancelRequest(BaseModel):
+    reason: str
+
+@api_router.post("/client/subscription/cancel")
+async def cancel_client_subscription(req: SubscriptionCancelRequest, current_client: dict = Depends(get_client_user)):
+    """Request subscription cancellation"""
+    subscription = await db.bookings.find_one(
+        {"customer_email": current_client["email"], "is_monthly": True},
+        {"_id": 0}
+    )
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    # Create cancellation request
+    cancel_request = {
+        "id": str(uuid.uuid4()),
+        "booking_id": subscription["id"],
+        "client_id": current_client["client_id"],
+        "client_name": current_client["name"],
+        "client_email": current_client["email"],
+        "reason": req.reason,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.cancellation_requests.insert_one(cancel_request)
+    
+    # Notify admin
+    admin_notif = {
+        "id": str(uuid.uuid4()),
+        "type": "cancellation_request",
+        "title": f"Cancellation Request: {current_client['name']}",
+        "message": f"Reason: {req.reason}",
+        "booking_id": subscription["id"],
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_notifications.insert_one(admin_notif)
+    
+    return {"message": "Cancellation request submitted"}
+
+@api_router.post("/client/subscription/pause")
+async def pause_client_subscription(current_client: dict = Depends(get_client_user)):
+    """Pause subscription temporarily"""
+    result = await db.bookings.update_one(
+        {"customer_email": current_client["email"], "is_monthly": True},
+        {"$set": {
+            "subscription_status": "paused",
+            "paused_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    return {"message": "Subscription paused"}
+
+@api_router.post("/client/subscription/resume")
+async def resume_client_subscription(current_client: dict = Depends(get_client_user)):
+    """Resume paused subscription"""
+    result = await db.bookings.update_one(
+        {"customer_email": current_client["email"], "is_monthly": True, "subscription_status": "paused"},
+        {"$set": {
+            "subscription_status": "active",
+            "resumed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No paused subscription found")
+    
+    return {"message": "Subscription resumed"}
+
 @api_router.get("/client/contracts")
 async def get_client_contracts(current_client: dict = Depends(get_client_user)):
     """Get client's signed contracts"""
