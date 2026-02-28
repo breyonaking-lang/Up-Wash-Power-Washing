@@ -417,7 +417,50 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] Fixed duplicate BIBLE_VERSES declaration in ClientPortal.jsx
 - [x] Added /admin/documentors alias routes to match frontend calls
 
+### Feb 28, 2026 - Session 5 Updates
+
+#### Quote Request System ✅ NEW
+- [x] Dedicated quote request page (/quote?service=<id>)
+- [x] Form fields: name, phone, email, address, city, state, zip, description
+- [x] Preferred day selection (Thursday, Friday, Either)
+- [x] Photo upload functionality (1-5 photos)
+- [x] Quote services route to /quote page instead of /booking
+- [x] POST /api/quotes/request - Submit quote request
+- [x] GET /api/admin/quotes - View all quote requests
+- [x] POST /api/admin/quotes/{id}/respond - Respond with price via SMS
+
+#### Scent Bomb Enhancement ✅ NEW
+- [x] Scent Bomb now clickable on Services page (not just addon)
+- [x] Quantity options: 1 ($5), 2 ($10), 3 ($15), 4 ($20) scent bombs
+- [x] Routes to booking flow like other services
+
+#### Route Statistics Summary ✅ NEW
+- [x] Pending Routes page shows stats cards:
+  - Total Routes count
+  - Total Stops count
+  - Estimated Documentor Pay ($11/stop)
+  - Unique Zip Codes count
+- [x] Stats update dynamically based on filtered routes
+
+#### Calendar Enhanced Info ✅ NEW
+- [x] Booking modal shows full customer details:
+  - Customer name, phone, email
+  - Full address
+  - Services with quantities
+  - Assigned Documentor name (or "Not Assigned")
+  - Total price
+  - Payment & booking status badges
+
+#### Subscription Auto-Populate ✅ NEW
+- [x] "Auto-select nearest days" button on Monthly Subscription
+- [x] Calculates nearest available days based on selected services
+- [x] Considers service day restrictions (Mon-Tue for bins, Wed-Fri for patio, etc.)
+- [x] Fills serviceDaysPerMonth days automatically
+
+#### SMS Status ✅
+- SMS is working correctly via Twilio
+- Errors in logs were for invalid test numbers (555-xxx-xxxx)
+- Real phone numbers receive SMS successfully
+
 #### Still TODO (Next Session):
-- [ ] Admin dashboard "All" tabs clickable with filterable lists
-- [ ] Subscription auto-populate nearest day
-- [ ] Quote service click-through to quote form
+- [ ] Admin dashboard "All" tabs clickable with filterable lists (stats cards already link to relevant pages)
