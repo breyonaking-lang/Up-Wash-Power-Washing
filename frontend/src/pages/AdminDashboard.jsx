@@ -2570,30 +2570,35 @@ function RoutesPage() {
         )}
       </div>
 
-      {routes.length === 0 ? (
+      {filteredRoutes.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
           <RouteIcon className="w-12 h-12 text-white/40 mx-auto mb-4" />
-          <p className="text-white/60">No pending routes</p>
-          <p className="text-white/40 text-sm mt-2">Routes are created automatically when customers pay for routable services</p>
+          <p className="text-white/60">{searchQuery ? 'No routes match your search' : 'No pending routes'}</p>
+          <p className="text-white/40 text-sm mt-2">
+            {searchQuery ? 'Try a different search term' : 'Routes are created automatically when customers pay for routable services'}
+          </p>
         </div>
       ) : (
         <>
-          {/* Group by Zip Code */}
+          {/* Grouped Routes Display */}
           {Object.entries(groupedRoutes)
-            .map(([zip, zipRoutes]) => {
-              const pendingInZip = zipRoutes.filter(r => !r.assigned_documentor_id);
-              if (pendingInZip.length === 0) return null;
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([groupKey, groupRoutes]) => {
+              const pendingInGroup = groupRoutes.filter(r => !r.assigned_documentor_id);
+              if (pendingInGroup.length === 0) return null;
+              
+              const groupLabel = groupBy === 'zip' ? 'Zip Code' : groupBy === 'city' ? 'City' : 'State';
               
               return (
-                <div key={zip} className="space-y-3">
+                <div key={groupKey} className="space-y-3">
                   <h2 className="text-lg font-bold text-white/80 flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-blue-400" />
-                    Zip Code: {zip}
-                    <span className="text-white/40 text-sm">({pendingInZip.length} routes)</span>
+                    {groupLabel}: {groupKey}
+                    <span className="text-white/40 text-sm">({pendingInGroup.length} routes)</span>
                   </h2>
                   
                   <div className="space-y-3">
-                    {pendingInZip.map((route) => (
+                    {pendingInGroup.map((route) => (
                       <div 
                         key={route.id} 
                         className={`bg-white/10 backdrop-blur rounded-2xl p-6 border transition cursor-pointer ${
