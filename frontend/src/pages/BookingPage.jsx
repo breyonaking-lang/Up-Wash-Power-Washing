@@ -971,22 +971,18 @@ const BookingPage = () => {
                         )}
                       </div>
 
-                      <div>
-                        <Label className="mb-2 block text-lg font-semibold">Start Date</Label>
-                        <p className="text-sm text-slate-500 mb-4">When should your subscription begin?</p>
-                        <div className="border rounded-2xl p-4 bg-slate-50 inline-block">
-                          <Calendar
-                            mode="single"
-                            selected={monthlyStartDate}
-                            onSelect={setMonthlyStartDate}
-                            disabled={isDateDisabled}
-                            fromDate={startOfToday()}
-                            toDate={addDays(new Date(), 60)}
-                            className="rounded-xl"
-                            data-testid="monthly-start-calendar"
-                          />
+                      {/* Auto-calculated Start Date Display */}
+                      {monthlyStartDate && (
+                        <div className="p-4 bg-green-50 rounded-2xl border border-green-200">
+                          <p className="text-green-800 font-medium">
+                            Your subscription will start on{' '}
+                            <strong>{format(monthlyStartDate, "MMMM d, yyyy")}</strong>
+                          </p>
+                          <p className="text-green-600 text-sm mt-1">
+                            (Nearest available date based on your selections)
+                          </p>
                         </div>
-                      </div>
+                      )}
 
                       {/* Payment Info */}
                       <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
