@@ -889,7 +889,17 @@ const BookingPage = () => {
 
                       {/* Select specific days of the month */}
                       <div className="mb-6">
-                        <Label className="mb-2 block text-lg font-semibold">Select Days of the Month</Label>
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="block text-lg font-semibold">Select Days of the Month</Label>
+                          <button
+                            type="button"
+                            onClick={autoPopulateMonthlyDays}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                            data-testid="auto-populate-days-btn"
+                          >
+                            Auto-select nearest days
+                          </button>
+                        </div>
                         <p className="text-sm text-slate-500 mb-4">
                           Choose {serviceDaysPerMonth} day{serviceDaysPerMonth > 1 ? 's' : ''} when you'd like service each month
                         </p>
@@ -923,7 +933,7 @@ const BookingPage = () => {
                                 : `${d}${suffix}${i < monthlyServiceDays.length - 2 ? ', ' : ' '}`;
                             })} of each month
                           </p>
-                        )}
+                        )}}
                       </div>
 
                       <div>
