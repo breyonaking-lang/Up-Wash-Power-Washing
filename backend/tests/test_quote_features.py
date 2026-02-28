@@ -102,7 +102,7 @@ class TestAdminLogin:
     
     def test_admin_login_success(self):
         """Test admin login with valid credentials"""
-        response = requests.post(f"{BASE_URL}/api/admin/login", json={
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "username": "Hughes0108",
             "password": "Godfirst7!"
         })
@@ -116,7 +116,7 @@ class TestAdminLogin:
     def test_admin_get_quotes_authenticated(self):
         """Test getting quote requests with valid auth"""
         # First login
-        login_response = requests.post(f"{BASE_URL}/api/admin/login", json={
+        login_response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "username": "Hughes0108",
             "password": "Godfirst7!"
         })
