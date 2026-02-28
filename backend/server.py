@@ -3809,6 +3809,274 @@ async def notify_clients_for_route(route_id: str, current_user: dict = Depends(g
         "notification_text": "We will be servicing your home soon, please be sure to set your bin to the curb!"
     }
 
+# ===================== ADMIN-CONTRACTOR SMS COMMUNICATION =====================
+
+class AdminContractorSMS(BaseModel):
+    contractor_id: str
+    message: str
+
+@api_router.post("/admin/sms/contractor")
+async def admin_send_sms_to_contractor(sms_data: AdminContractorSMS, current_user: dict = Depends(get_admin_user)):
+    """Admin sends SMS directly to a contractor"""
+    # Get contractor info
+    contractor = await db.users.find_one({"id": sms_data.contractor_id, "role": "contractor"}, {"_id": 0})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    
+    phone = contractor.get("phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="Contractor has no phone number")
+    
+    # Send SMS via Twilio
+    result = await send_sms(phone, sms_data.message)
+    
+    # Log the admin-contractor conversation
+    conversation_log = {
+        "id": str(uuid.uuid4()),
+        "sender_type": "admin",
+        "sender_id": current_user["user_id"],
+        "recipient_type": "contractor",
+        "recipient_id": sms_data.contractor_id,
+        "recipient_name": contractor.get("full_name", contractor.get("username")),
+        "recipient_phone": phone,
+        "direction": "outbound",
+        "message": sms_data.message,
+        "status": result["status"],
+        "channel": "sms",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_contractor_messages.insert_one(conversation_log)
+    
+    # Also create in-app notification for contractor
+    notification = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": sms_data.contractor_id,
+        "type": "admin_sms",
+        "title": "SMS from Admin",
+        "message": sms_data.message[:100] + ("..." if len(sms_data.message) > 100 else ""),
+        "full_message": sms_data.message,
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    
+    return {
+        "message": "SMS sent to contractor",
+        "status": result["status"],
+        "sms_id": result["id"],
+        "contractor_name": contractor.get("full_name", contractor.get("username"))
+    }
+
+class ContractorLoginSMS(BaseModel):
+    contractor_id: str
+    include_password: bool = True  # If false, only sends username
+
+@api_router.post("/admin/sms/contractor/login")
+async def send_contractor_login_sms(login_sms: ContractorLoginSMS, current_user: dict = Depends(get_admin_user)):
+    """Admin sends contractor login credentials via SMS"""
+    contractor = await db.users.find_one({"id": login_sms.contractor_id, "role": "contractor"}, {"_id": 0})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    
+    phone = contractor.get("phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="Contractor has no phone number")
+    
+    username = contractor.get("username")
+    full_name = contractor.get("full_name", username)
+    
+    # Generate a temporary password if needed
+    if login_sms.include_password:
+        # Generate new temporary password
+        temp_password = f"Upwash{str(uuid.uuid4())[:6]}"
+        
+        # Update contractor's password
+        await db.users.update_one(
+            {"id": login_sms.contractor_id},
+            {"$set": {
+                "password_hash": hash_password(temp_password),
+                "temp_password": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        message = f"Hi {full_name}! Your Up-Wash contractor login credentials:\n\nUsername: {username}\nPassword: {temp_password}\n\nLogin at: https://upwash.com/contractor/login\n\nPlease change your password after first login."
+    else:
+        message = f"Hi {full_name}! Your Up-Wash contractor username is: {username}\n\nLogin at: https://upwash.com/contractor/login\n\nContact admin if you need password reset."
+    
+    # Send SMS
+    result = await send_sms(phone, message)
+    
+    # Log the credential SMS
+    log_entry = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": login_sms.contractor_id,
+        "contractor_name": full_name,
+        "phone": phone,
+        "type": "login_credentials",
+        "included_password": login_sms.include_password,
+        "status": result["status"],
+        "sent_by": current_user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.credential_sms_logs.insert_one(log_entry)
+    
+    return {
+        "message": "Login credentials sent via SMS",
+        "status": result["status"],
+        "contractor_name": full_name,
+        "included_password": login_sms.include_password
+    }
+
+@api_router.post("/admin/contractors/create-and-notify")
+async def create_contractor_and_send_login(contractor: ContractorCreate, current_user: dict = Depends(get_admin_user)):
+    """Create a new contractor and send login credentials via SMS"""
+    # Check if username exists
+    existing = await db.users.find_one({"username": contractor.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "username": contractor.username,
+        "password_hash": hash_password(contractor.password),
+        "role": "contractor",
+        "full_name": contractor.full_name,
+        "phone": contractor.phone,
+        "email": contractor.email,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(user_doc)
+    
+    # Send login credentials via SMS if phone provided
+    sms_result = None
+    if contractor.phone:
+        message = f"Welcome to Up-Wash, {contractor.full_name}!\n\nYour contractor login credentials:\nUsername: {contractor.username}\nPassword: {contractor.password}\n\nLogin at: https://upwash.com/contractor/login"
+        sms_result = await send_sms(contractor.phone, message)
+        
+        # Log credential SMS
+        log_entry = {
+            "id": str(uuid.uuid4()),
+            "contractor_id": user_doc["id"],
+            "contractor_name": contractor.full_name,
+            "phone": contractor.phone,
+            "type": "new_account_credentials",
+            "status": sms_result["status"],
+            "sent_by": current_user["user_id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.credential_sms_logs.insert_one(log_entry)
+    
+    return {
+        "id": user_doc["id"],
+        "username": contractor.username,
+        "message": "Contractor created",
+        "sms_sent": sms_result is not None,
+        "sms_status": sms_result["status"] if sms_result else "no_phone"
+    }
+
+class ContractorToAdminSMS(BaseModel):
+    message: str
+
+@api_router.post("/contractor/sms/admin")
+async def contractor_send_sms_to_admin(sms_data: ContractorToAdminSMS, current_user: dict = Depends(get_contractor_user)):
+    """Contractor sends SMS to admin (replies back)"""
+    # Get admin phone (from settings or environment)
+    admin_phone = os.environ.get('ADMIN_PHONE', '')
+    
+    if not admin_phone:
+        # Fallback: Log as in-app message only
+        conversation_log = {
+            "id": str(uuid.uuid4()),
+            "sender_type": "contractor",
+            "sender_id": current_user["user_id"],
+            "sender_name": current_user.get("username", "Contractor"),
+            "recipient_type": "admin",
+            "direction": "inbound",
+            "message": sms_data.message,
+            "status": "in_app_only",
+            "channel": "in_app",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.admin_contractor_messages.insert_one(conversation_log)
+        
+        # Create admin notification
+        admin_notif = {
+            "id": str(uuid.uuid4()),
+            "type": "contractor_sms_reply",
+            "title": f"Message from {current_user.get('username', 'Contractor')}",
+            "message": sms_data.message[:100] + ("..." if len(sms_data.message) > 100 else ""),
+            "full_message": sms_data.message,
+            "sender_id": current_user["user_id"],
+            "read": False,
+            "play_sound": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.admin_notifications.insert_one(admin_notif)
+        
+        return {"message": "Message sent to admin (in-app)", "status": "in_app_only"}
+    
+    # Send SMS to admin
+    contractor = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
+    contractor_name = contractor.get("full_name", contractor.get("username", "Contractor"))
+    
+    full_message = f"[From: {contractor_name}]\n{sms_data.message}"
+    result = await send_sms(admin_phone, full_message, current_user["user_id"])
+    
+    # Log conversation
+    conversation_log = {
+        "id": str(uuid.uuid4()),
+        "sender_type": "contractor",
+        "sender_id": current_user["user_id"],
+        "sender_name": contractor_name,
+        "recipient_type": "admin",
+        "recipient_phone": admin_phone,
+        "direction": "inbound",
+        "message": sms_data.message,
+        "status": result["status"],
+        "channel": "sms",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_contractor_messages.insert_one(conversation_log)
+    
+    return {"message": "SMS sent to admin", "status": result["status"]}
+
+@api_router.get("/admin/sms/contractor/history/{contractor_id}")
+async def get_admin_contractor_sms_history(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Get SMS conversation history between admin and a contractor"""
+    messages = await db.admin_contractor_messages.find(
+        {"$or": [
+            {"recipient_id": contractor_id, "sender_type": "admin"},
+            {"sender_id": contractor_id, "sender_type": "contractor"}
+        ]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return {"messages": messages}
+
+@api_router.get("/contractor/sms/admin/history")
+async def get_contractor_admin_sms_history(current_user: dict = Depends(get_contractor_user)):
+    """Get contractor's SMS conversation history with admin"""
+    messages = await db.admin_contractor_messages.find(
+        {"$or": [
+            {"recipient_id": current_user["user_id"], "recipient_type": "contractor"},
+            {"sender_id": current_user["user_id"], "sender_type": "contractor"}
+        ]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return {"messages": messages}
+
+@api_router.get("/admin/sms/contractors/all")
+async def get_all_admin_contractor_messages(current_user: dict = Depends(get_admin_user)):
+    """Get all admin-contractor SMS messages"""
+    messages = await db.admin_contractor_messages.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return {"messages": messages}
+
 # ===================== AUTOMATED PAYROLL SYSTEM =====================
 
 @api_router.get("/admin/payroll/pending")
