@@ -178,7 +178,7 @@ const ServicesPage = () => {
               transition={{ delay: index * 0.1 }}
               className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer group"
               data-testid={`service-detail-${service.id}`}
-              onClick={() => handleBookService(service.id, 1)}
+              onClick={() => handleBookService(service.id, 1, service.isQuote)}
             >
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
                 {/* Service Info */}
