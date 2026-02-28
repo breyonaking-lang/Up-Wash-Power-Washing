@@ -84,36 +84,34 @@ function EarningsDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-        <Wallet className="text-green-400" />
-        My Earnings
-      </h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <Wallet className="text-green-400" />
+          My Earnings
+        </h1>
+        <div className="text-right">
+          <p className="text-white/60 text-sm">Week resets in</p>
+          <p className="text-amber-400 font-bold">{earnings?.resets_in_days || 0} days</p>
+        </div>
+      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl p-6 border border-green-500/30">
-          <p className="text-green-400 text-sm">This Week</p>
-          <p className="text-3xl font-bold text-white">${(earnings?.this_week_earnings || 0).toFixed(2)}</p>
-          <p className="text-white/60 text-sm">{earnings?.this_week_stops || 0} stops</p>
+      {/* Week Period Banner */}
+      <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-xl p-4 border border-indigo-500/30">
+        <p className="text-indigo-300 text-sm">Current Week</p>
+        <p className="text-white font-semibold">{earnings?.week_start} - {earnings?.week_end}</p>
+      </div>
+
+      {/* Summary Cards - Only Today and This Week */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-2xl p-6 border border-emerald-500/30">
+          <p className="text-emerald-400 text-sm">Today's Earnings</p>
+          <p className="text-4xl font-bold text-white">${(earnings?.today_earnings || 0).toFixed(2)}</p>
+          <p className="text-white/60 text-sm mt-1">{earnings?.today_stops || 0} stops completed</p>
         </div>
         <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl p-6 border border-blue-500/30">
-          <p className="text-blue-400 text-sm">Total Earnings</p>
-          <p className="text-3xl font-bold text-white">${(earnings?.total_earnings || 0).toFixed(2)}</p>
-          <p className="text-white/60 text-sm">{earnings?.total_completed_stops || 0} stops</p>
-        </div>
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl p-6 border border-purple-500/30">
-          <p className="text-purple-400 text-sm">Total Paid</p>
-          <p className="text-3xl font-bold text-white">${(earnings?.total_paid || 0).toFixed(2)}</p>
-        </div>
-        <div className={`rounded-2xl p-6 border ${
-          (earnings?.unpaid_balance || 0) > 0 
-            ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-yellow-500/30' 
-            : 'bg-white/5 border-white/20'
-        }`}>
-          <p className={`text-sm ${(earnings?.unpaid_balance || 0) > 0 ? 'text-yellow-400' : 'text-white/60'}`}>
-            Unpaid Balance
-          </p>
-          <p className="text-3xl font-bold text-white">${(earnings?.unpaid_balance || 0).toFixed(2)}</p>
+          <p className="text-blue-400 text-sm">This Week's Earnings</p>
+          <p className="text-4xl font-bold text-white">${(earnings?.this_week_earnings || 0).toFixed(2)}</p>
+          <p className="text-white/60 text-sm mt-1">{earnings?.this_week_stops || 0} stops completed</p>
         </div>
       </div>
 
@@ -126,23 +124,24 @@ function EarningsDashboard() {
             <p className="text-2xl font-bold text-green-400">${payPerStop.toFixed(2)}</p>
           </div>
           <div>
-            <p className="text-white/60">CNS Stops (No Pay)</p>
-            <p className="text-2xl font-bold text-red-400">{earnings?.total_cns_stops || 0} stops</p>
+            <p className="text-white/60">CNS Stops This Week</p>
+            <p className="text-2xl font-bold text-red-400">{earnings?.this_week_cns_stops || 0} stops</p>
+            <p className="text-white/40 text-xs">(No Pay)</p>
           </div>
         </div>
       </div>
 
-      {/* Recent Payments */}
-      {earnings?.recent_payments?.length > 0 && (
-        <div className="bg-white/10 rounded-2xl p-6 border border-white/20">
-          <h3 className="text-lg font-bold text-white mb-4">Payment History</h3>
-          <div className="space-y-3">
-            {earnings.recent_payments.map((payment, i) => (
-              <div key={i} className="flex justify-between items-center py-3 border-b border-white/10 last:border-0">
-                <div>
-                  <p className="text-white font-semibold">${payment.amount.toFixed(2)}</p>
-                  <p className="text-white/60 text-sm">{payment.payment_method}</p>
-                </div>
+      {/* Weekly Reset Notice */}
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3">
+        <Clock className="w-6 h-6 text-amber-400" />
+        <div>
+          <p className="text-amber-400 font-medium">Weekly Reset</p>
+          <p className="text-white/60 text-sm">Earnings counter resets every Monday. Make sure to track your stops!</p>
+        </div>
+      </div>
+    </div>
+  );
+}
                 <p className="text-white/60 text-sm">{new Date(payment.paid_at).toLocaleDateString()}</p>
               </div>
             ))}
