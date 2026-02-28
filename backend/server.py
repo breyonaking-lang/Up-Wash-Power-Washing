@@ -6892,6 +6892,87 @@ async def mark_notification_read(notification_id: str, current_client: dict = De
     
     return {"message": "Notification marked as read"}
 
+# ===================== QUOTE REQUEST API =====================
+
+class QuoteRequest(BaseModel):
+    service_type: str
+    customer_name: str
+    customer_email: Optional[str] = None
+    customer_phone: str
+    customer_address: str
+    description: str
+    preferred_day: Optional[str] = None
+    photos: List[dict] = []
+
+@api_router.post("/quotes/request")
+async def create_quote_request(quote: QuoteRequest):
+    """Submit a new quote request"""
+    quote_doc = {
+        "id": str(uuid.uuid4()),
+        "service_type": quote.service_type,
+        "customer_name": quote.customer_name,
+        "customer_email": quote.customer_email,
+        "customer_phone": quote.customer_phone,
+        "customer_address": quote.customer_address,
+        "description": quote.description,
+        "preferred_day": quote.preferred_day,
+        "photos": quote.photos,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.quote_requests.insert_one(quote_doc)
+    
+    # Create admin notification
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "new_quote_request",
+        "title": "New Quote Request",
+        "message": f"Quote request from {quote.customer_name} for {quote.service_type}",
+        "data": {"quote_id": quote_doc["id"]},
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_notifications.insert_one(notification)
+    
+    return {"message": "Quote request submitted", "quote_id": quote_doc["id"]}
+
+@api_router.get("/admin/quotes")
+async def get_quote_requests(current_user: dict = Depends(get_admin_user)):
+    """Get all quote requests"""
+    quotes = await db.quote_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"quotes": quotes}
+
+@api_router.post("/admin/quotes/{quote_id}/respond")
+async def respond_to_quote(quote_id: str, request: Request, current_user: dict = Depends(get_admin_user)):
+    """Respond to a quote request with a price"""
+    data = await request.json()
+    price = data.get("price")
+    message = data.get("message", "")
+    
+    quote = await db.quote_requests.find_one({"id": quote_id}, {"_id": 0})
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote request not found")
+    
+    # Update quote status
+    await db.quote_requests.update_one(
+        {"id": quote_id},
+        {"$set": {
+            "status": "quoted",
+            "quoted_price": price,
+            "admin_message": message,
+            "responded_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Send SMS to customer
+    customer_phone = quote.get("customer_phone")
+    if customer_phone:
+        sms_message = f"Up-Wash Quote: Your {quote.get('service_type', 'service')} quote is ${price}. {message}"
+        await send_sms(customer_phone, sms_message)
+    
+    return {"message": "Quote response sent"}
+
 # Include the router
 app.include_router(api_router)
 
