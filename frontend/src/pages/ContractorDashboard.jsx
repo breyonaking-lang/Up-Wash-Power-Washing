@@ -1527,18 +1527,73 @@ function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [chatTarget, setChatTarget] = useState({ type: 'admin', id: null }); // admin, contractor, group
+  const [lastMessageCount, setLastMessageCount] = useState(0);
+  const [newMessageNotification, setNewMessageNotification] = useState(null);
+  const notificationAudioRef = useRef(null);
+
+  // Play notification sound
+  const playNotificationSound = () => {
+    try {
+      if (notificationAudioRef.current) {
+        notificationAudioRef.current.currentTime = 0;
+        notificationAudioRef.current.play();
+      }
+    } catch (e) {
+      console.log('Could not play notification sound');
+    }
+  };
+
+  // Check for new messages and show notification
+  const checkForNewMessages = (newMessages) => {
+    if (newMessages.length > lastMessageCount && lastMessageCount > 0) {
+      // Find the newest message from admin
+      const adminMessages = newMessages.filter(m => m.sender_type === 'admin' || m.is_admin_sender);
+      if (adminMessages.length > 0) {
+        const latestMessage = adminMessages[0];
+        
+        // Show notification
+        setNewMessageNotification({
+          sender: 'Admin',
+          message: latestMessage.content?.substring(0, 50) + (latestMessage.content?.length > 50 ? '...' : '') ||
+                   latestMessage.message?.substring(0, 50) + (latestMessage.message?.length > 50 ? '...' : '')
+        });
+        
+        // Play sound
+        playNotificationSound();
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => setNewMessageNotification(null), 5000);
+      }
+    }
+    setLastMessageCount(newMessages.length);
+  };
 
   useEffect(() => {
     fetchData();
+    
+    // Poll for new messages every 10 seconds
+    const pollInterval = setInterval(() => {
+      fetchData(true);
+    }, 10000);
+    
+    return () => clearInterval(pollInterval);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (isPolling = false) => {
     try {
       // Fetch messages
       const msgRes = await fetch(`${API_URL}/api/chat/messages`, { headers: getAuthHeaders() });
       if (msgRes.ok) {
         const msgData = await msgRes.json();
-        setMessages(msgData.messages || []);
+        const newMessages = msgData.messages || [];
+        setMessages(newMessages);
+        
+        // Check for new messages only during polling
+        if (isPolling) {
+          checkForNewMessages(newMessages);
+        } else {
+          setLastMessageCount(newMessages.length);
+        }
       }
 
       // Fetch nearby contractors
