@@ -14,6 +14,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ContractorLoginPage from "./pages/ContractorLoginPage";
 import ContractorDashboard from "./pages/ContractorDashboard";
 import ClientPortal, { ClientLogin, ClientRegister } from "./pages/ClientPortal";
+import QuoteRequestPage from "./pages/QuoteRequestPage";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="services" element={<ServicesPage />} />
             <Route path="booking" element={<BookingPage />} />
             <Route path="scent-bombs" element={<ScentBombPage />} />
+            <Route path="quote" element={<QuoteRequestPage />} />
             <Route path="payment/success" element={<PaymentSuccessPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="admin" element={<AdminPage />} />
