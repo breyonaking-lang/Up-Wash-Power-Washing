@@ -68,6 +68,23 @@ class ETANotificationAPITester:
         print(f"\n🔍 Testing Contractor Login...")
         try:
             response = requests.post(
+                f"{self.base_url}/api/auth/login",
+                json={"username": self.contractor_username, "password": self.contractor_password},
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.contractor_token = data.get('access_token')
+                self.contractor_id = data.get('user', {}).get('id')
+                self.log_test("Contractor Login", True, f"- Status: {response.status_code}")
+                return True
+            else:
+                self.log_test("Contractor Login", False, f"- Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Contractor Login", False, f"- Error: {str(e)}")
+            return False
     def get_contractor_headers(self):
         """Get headers for contractor requests"""
         return {
