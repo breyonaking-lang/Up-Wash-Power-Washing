@@ -4084,31 +4084,25 @@ function DocumentsPage() {
 }
 
 
-// Messages Page
+// Messages Page - 2-Way Admin-Contractor Messaging with Timestamps
 function MessagesPage() {
   const [messages, setMessages] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [selectedContractor, setSelectedContractor] = useState(null);
+  const [messageThreads, setMessageThreads] = useState({});
 
   useEffect(() => {
-    fetchMessages();
     fetchContractors();
+    fetchAllMessages();
   }, []);
 
-  const fetchMessages = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/chat/messages`, { headers: getAuthHeaders() });
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      setMessages(data.messages || []);
-    } catch (err) {
-      console.error('Failed to load messages');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (selectedContractor) {
+      fetchContractorThread(selectedContractor);
     }
-  };
+  }, [selectedContractor]);
 
   const fetchContractors = async () => {
     try {
@@ -4118,32 +4112,87 @@ function MessagesPage() {
       setContractors(data.contractors || []);
     } catch (err) {
       console.error('Failed to load contractors');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllMessages = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractors/all`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setMessages(data.messages || []);
+    } catch (err) {
+      console.error('Failed to load messages');
+    }
+  };
+
+  const fetchContractorThread = async (contractorId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor/history/${contractorId}`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setMessageThreads(prev => ({ ...prev, [contractorId]: data.messages || [] }));
+    } catch (err) {
+      console.error('Failed to load thread');
     }
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !selectedContractor) {
+      if (!selectedContractor) toast.error('Please select a contractor');
+      return;
+    }
 
     try {
-      const res = await fetch(`${API_URL}/api/chat/send`, {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          content: newMessage,
-          recipient_id: selectedContractor,
-          is_group: false
+          contractor_id: selectedContractor,
+          message: newMessage
         })
       });
       if (!res.ok) throw new Error('Failed to send');
+      const data = await res.json();
       setNewMessage('');
-      fetchMessages();
-      toast.success('Message sent!');
+      fetchContractorThread(selectedContractor);
+      fetchAllMessages();
+      if (data.status === 'sent') {
+        toast.success(`SMS sent to ${data.contractor_name}!`);
+      } else {
+        toast.info(`Message logged (${data.status})`);
+      }
     } catch (err) {
       toast.error('Failed to send message');
     }
   };
 
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const getUnreadCount = (contractorId) => {
+    return messages.filter(m => 
+      m.sender_id === contractorId && 
+      m.sender_type === 'contractor' && 
+      !m.read
+    ).length;
+  };
+
   if (loading) return <LoadingSpinner />;
+
+  const currentThread = selectedContractor ? (messageThreads[selectedContractor] || []) : [];
+  const selectedContractorInfo = contractors.find(c => c.id === selectedContractor);
 
   return (
     <div className="space-y-6">
@@ -4152,58 +4201,111 @@ function MessagesPage() {
         Messages
       </h1>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-white/10 rounded-2xl p-4">
+      <div className="grid md:grid-cols-3 gap-6 h-[600px]">
+        {/* Contractor List */}
+        <div className="bg-white/10 rounded-2xl p-4 overflow-y-auto">
           <h3 className="text-white font-semibold mb-4">Contractors</h3>
           <div className="space-y-2">
-            <button
-              onClick={() => setSelectedContractor(null)}
-              className={`w-full text-left p-3 rounded-xl transition ${!selectedContractor ? 'bg-teal-500' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <span className="text-white">Broadcast to All</span>
-            </button>
-            {contractors.map(c => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedContractor(c.id)}
-                className={`w-full text-left p-3 rounded-xl transition ${selectedContractor === c.id ? 'bg-teal-500' : 'bg-white/10 hover:bg-white/20'}`}
-              >
-                <span className="text-white">{c.full_name}</span>
-              </button>
-            ))}
+            {contractors.length === 0 ? (
+              <p className="text-white/60 text-sm">No contractors yet</p>
+            ) : (
+              contractors.map(c => {
+                const unread = getUnreadCount(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedContractor(c.id)}
+                    className={`w-full text-left p-3 rounded-xl transition flex justify-between items-center ${
+                      selectedContractor === c.id ? 'bg-teal-500' : 'bg-white/10 hover:bg-white/20'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-white font-medium">{c.full_name}</span>
+                      <p className="text-white/60 text-xs">{c.phone || 'No phone'}</p>
+                    </div>
+                    {unread > 0 && (
+                      <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">{unread}</span>
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 
-        <div className="md:col-span-2 bg-white/10 rounded-2xl p-4 flex flex-col h-[500px]">
-          <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-            {messages.length === 0 ? (
-              <p className="text-white/60 text-center py-8">No messages yet</p>
+        {/* Message Thread */}
+        <div className="md:col-span-2 bg-white/10 rounded-2xl p-4 flex flex-col">
+          {/* Header */}
+          <div className="pb-3 border-b border-white/20 mb-3">
+            {selectedContractorInfo ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold">{selectedContractorInfo.full_name}</h3>
+                  <p className="text-white/60 text-sm">{selectedContractorInfo.phone}</p>
+                </div>
+              </div>
             ) : (
-              messages.map((msg, i) => (
-                <div key={i} className={`p-3 rounded-xl ${msg.sender_id === 'admin' ? 'bg-teal-500/30 ml-8' : 'bg-white/10 mr-8'}`}>
-                  <p className="text-white/60 text-xs mb-1">{msg.sender_name}</p>
-                  <p className="text-white">{msg.content}</p>
+              <p className="text-white/60">Select a contractor to start messaging</p>
+            )}
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+            {!selectedContractor ? (
+              <p className="text-white/60 text-center py-8">Select a contractor to view messages</p>
+            ) : currentThread.length === 0 ? (
+              <p className="text-white/60 text-center py-8">No messages yet. Start a conversation!</p>
+            ) : (
+              [...currentThread].reverse().map((msg, i) => (
+                <div 
+                  key={i} 
+                  className={`max-w-[80%] ${msg.sender_type === 'admin' ? 'ml-auto' : 'mr-auto'}`}
+                >
+                  <div className={`p-3 rounded-xl ${
+                    msg.sender_type === 'admin' 
+                      ? 'bg-teal-500/30' 
+                      : 'bg-white/10'
+                  }`}>
+                    <p className="text-white">{msg.message}</p>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className={`text-xs ${
+                        msg.status === 'sent' ? 'text-green-400' : 
+                        msg.status === 'failed' ? 'text-red-400' : 'text-white/40'
+                      }`}>
+                        {msg.status}
+                      </span>
+                      <span className="text-white/40 text-xs">
+                        {formatTimestamp(msg.created_at)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            />
-            <button
-              onClick={sendMessage}
-              className="px-4 py-3 bg-teal-500 text-white rounded-xl hover:bg-teal-600"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
+          {/* Input */}
+          {selectedContractor && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
+                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              />
+              <button
+                onClick={sendMessage}
+                className="px-4 py-3 bg-teal-500 text-white rounded-xl hover:bg-teal-600 flex items-center gap-2"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
