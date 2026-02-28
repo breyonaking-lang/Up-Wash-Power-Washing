@@ -142,15 +142,6 @@ function EarningsDashboard() {
     </div>
   );
 }
-                <p className="text-white/60 text-sm">{new Date(payment.paid_at).toLocaleDateString()}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Today's Route / Tasks with Complete/CNS buttons
 function TodayRoute() {
