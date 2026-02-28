@@ -452,10 +452,41 @@ function TodayRoute() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-white">Today's Route</h1>
-        <span className="text-emerald-400 font-semibold">{tasks.length} stops</span>
+        <div className="flex items-center gap-4">
+          {/* Auto ETA Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAutoETAEnabled(!autoETAEnabled)}
+              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                autoETAEnabled 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  : 'bg-white/10 text-white/60 border border-white/20'
+              }`}
+              data-testid="auto-eta-toggle"
+            >
+              <Navigation className={`w-4 h-4 ${autoETAEnabled ? 'animate-pulse' : ''}`} />
+              Auto ETA {autoETAEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <span className="text-emerald-400 font-semibold">{tasks.length} stops</span>
+        </div>
       </div>
+
+      {/* Auto ETA Status Banner */}
+      {autoETAEnabled && myLocation && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center gap-3">
+          <Navigation className="w-5 h-5 text-emerald-400 animate-pulse" />
+          <div className="flex-1">
+            <p className="text-emerald-400 text-sm font-medium">Auto ETA Active</p>
+            <p className="text-white/60 text-xs">Customers will be notified when you're ~10 min away</p>
+          </div>
+          <span className="text-white/40 text-xs">
+            📍 {myLocation.lat.toFixed(4)}, {myLocation.lng.toFixed(4)}
+          </span>
+        </div>
+      )}
 
       {tasks.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
