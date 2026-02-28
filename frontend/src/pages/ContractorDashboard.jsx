@@ -526,6 +526,14 @@ function TodayRoute() {
                   </div>
                 </div>
 
+                {/* ETA Sent Badge */}
+                {task.eta_notified && (
+                  <div className="flex items-center gap-2 mb-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                    <Navigation className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-400 text-sm">ETA Sent ({task.eta_minutes || '~10'} min)</span>
+                  </div>
+                )}
+
                 <div className="bg-white/5 rounded-xl p-3 mb-3">
                   <p className="text-white/80 flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-emerald-400" />
