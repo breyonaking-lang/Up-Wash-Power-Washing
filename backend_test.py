@@ -1038,6 +1038,22 @@ class ETANotificationAPITester:
                 print("📱 TESTING COMPREHENSIVE SMS FUNCTIONALITY")  
                 print("="*50)
                 
+                # Test SMS opt-out handling
+                self.test_sms_opt_out_handling()
+                self.test_get_sms_optouts()
+                
+                # Test contractor management
+                self.test_update_contractor_info()
+                
+                # Test booking price modification
+                self.test_booking_price_modification()
+                self.test_send_payment_link()
+                
+                # Test separated SMS threads
+                self.test_direct_sms_to_contractor()
+                self.test_group_sms_to_contractors()
+                self.test_separated_sms_threads()
+                
                 # Test SMS templates API
                 self.test_sms_templates_endpoint()
                 
@@ -1050,6 +1066,8 @@ class ETANotificationAPITester:
                 # Test contractor SMS inbox
                 if contractor_login_success:
                     self.test_contractor_sms_inbox()
+                    # Test contractor earnings (daily/weekly only)
+                    self.test_contractor_earnings_daily_weekly()
                 
                 # Test admin SMS inbox
                 self.test_admin_sms_inbox()
