@@ -1671,6 +1671,43 @@ function ChatPage() {
 
   return (
     <div className="space-y-6">
+      {/* Audio element for notification sound */}
+      <audio ref={notificationAudioRef} src={NOTIFICATION_SOUND} preload="auto" />
+      
+      {/* New Message Notification Popup */}
+      <AnimatePresence>
+        {newMessageNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: 50 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 right-4 z-50 bg-teal-600 text-white p-4 rounded-xl shadow-2xl max-w-sm cursor-pointer border border-teal-400"
+            onClick={() => {
+              setChatTarget({ type: 'admin', id: null });
+              setNewMessageNotification(null);
+            }}
+            data-testid="new-message-notification"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <BellRing className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-white">New Message from {newMessageNotification.sender}</p>
+                <p className="text-white/80 text-sm mt-1">{newMessageNotification.message}</p>
+                <p className="text-white/60 text-xs mt-2">Click to view</p>
+              </div>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setNewMessageNotification(null); }}
+                className="text-white/60 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <h1 className="text-2xl font-bold text-white flex items-center gap-3">
         <MessageSquare className="text-teal-400" />
         Messages
