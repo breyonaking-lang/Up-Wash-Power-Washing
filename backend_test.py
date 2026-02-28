@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 class TwilioSMSAPITester:
-    def __init__(self, base_url="https://xzr8d2y3-preview.emergentagent.com"):
+    def __init__(self, base_url="http://localhost:8001"):
         self.base_url = base_url
         self.token = None
         self.admin_username = "Hughes0108"
