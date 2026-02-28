@@ -660,10 +660,6 @@ export default function ClientPortal() {
                     </span>
                   )}
                 </h2>
-                  {notifications.filter(n => !n.read).length} new
-                </span>
-              )}
-            </h2>
             
             {notifications.length === 0 ? (
               <p className="text-white/60 text-center py-4">No notifications yet</p>
