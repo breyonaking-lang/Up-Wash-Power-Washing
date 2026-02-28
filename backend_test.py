@@ -270,7 +270,7 @@ class ETANotificationAPITester:
         """Get headers with auth token"""
         return {
             'Content-Type': 'application/json',
-            'Authorization': f'Bearer {self.token}'
+            'Authorization': f'Bearer {self.admin_token}'
         }
 
     def get_contractors(self):
