@@ -1,267 +1,269 @@
 #!/usr/bin/env python3
+"""
+Backend API Testing for Twilio SMS Integration
+Testing all SMS-related endpoints for Up-Wash Power Washing
+"""
 
 import requests
 import sys
 import json
 from datetime import datetime
 
-# Use the public endpoint from frontend/.env
-API_BASE_URL = "https://upwash-preview.preview.emergentagent.com"
-
-class ContractorEarningsAPITester:
-    def __init__(self, base_url=API_BASE_URL):
+class TwilioSMSAPITester:
+    def __init__(self, base_url="https://xzr8d2y3-preview.emergentagent.com"):
         self.base_url = base_url
-        self.admin_token = None
-        self.contractor_token = None
+        self.token = None
+        self.admin_username = "Hughes0108"
+        self.admin_password = "Godfirst7!"
         self.tests_run = 0
         self.tests_passed = 0
-        self.failed_tests = []
+        self.contractor_id = None
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, description=""):
-        """Run a single API test"""
-        url = f"{self.base_url}/api/{endpoint}"
-        test_headers = {'Content-Type': 'application/json'}
-        if headers:
-            test_headers.update(headers)
-
+    def log_test(self, name, success, details=""):
+        """Log test results"""
         self.tests_run += 1
-        print(f"\n🔍 Test {self.tests_run}: {name}")
-        if description:
-            print(f"   Description: {description}")
-        
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {name} - PASSED {details}")
+        else:
+            print(f"❌ {name} - FAILED {details}")
+
+    def login_admin(self):
+        """Login as admin to get token"""
+        print(f"\n🔍 Testing Admin Login...")
         try:
-            if method == 'GET':
-                response = requests.get(url, headers=test_headers, timeout=30)
-            elif method == 'POST':
-                response = requests.post(url, json=data, headers=test_headers, timeout=30)
-            elif method == 'PATCH':
-                response = requests.patch(url, json=data, headers=test_headers, timeout=30)
-            elif method == 'DELETE':
-                response = requests.delete(url, headers=test_headers, timeout=30)
+            response = requests.post(
+                f"{self.base_url}/api/auth/login",
+                json={"username": self.admin_username, "password": self.admin_password},
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.token = data.get('access_token')
+                self.log_test("Admin Login", True, f"- Status: {response.status_code}")
+                return True
             else:
-                raise ValueError(f"Unsupported method: {method}")
-
-            success = response.status_code == expected_status
-            if success:
-                self.tests_passed += 1
-                print(f"   ✅ PASSED - Status: {response.status_code}")
-                try:
-                    response_data = response.json()
-                    return True, response_data
-                except:
-                    return True, {}
-            else:
-                print(f"   ❌ FAILED - Expected {expected_status}, got {response.status_code}")
-                try:
-                    error_data = response.json()
-                    print(f"   Error: {error_data}")
-                except:
-                    print(f"   Error: {response.text}")
-                self.failed_tests.append(f"{name} - Expected {expected_status}, got {response.status_code}")
-                return False, {}
-
+                self.log_test("Admin Login", False, f"- Status: {response.status_code}, Response: {response.text}")
+                return False
         except Exception as e:
-            print(f"   ❌ FAILED - Exception: {str(e)}")
-            self.failed_tests.append(f"{name} - Exception: {str(e)}")
-            return False, {}
+            self.log_test("Admin Login", False, f"- Error: {str(e)}")
+            return False
 
-    def test_admin_login(self):
-        """Test admin login credentials"""
-        success, response = self.run_test(
-            "Admin Login",
-            "POST",
-            "auth/login",
-            200,
-            {"username": "Hughes0108", "password": "Godfirst7!"},
-            description="Test admin login with Hughes0108 / Godfirst7!"
-        )
-        if success and 'access_token' in response:
-            self.admin_token = response['access_token']
-            print(f"   🔑 Admin token obtained")
-            return True
-        return False
+    def get_auth_headers(self):
+        """Get headers with auth token"""
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {self.token}'
+        }
 
-    def test_contractor_login(self):
-        """Test contractor login credentials"""
-        success, response = self.run_test(
-            "Contractor Login", 
-            "POST",
-            "auth/login",
-            200,
-            {"username": "ajb123", "password": "upwash_test_123"},
-            description="Test contractor login with ajb123 / upwash_test_123"
-        )
-        if success and 'access_token' in response:
-            self.contractor_token = response['access_token']
-            print(f"   🔑 Contractor token obtained")
-            return True
-        return False
+    def get_contractors(self):
+        """Get list of contractors to use for SMS testing"""
+        print(f"\n🔍 Testing Get Contractors...")
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/contractors",
+                headers=self.get_auth_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                contractors = data.get('contractors', [])
+                if contractors:
+                    self.contractor_id = contractors[0].get('id')
+                    self.log_test("Get Contractors", True, f"- Found {len(contractors)} contractors, using ID: {self.contractor_id}")
+                    return True
+                else:
+                    self.log_test("Get Contractors", False, "- No contractors found")
+                    return False
+            else:
+                self.log_test("Get Contractors", False, f"- Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Get Contractors", False, f"- Error: {str(e)}")
+            return False
 
-    def test_contractor_earnings_endpoint(self):
-        """Test /api/contractor/earnings endpoint"""
-        if not self.contractor_token:
-            print("   ⚠️  Skipping - no contractor token")
+    def test_send_sms_contractor(self):
+        """Test POST /api/admin/sms/contractor - Admin sends SMS to contractor"""
+        print(f"\n🔍 Testing Send SMS to Contractor...")
+        if not self.contractor_id:
+            self.log_test("Send SMS to Contractor", False, "- No contractor ID available")
             return False
             
-        success, response = self.run_test(
-            "Contractor Earnings Endpoint",
-            "GET", 
-            "contractor/earnings",
-            200,
-            headers={'Authorization': f'Bearer {self.contractor_token}'},
-            description="Test contractor earnings endpoint returns earnings data"
-        )
-        
-        if success:
-            # Check if response contains expected fields
-            expected_fields = ['total_completed_stops', 'total_earnings', 'unpaid_balance', 'pay_per_stop']
-            missing_fields = [field for field in expected_fields if field not in response]
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/admin/sms/contractor",
+                headers=self.get_auth_headers(),
+                json={
+                    "contractor_id": self.contractor_id,
+                    "message": "Test SMS from admin - Twilio integration working!"
+                }
+            )
             
-            if missing_fields:
-                print(f"   ⚠️  Warning: Missing fields in response: {missing_fields}")
+            if response.status_code == 200:
+                data = response.json()
+                status = data.get('status', 'unknown')
+                self.log_test("Send SMS to Contractor", True, f"- Status: {response.status_code}, SMS Status: {status}")
+                return True
             else:
-                print(f"   ✅ All expected earnings fields present")
-                
-            # Check pay per stop is $13
-            if response.get('pay_per_stop') == 13.0:
-                print(f"   ✅ Pay per stop correctly set to $13")
-            else:
-                print(f"   ⚠️  Pay per stop is {response.get('pay_per_stop')}, expected $13")
-                
-        return success
+                self.log_test("Send SMS to Contractor", False, f"- Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Send SMS to Contractor", False, f"- Error: {str(e)}")
+            return False
 
-    def test_stop_completion_endpoint(self):
-        """Test /api/contractor/stop/{id}/complete endpoint exists"""
-        if not self.contractor_token:
-            print("   ⚠️  Skipping - no contractor token")
+    def test_send_login_credentials_sms(self):
+        """Test POST /api/admin/sms/contractor/login - Admin sends login credentials via SMS"""
+        print(f"\n🔍 Testing Send Login Credentials SMS...")
+        if not self.contractor_id:
+            self.log_test("Send Login Credentials SMS", False, "- No contractor ID available")
             return False
             
-        # Test with dummy booking ID - should return 404 but endpoint should exist
-        success, response = self.run_test(
-            "Stop Completion Endpoint",
-            "POST",
-            "contractor/stop/dummy-booking-id/complete", 
-            404,  # Expected 404 for non-existent booking
-            {"status": "completed"},
-            headers={'Authorization': f'Bearer {self.contractor_token}'},
-            description="Test stop completion endpoint exists (404 expected for dummy ID)"
-        )
-        return success
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/admin/sms/contractor/login",
+                headers=self.get_auth_headers(),
+                json={
+                    "contractor_id": self.contractor_id,
+                    "include_password": True
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                status = data.get('status', 'unknown')
+                contractor_name = data.get('contractor_name', 'Unknown')
+                self.log_test("Send Login Credentials SMS", True, f"- Status: {response.status_code}, SMS Status: {status}, Contractor: {contractor_name}")
+                return True
+            else:
+                self.log_test("Send Login Credentials SMS", False, f"- Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Send Login Credentials SMS", False, f"- Error: {str(e)}")
+            return False
 
-    def test_admin_contractor_earnings_endpoint(self):
-        """Test /api/admin/contractors/{id}/earnings endpoint"""
-        if not self.admin_token:
-            print("   ⚠️  Skipping - no admin token")
+    def test_get_sms_history(self):
+        """Test GET /api/admin/sms/contractor/history/{contractor_id} - Get SMS conversation history"""
+        print(f"\n🔍 Testing Get SMS History...")
+        if not self.contractor_id:
+            self.log_test("Get SMS History", False, "- No contractor ID available")
             return False
             
-        # Test with dummy contractor ID - should return 404 but endpoint should exist  
-        success, response = self.run_test(
-            "Admin Contractor Earnings Endpoint",
-            "GET",
-            "admin/contractors/dummy-contractor-id/earnings",
-            404,  # Expected 404 for non-existent contractor
-            headers={'Authorization': f'Bearer {self.admin_token}'},
-            description="Test admin contractor earnings endpoint exists (404 expected for dummy ID)"
-        )
-        return success
-
-    def test_admin_contractor_pay_endpoint(self):
-        """Test /api/admin/contractors/{id}/pay endpoint"""
-        if not self.admin_token:
-            print("   ⚠️  Skipping - no admin token")
-            return False
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/sms/contractor/history/{self.contractor_id}",
+                headers=self.get_auth_headers()
+            )
             
-        # Test with dummy contractor ID - should return 404 but endpoint should exist
-        success, response = self.run_test(
-            "Admin Contractor Pay Endpoint", 
-            "POST",
-            "admin/contractors/dummy-contractor-id/pay",
-            404,  # Expected 404 for non-existent contractor
-            {"amount": 100.0, "payment_method": "bank_transfer"},
-            headers={'Authorization': f'Bearer {self.admin_token}'},
-            description="Test Easy Pay endpoint exists (404 expected for dummy ID)"
-        )
-        return success
-
-    def test_square_config_endpoint(self):
-        """Test Square sandbox payment configuration"""
-        success, response = self.run_test(
-            "Square Payment Config",
-            "GET",
-            "payments/config",
-            200,
-            description="Test Square sandbox configuration endpoint"
-        )
-        
-        if success:
-            if response.get('environment') == 'sandbox':
-                print(f"   ✅ Square environment correctly set to sandbox")
+            if response.status_code == 200:
+                data = response.json()
+                messages = data.get('messages', [])
+                contractor_name = data.get('contractor_name', 'Unknown')
+                self.log_test("Get SMS History", True, f"- Status: {response.status_code}, Found {len(messages)} messages for {contractor_name}")
+                return True
             else:
-                print(f"   ⚠️  Square environment: {response.get('environment')}")
-                
-            if response.get('app_id'):
-                print(f"   ✅ Square app ID present")
-            else:
-                print(f"   ⚠️  Square app ID missing")
-                
-        return success
+                self.log_test("Get SMS History", False, f"- Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Get SMS History", False, f"- Error: {str(e)}")
+            return False
 
-    def test_admin_endpoints_authentication(self):
-        """Test that admin endpoints require authentication"""
-        success, response = self.run_test(
-            "Admin Endpoints Authentication",
-            "GET",
-            "admin/contractors",
-            401,  # Expected 401 without authentication
-            description="Test admin endpoints require authentication (401 expected)"
-        )
-        return success
+    def test_get_all_sms_messages(self):
+        """Test GET /api/admin/sms/contractors/all - Get all admin-contractor messages"""
+        print(f"\n🔍 Testing Get All SMS Messages...")
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/sms/contractors/all",
+                headers=self.get_auth_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                messages = data.get('messages', [])
+                self.log_test("Get All SMS Messages", True, f"- Status: {response.status_code}, Found {len(messages)} total messages")
+                return True
+            else:
+                self.log_test("Get All SMS Messages", False, f"- Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Get All SMS Messages", False, f"- Error: {str(e)}")
+            return False
+
+    def test_basic_endpoints(self):
+        """Test basic API functionality"""
+        print(f"\n🔍 Testing Basic API Health...")
+        try:
+            # Test root endpoint
+            response = requests.get(f"{self.base_url}/api/")
+            if response.status_code == 200:
+                self.log_test("API Root Endpoint", True, f"- Status: {response.status_code}")
+            else:
+                self.log_test("API Root Endpoint", False, f"- Status: {response.status_code}")
+                
+            # Test services endpoint
+            response = requests.get(f"{self.base_url}/api/services")
+            if response.status_code == 200:
+                self.log_test("Services Endpoint", True, f"- Status: {response.status_code}")
+            else:
+                self.log_test("Services Endpoint", False, f"- Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Basic API Health", False, f"- Error: {str(e)}")
 
     def run_all_tests(self):
-        """Run all contractor earnings and stop completion tests"""
-        print("🚀 Starting Contractor Earnings & Stop Completion API Tests")
-        print("=" * 70)
+        """Run all SMS API tests"""
+        print("=" * 80)
+        print("🚀 STARTING TWILIO SMS API TESTING")
+        print("=" * 80)
+        print(f"Testing Backend URL: {self.base_url}")
+        print(f"Admin Credentials: {self.admin_username}")
+        print(f"Test Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-        # Authentication tests
-        admin_login_success = self.test_admin_login()
-        contractor_login_success = self.test_contractor_login()
+        # Test basic API health
+        self.test_basic_endpoints()
         
-        # Core earnings and completion tests
-        self.test_contractor_earnings_endpoint()
-        self.test_stop_completion_endpoint()
-        self.test_admin_contractor_earnings_endpoint() 
-        self.test_admin_contractor_pay_endpoint()
-        
-        # Payment configuration
-        self.test_square_config_endpoint()
-        
-        # Security test
-        self.test_admin_endpoints_authentication()
-        
-        # Print summary
-        print("\n" + "=" * 70)
-        print(f"📊 Test Summary:")
-        print(f"   Tests Run: {self.tests_run}")
-        print(f"   Tests Passed: {self.tests_passed}")
-        print(f"   Success Rate: {(self.tests_passed/self.tests_run*100):.1f}%")
-        
-        if self.failed_tests:
-            print(f"\n❌ Failed Tests:")
-            for failed in self.failed_tests:
-                print(f"   - {failed}")
-        else:
-            print(f"\n🎉 All tests passed!")
+        # Login first
+        if not self.login_admin():
+            print("\n❌ Cannot proceed with SMS tests - Admin login failed")
+            return False
             
-        return self.tests_passed == self.tests_run
+        # Get contractors for testing
+        if not self.get_contractors():
+            print("\n❌ Cannot proceed with SMS tests - No contractors available")
+            return False
+            
+        # Test all SMS endpoints
+        print("\n" + "=" * 60)
+        print("📱 TESTING TWILIO SMS ENDPOINTS")
+        print("=" * 60)
+        
+        self.test_send_sms_contractor()
+        self.test_send_login_credentials_sms()
+        self.test_get_sms_history()
+        self.test_get_all_sms_messages()
+        
+        # Print results
+        print("\n" + "=" * 60)
+        print("📊 TEST RESULTS SUMMARY")
+        print("=" * 60)
+        print(f"✅ Tests Passed: {self.tests_passed}/{self.tests_run}")
+        print(f"❌ Tests Failed: {self.tests_run - self.tests_passed}/{self.tests_run}")
+        success_rate = (self.tests_passed / self.tests_run * 100) if self.tests_run > 0 else 0
+        print(f"📈 Success Rate: {success_rate:.1f}%")
+        
+        if success_rate >= 80:
+            print("\n🎉 SMS Integration Status: WORKING")
+        elif success_rate >= 50:
+            print("\n⚠️  SMS Integration Status: PARTIAL")
+        else:
+            print("\n🚨 SMS Integration Status: FAILING")
+            
+        return success_rate >= 80
 
 def main():
-    print("🔧 Contractor Earnings & Stop Completion API Testing")
-    print(f"🌐 Testing API at: {API_BASE_URL}")
-    print()
-    
-    tester = ContractorEarningsAPITester()
+    """Main test execution"""
+    tester = TwilioSMSAPITester()
     success = tester.run_all_tests()
-    
     return 0 if success else 1
 
 if __name__ == "__main__":
