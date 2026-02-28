@@ -9,7 +9,7 @@ import {
   Copy, ExternalLink, Phone, Mail, Navigation, Inbox, Building2,
   Home, Car, Sparkles, Warehouse, HardHat, Calendar as CalendarIcon,
   AlertCircle, ChevronLeft, AlertTriangle, Banknote, MessageCircle,
-  Settings, Truck, UserCheck, PlusCircle
+  Settings, Truck, UserCheck, PlusCircle, FileQuestion, Camera, Image
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DailyBibleVerse from '../components/shared/DailyBibleVerse';
