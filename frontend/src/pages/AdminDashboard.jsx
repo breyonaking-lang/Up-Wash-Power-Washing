@@ -1988,6 +1988,94 @@ function ContractorsPage() {
           </motion.div>
         </div>
       )}
+
+      {/* SMS Modal */}
+      {showSMSModal && smsContractor && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={() => setShowSMSModal(false)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-green-400" />
+                  SMS to {smsContractor.full_name}
+                </h2>
+                <p className="text-white/60 text-sm">{smsContractor.phone}</p>
+              </div>
+              <button onClick={() => setShowSMSModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* SMS History */}
+            <div className="flex-1 bg-white/5 rounded-xl p-3 mb-4 overflow-y-auto min-h-[200px] max-h-[300px]">
+              {smsHistory.length === 0 ? (
+                <p className="text-white/40 text-center py-8">No messages yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {[...smsHistory].reverse().map((msg, i) => (
+                    <div 
+                      key={i} 
+                      className={`p-3 rounded-lg ${msg.sender_type === 'admin' ? 'bg-green-500/20 ml-8' : 'bg-blue-500/20 mr-8'}`}
+                    >
+                      <p className="text-white text-sm">{msg.message}</p>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className={`text-xs ${msg.status === 'sent' ? 'text-green-400' : msg.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
+                          {msg.status}
+                        </span>
+                        <span className="text-white/40 text-xs">
+                          {new Date(msg.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={handleSendLoginCredentials}
+                disabled={sendingSMS}
+                className="flex-1 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm hover:bg-amber-500/30 flex items-center justify-center gap-2"
+                data-testid="send-login-credentials-btn"
+              >
+                <Key className="w-4 h-4" />
+                Send Login Credentials
+              </button>
+            </div>
+
+            {/* Message Input */}
+            <div className="flex gap-2">
+              <textarea
+                value={smsMessage}
+                onChange={(e) => setSmsMessage(e.target.value)}
+                placeholder="Type your message..."
+                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 resize-none"
+                rows={2}
+                data-testid="sms-message-input"
+              />
+              <button
+                onClick={handleSendSMS}
+                disabled={sendingSMS || !smsMessage.trim()}
+                className="px-6 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                data-testid="send-sms-btn"
+              >
+                {sendingSMS ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
