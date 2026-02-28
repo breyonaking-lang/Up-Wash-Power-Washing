@@ -351,3 +351,13 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] Pause/Resume/Cancel buttons for subscription management
 - [x] Cancellation reason modal
 - [x] Admin notified of cancellation requests
+
+#### SMS Service Fixes & Payment Reminders ✅ NEW
+- [x] Fixed phone number formatting (auto-adds +1 for US numbers)
+- [x] Added validation for empty messages
+- [x] POST /api/admin/send-payment-reminders - Manual trigger for 3-day reminders
+- [x] GET /api/admin/upcoming-reminders - Preview customers needing reminders
+- [x] POST /api/cron/payment-reminders - Cron endpoint (no auth) for automation
+- [x] "Send Payment Reminders" button in SMS Logs page
+- [x] Respects SMS opt-out list
+- [x] Marks bookings as reminded to prevent duplicates
