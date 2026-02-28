@@ -7,6 +7,7 @@ import {
   Check, Play, Pause, Edit
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BIBLE_VERSES } from '../data/bibleVerses';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
