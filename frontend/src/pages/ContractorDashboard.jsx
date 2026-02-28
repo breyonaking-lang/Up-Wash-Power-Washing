@@ -1065,8 +1065,8 @@ function MyRoutes() {
       {routes.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
           <p className="text-white/60">You don't have any routes assigned yet</p>
-          <Link to="/contractor/dashboard/purchase" className="text-emerald-400 hover:underline mt-2 inline-block">
-            Purchase a route →
+          <Link to="/contractor/dashboard/request-routes" className="text-emerald-400 hover:underline mt-2 inline-block">
+            Request a route →
           </Link>
         </div>
       ) : (
