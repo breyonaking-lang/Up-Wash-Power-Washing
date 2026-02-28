@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for ETA Notification & SMS Integration
-Testing ETA alert and SMS-related endpoints for Up-Wash Power Washing
+Backend API Testing for SMS Service & Payment Reminder System
+Testing SMS functionality and payment reminders for Up-Wash Power Washing
 """
 
 import requests
