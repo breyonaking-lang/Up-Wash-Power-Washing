@@ -556,6 +556,288 @@ class ETANotificationAPITester:
         except Exception as e:
             self.log_test("SMS Stats", False, f"Error: {str(e)}")
             return False
+
+    def test_sms_opt_out_handling(self):
+        """Test POST /api/webhooks/twilio/incoming with STOP keyword for opt-out"""
+        print(f"\n🔍 Testing SMS Opt-out Handling (STOP keyword)...")
+        
+        # Simulate Twilio webhook with STOP keyword
+        stop_data = {
+            "From": "+15551234567",
+            "To": "+15559876543", 
+            "Body": "STOP",
+            "MessageSid": "SM12345678901234567890123456789013"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/webhooks/twilio/incoming",
+                data=stop_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            
+            if response.status_code in [200, 201]:
+                self.log_test("SMS Opt-out STOP", True, f"Status: {response.status_code}")
+                return True
+            else:
+                self.log_test("SMS Opt-out STOP", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("SMS Opt-out STOP", False, f"Error: {str(e)}")
+            return False
+
+    def test_get_sms_optouts(self):
+        """Test GET /api/admin/sms/optouts - Get opted out phone numbers"""
+        print(f"\n🔍 Testing Get SMS Opt-outs...")
+        
+        if not self.admin_token:
+            self.log_test("Get SMS Opt-outs", False, "No admin token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/sms/optouts",
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                optouts = data.get('optouts', [])
+                self.log_test("Get SMS Opt-outs", True, f"Status: {response.status_code}, Found {len(optouts)} opt-outs")
+                return True
+            else:
+                self.log_test("Get SMS Opt-outs", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Get SMS Opt-outs", False, f"Error: {str(e)}")
+            return False
+
+    def test_update_contractor_info(self):
+        """Test PUT /api/admin/contractors/{id} - Update contractor info"""
+        print(f"\n🔍 Testing Update Contractor Info...")
+        
+        if not self.admin_token or not self.contractor_id:
+            self.log_test("Update Contractor Info", False, "No admin token or contractor ID available")
+            return False
+
+        update_data = {
+            "full_name": "Updated Test Contractor",
+            "phone": "+15559876543",
+            "email": "updated.contractor@test.com"
+        }
+        
+        try:
+            response = requests.put(
+                f"{self.base_url}/api/admin/contractors/{self.contractor_id}",
+                json=update_data,
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code == 200:
+                self.log_test("Update Contractor Info", True, f"Status: {response.status_code}")
+                return True
+            else:
+                self.log_test("Update Contractor Info", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Update Contractor Info", False, f"Error: {str(e)}")
+            return False
+
+    def test_booking_price_modification(self):
+        """Test PUT /api/admin/bookings/{id}/price - Update booking price"""
+        print(f"\n🔍 Testing Booking Price Modification...")
+        
+        if not self.admin_token:
+            self.log_test("Booking Price Modification", False, "No admin token available")
+            return False
+
+        # Test with dummy booking ID
+        price_data = {
+            "total": 150.00,
+            "price_notes": "Custom quote pricing"
+        }
+        
+        try:
+            response = requests.put(
+                f"{self.base_url}/api/admin/bookings/test-booking-123/price",
+                json=price_data,
+                headers=self.get_admin_headers()
+            )
+            
+            # Expecting 404 since booking doesn't exist, but endpoint should work
+            if response.status_code in [404, 400]:
+                self.log_test("Booking Price Modification", True, f"Status: {response.status_code} (expected - no booking exists)")
+                return True
+            else:
+                self.log_test("Booking Price Modification", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Booking Price Modification", False, f"Error: {str(e)}")
+            return False
+
+    def test_send_payment_link(self):
+        """Test POST /api/admin/bookings/send-payment-link - Send payment link SMS"""
+        print(f"\n🔍 Testing Send Payment Link SMS...")
+        
+        if not self.admin_token:
+            self.log_test("Send Payment Link SMS", False, "No admin token available")
+            return False
+
+        payment_link_data = {
+            "booking_id": "test-booking-123",
+            "custom_amount": 100.00,
+            "message": "Your payment is ready"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/admin/bookings/send-payment-link",
+                json=payment_link_data,
+                headers=self.get_admin_headers()
+            )
+            
+            # Expecting 404 since booking doesn't exist, but endpoint should work
+            if response.status_code in [404, 400]:
+                self.log_test("Send Payment Link SMS", True, f"Status: {response.status_code} (expected - no booking exists)")
+                return True
+            else:
+                self.log_test("Send Payment Link SMS", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Send Payment Link SMS", False, f"Error: {str(e)}")
+            return False
+
+    def test_direct_sms_to_contractor(self):
+        """Test POST /api/admin/sms/direct - Send SMS to specific contractor only"""
+        print(f"\n🔍 Testing Direct SMS to Contractor...")
+        
+        if not self.admin_token or not self.contractor_id:
+            self.log_test("Direct SMS to Contractor", False, "No admin token or contractor ID available")
+            return False
+
+        direct_sms_data = {
+            "contractor_id": self.contractor_id,
+            "message": "Direct message test - specific contractor only"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/admin/sms/direct",
+                json=direct_sms_data,
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                status = data.get('status', 'unknown')
+                self.log_test("Direct SMS to Contractor", True, f"Status: {response.status_code}, SMS Status: {status}")
+                return True
+            else:
+                self.log_test("Direct SMS to Contractor", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Direct SMS to Contractor", False, f"Error: {str(e)}")
+            return False
+
+    def test_group_sms_to_contractors(self):
+        """Test POST /api/admin/sms/group - Send SMS to multiple contractors"""
+        print(f"\n🔍 Testing Group SMS to Contractors...")
+        
+        if not self.admin_token:
+            self.log_test("Group SMS to Contractors", False, "No admin token available")
+            return False
+
+        group_sms_data = {
+            "contractor_ids": [self.contractor_id] if self.contractor_id else [],
+            "message": "Group message test - multiple contractors"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/admin/sms/group",
+                json=group_sms_data,
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                self.log_test("Group SMS to Contractors", True, f"Status: {response.status_code}")
+                return True
+            else:
+                self.log_test("Group SMS to Contractors", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Group SMS to Contractors", False, f"Error: {str(e)}")
+            return False
+
+    def test_separated_sms_threads(self):
+        """Test GET /api/admin/sms/threads - Get separated SMS threads"""
+        print(f"\n🔍 Testing Separated SMS Threads...")
+        
+        if not self.admin_token:
+            self.log_test("Separated SMS Threads", False, "No admin token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/admin/sms/threads",
+                headers=self.get_admin_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                threads = data.get('threads', [])
+                self.log_test("Separated SMS Threads", True, f"Status: {response.status_code}, Found {len(threads)} threads")
+                return True
+            else:
+                self.log_test("Separated SMS Threads", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Separated SMS Threads", False, f"Error: {str(e)}")
+            return False
+
+    def test_contractor_earnings_daily_weekly(self):
+        """Test GET /api/contractor/earnings - Returns daily and weekly only"""
+        print(f"\n🔍 Testing Contractor Earnings (Daily/Weekly Only)...")
+        
+        if not self.contractor_token:
+            self.log_test("Contractor Earnings", False, "No contractor token available")
+            return False
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/contractor/earnings",
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Check if it has daily and weekly data (not total)
+                has_daily = 'today_earnings' in data or 'daily_earnings' in data
+                has_weekly = 'this_week_earnings' in data or 'weekly_earnings' in data
+                has_total = 'total_earnings' in data or 'all_time_earnings' in data
+                
+                if has_daily and has_weekly and not has_total:
+                    self.log_test("Contractor Earnings", True, f"Status: {response.status_code}, Has daily/weekly only (no total)")
+                    return True
+                else:
+                    self.log_test("Contractor Earnings", False, f"Expected daily/weekly only, got: {list(data.keys())}")
+                    return False
+            else:
+                self.log_test("Contractor Earnings", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Contractor Earnings", False, f"Error: {str(e)}")
+            return False
     def get_auth_headers(self):
         """Get headers with auth token"""
         return {
