@@ -1731,11 +1731,73 @@ function ContractorsPage() {
                       {contractorRoutes.length === 0 ? (
                         <p className="text-yellow-400 text-sm">No routes assigned</p>
                       ) : (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="space-y-3">
                           {contractorRoutes.map(route => (
-                            <span key={route.id} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
-                              {route.name} ({route.bookings?.length || 0} stops)
-                            </span>
+                            <div key={route.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                  <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
+                                    {route.name}
+                                  </span>
+                                  <span className="text-white/60 text-sm">
+                                    {route.bookings?.length || 0} stops | ${((route.bookings?.length || 0) * 11).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => toggleRouteExpanded(route.id)}
+                                    className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30"
+                                    data-testid={`expand-route-${route.id}`}
+                                  >
+                                    {expandedRoutes[route.id] ? 'Hide' : 'Show'} Clients
+                                  </button>
+                                  <button
+                                    onClick={() => openReassignModal(route)}
+                                    className="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-sm hover:bg-orange-500/30"
+                                    data-testid={`reassign-route-${route.id}`}
+                                  >
+                                    Reassign
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              {/* Expanded Client Details */}
+                              {expandedRoutes[route.id] && route.bookings && route.bookings.length > 0 && (
+                                <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
+                                  {route.bookings.map((booking, idx) => (
+                                    <div key={idx} className="bg-white/5 rounded-lg p-3">
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <p className="text-white font-medium">{booking.customer_name}</p>
+                                          <p className="text-white/60 text-sm">{booking.customer_address}</p>
+                                          {booking.customer_phone && (
+                                            <p className="text-white/60 text-sm">{booking.customer_phone}</p>
+                                          )}
+                                          {booking.customer_email && (
+                                            <p className="text-white/60 text-sm">{booking.customer_email}</p>
+                                          )}
+                                          {booking.services && (
+                                            <div className="flex gap-1 mt-1 flex-wrap">
+                                              {booking.services.map((svc, i) => (
+                                                <span key={i} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
+                                                  {svc.name || svc.service_id}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <a
+                                          href={`tel:${booking.customer_phone}`}
+                                          className="px-2 py-1 bg-green-500 text-white rounded text-xs"
+                                        >
+                                          Call
+                                        </a>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
