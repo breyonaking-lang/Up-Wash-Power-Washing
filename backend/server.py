@@ -1961,6 +1961,11 @@ async def update_subscription_status(booking_id: str, status: str, current_user:
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Invalid subscription status")
     
+    # Get booking for customer info
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
     update_data = {
         "subscription_status": status,
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -1978,7 +1983,51 @@ async def update_subscription_status(booking_id: str, status: str, current_user:
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Booking not found")
     
-    return {"message": f"Subscription status updated to {status}"}
+    # Send SMS notification based on status change
+    customer_phone = booking.get("customer_phone")
+    customer_name = booking.get("customer_name", "Valued Customer")
+    sms_sent = False
+    
+    if customer_phone:
+        if status == "payment_failed":
+            sms_message = f"Hi {customer_name}, your Up-Wash subscription payment could not be processed. Please update your payment method at upwash.com or call us to avoid service interruption. Thank you!"
+            await send_sms(customer_phone, sms_message)
+            sms_sent = True
+            
+            # Store message
+            msg_record = {
+                "id": str(uuid.uuid4()),
+                "booking_id": booking_id,
+                "customer_phone": customer_phone,
+                "customer_name": customer_name,
+                "type": "payment_failed",
+                "message": sms_message,
+                "message_type": "payment_failed",
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.customer_messages.insert_one(msg_record)
+            
+        elif status == "cancelled":
+            sms_message = f"Hi {customer_name}, your Up-Wash subscription has been cancelled due to non-payment. We're sorry to see you go! If you'd like to restart service, visit upwash.com or call us. Thank you for being a customer!"
+            await send_sms(customer_phone, sms_message)
+            sms_sent = True
+            
+            # Store message
+            msg_record = {
+                "id": str(uuid.uuid4()),
+                "booking_id": booking_id,
+                "customer_phone": customer_phone,
+                "customer_name": customer_name,
+                "type": "subscription_cancelled",
+                "message": sms_message,
+                "message_type": "subscription_cancelled",
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.customer_messages.insert_one(msg_record)
+    
+    return {"message": f"Subscription status updated to {status}", "sms_sent": sms_sent}
 
 @api_router.post("/admin/process-subscription-payments")
 async def process_subscription_payments(current_user: dict = Depends(get_admin_user)):
