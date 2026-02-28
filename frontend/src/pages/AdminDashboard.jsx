@@ -2427,11 +2427,47 @@ function RoutesPage() {
     }
   };
 
-  // Group routes by zip code
-  const groupedRoutes = routes.reduce((acc, route) => {
-    const zip = route.zip_code || 'Unassigned';
-    if (!acc[zip]) acc[zip] = [];
-    acc[zip].push(route);
+  // Filter routes by search query
+  const filteredRoutes = routes.filter(route => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    const routeName = (route.name || '').toLowerCase();
+    const routeArea = (route.area || '').toLowerCase();
+    const routeZip = (route.zip_code || '').toLowerCase();
+    const bookings = route.bookings || [];
+    
+    // Search in route name, area, zip
+    if (routeName.includes(query) || routeArea.includes(query) || routeZip.includes(query)) {
+      return true;
+    }
+    
+    // Search in booking customer names and addresses
+    return bookings.some(b => 
+      (b.customer_name || '').toLowerCase().includes(query) ||
+      (b.customer_address || '').toLowerCase().includes(query) ||
+      (b.customer_city || '').toLowerCase().includes(query)
+    );
+  });
+
+  // Get unique grouping key for a route based on groupBy selection
+  const getGroupKey = (route) => {
+    if (groupBy === 'zip') return route.zip_code || 'Unassigned';
+    if (groupBy === 'city') {
+      const booking = route.bookings?.[0];
+      return booking?.customer_city || route.area || 'Unknown City';
+    }
+    if (groupBy === 'state') {
+      const booking = route.bookings?.[0];
+      return booking?.customer_state || 'TX';
+    }
+    return 'All';
+  };
+
+  // Group routes dynamically based on groupBy
+  const groupedRoutes = filteredRoutes.reduce((acc, route) => {
+    const key = getGroupKey(route);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(route);
     return acc;
   }, {});
 
