@@ -1450,13 +1450,85 @@ function ContractorsPage() {
     }
   };
 
-  const sendSMS = (contractor) => {
-    const message = prompt('Enter SMS message:');
-    if (!message) return;
-    
-    // Open SMS app with pre-filled message
-    window.open(`sms:${contractor.phone}?body=${encodeURIComponent(message)}`);
-    toast.success('Opening SMS app...');
+  const sendSMS = async (contractor) => {
+    setSmsContractor(contractor);
+    setShowSMSModal(true);
+    setSmsMessage('');
+    setSendCredentials(false);
+    // Fetch SMS history
+    try {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor/history/${contractor.id}`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setSmsHistory(data.messages || []);
+      }
+    } catch (err) {
+      console.error('Failed to load SMS history');
+    }
+  };
+
+  const handleSendSMS = async () => {
+    if (!smsMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    setSendingSMS(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          contractor_id: smsContractor.id,
+          message: smsMessage
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'sent') {
+        toast.success(`SMS sent to ${smsContractor.full_name}!`);
+      } else if (data.status === 'failed') {
+        toast.error('SMS failed - check phone number');
+      } else {
+        toast.info(`SMS logged (${data.status})`);
+      }
+      setSmsMessage('');
+      // Refresh history
+      const histRes = await fetch(`${API_URL}/api/admin/sms/contractor/history/${smsContractor.id}`, { headers: getAuthHeaders() });
+      if (histRes.ok) {
+        const histData = await histRes.json();
+        setSmsHistory(histData.messages || []);
+      }
+    } catch (err) {
+      toast.error('Failed to send SMS');
+    } finally {
+      setSendingSMS(false);
+    }
+  };
+
+  const handleSendLoginCredentials = async () => {
+    setSendingSMS(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/sms/contractor/login`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          contractor_id: smsContractor.id,
+          include_password: true
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'sent') {
+        toast.success(`Login credentials sent to ${data.contractor_name}!`);
+      } else if (data.status === 'failed') {
+        toast.error('SMS failed - check phone number');
+      } else {
+        toast.info(`Credentials logged (${data.status})`);
+      }
+      setShowSMSModal(false);
+    } catch (err) {
+      toast.error('Failed to send login credentials');
+    } finally {
+      setSendingSMS(false);
+    }
   };
 
   const sendNotification = async (contractor) => {
