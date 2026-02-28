@@ -4020,6 +4020,270 @@ async def get_sms_logs(current_user: dict = Depends(get_admin_user)):
     logs = await db.sms_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return {"logs": logs}
 
+# ===================== SMS TEMPLATES FOR CONTRACTORS =====================
+
+@api_router.get("/contractor/sms/templates")
+async def get_sms_templates(current_user: dict = Depends(get_contractor_user)):
+    """Get pre-populated SMS templates for efficient customer communication"""
+    templates = [
+        {
+            "id": "en_route",
+            "name": "On My Way",
+            "template": "Hi {customer_name}! This is {contractor_name} from Up-Wash Power Washing. I'm on my way to your location and should arrive shortly. Please ensure the area is accessible. Thank you!",
+            "category": "arrival"
+        },
+        {
+            "id": "arrived",
+            "name": "I've Arrived",
+            "template": "Hi {customer_name}! I've arrived at your location. I'll begin servicing your {service_type} now. Thank you!",
+            "category": "arrival"
+        },
+        {
+            "id": "running_late",
+            "name": "Running Late",
+            "template": "Hi {customer_name}! I'm running about {delay} minutes behind schedule. I apologize for the delay and will be there as soon as possible. Thank you for your patience!",
+            "category": "delay"
+        },
+        {
+            "id": "need_access",
+            "name": "Need Access",
+            "template": "Hi {customer_name}! I'm at your location but need access to the {area}. Could you please unlock the gate/door? Thank you!",
+            "category": "access"
+        },
+        {
+            "id": "gate_code",
+            "name": "Gate Code Request",
+            "template": "Hi {customer_name}! I'm at your location. Could you please provide the gate code so I can access the property? Thank you!",
+            "category": "access"
+        },
+        {
+            "id": "bins_not_out",
+            "name": "Bins Not Out",
+            "template": "Hi {customer_name}! I'm at your location but your bins are not at the curb. Would you like me to pull them out, or should we reschedule? Please let me know. Thank you!",
+            "category": "issue"
+        },
+        {
+            "id": "weather_delay",
+            "name": "Weather Delay",
+            "template": "Hi {customer_name}! Due to weather conditions, we need to reschedule your service. We'll contact you soon with a new date. Thank you for understanding!",
+            "category": "delay"
+        },
+        {
+            "id": "completed",
+            "name": "Job Complete",
+            "template": "Hi {customer_name}! Your Up-Wash Power Washing service has been completed. Thank you for choosing us! If you have any questions, feel free to reach out. Have a blessed day!",
+            "category": "completion"
+        },
+        {
+            "id": "unable_to_service",
+            "name": "Unable to Service",
+            "template": "Hi {customer_name}! I was unable to complete your service today due to {reason}. We'll contact you to reschedule. Apologies for any inconvenience!",
+            "category": "issue"
+        },
+        {
+            "id": "follow_up",
+            "name": "Follow-Up",
+            "template": "Hi {customer_name}! Just checking in to make sure you're satisfied with your recent Up-Wash service. If you have any feedback, we'd love to hear it! Thank you!",
+            "category": "follow_up"
+        },
+        {
+            "id": "review_request",
+            "name": "Review Request",
+            "template": "Hi {customer_name}! Thank you for using Up-Wash! If you were happy with our service, we'd really appreciate a review on Google. It helps us serve more customers like you! Thank you!",
+            "category": "follow_up"
+        },
+        {
+            "id": "payment_reminder",
+            "name": "Payment Reminder",
+            "template": "Hi {customer_name}! This is a friendly reminder about your Up-Wash service payment of ${amount}. Please visit upwash.com to complete payment. Thank you!",
+            "category": "payment"
+        }
+    ]
+    return {"templates": templates}
+
+class TemplatedSMS(BaseModel):
+    booking_id: str
+    template_id: str
+    custom_fields: Optional[Dict[str, str]] = {}
+
+@api_router.post("/contractor/sms/send-template")
+async def send_templated_sms(sms_data: TemplatedSMS, current_user: dict = Depends(get_contractor_user)):
+    """Send SMS using a pre-defined template with auto-filled customer info"""
+    # Get booking info
+    booking = await db.bookings.find_one({"id": sms_data.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    customer_phone = booking.get("customer_phone")
+    if not customer_phone:
+        raise HTTPException(status_code=400, detail="No phone number for customer")
+    
+    # Get contractor info
+    contractor = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
+    contractor_name = contractor.get("full_name", "Your technician")
+    
+    # Get templates
+    templates_response = await get_sms_templates(current_user)
+    templates = {t["id"]: t["template"] for t in templates_response["templates"]}
+    
+    if sms_data.template_id not in templates:
+        raise HTTPException(status_code=400, detail="Invalid template ID")
+    
+    # Get template and fill in placeholders
+    template = templates[sms_data.template_id]
+    
+    # Auto-fill standard placeholders
+    service_names = ", ".join([s.get("service_id", "").replace("_", " ").title() for s in booking.get("services", [])])
+    
+    replacements = {
+        "customer_name": booking.get("customer_name", "Valued Customer"),
+        "contractor_name": contractor_name,
+        "service_type": service_names,
+        "amount": f"{booking.get('total', 0):.2f}",
+        "area": "property",
+        "delay": "15",
+        "reason": "unforeseen circumstances",
+        **sms_data.custom_fields  # Allow override with custom fields
+    }
+    
+    message = template
+    for key, value in replacements.items():
+        message = message.replace(f"{{{key}}}", str(value))
+    
+    # Send SMS
+    result = await send_sms(customer_phone, message, current_user["user_id"])
+    
+    # Log conversation
+    conversation = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": current_user["user_id"],
+        "customer_phone": customer_phone,
+        "booking_id": sms_data.booking_id,
+        "direction": "outbound",
+        "message": message,
+        "template_id": sms_data.template_id,
+        "status": result["status"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.sms_conversations.insert_one(conversation)
+    
+    return {
+        "message": "SMS sent",
+        "status": result["status"],
+        "sms_id": result["id"],
+        "sent_message": message
+    }
+
+# ===================== TWO-WAY SMS (TWILIO WEBHOOK) =====================
+
+@api_router.post("/webhooks/twilio/incoming")
+async def handle_incoming_sms(request: Request):
+    """Handle incoming SMS from customers via Twilio webhook"""
+    try:
+        form_data = await request.form()
+        
+        from_phone = form_data.get("From", "")
+        to_phone = form_data.get("To", "")
+        message_body = form_data.get("Body", "")
+        message_sid = form_data.get("MessageSid", "")
+        
+        if not from_phone or not message_body:
+            return {"status": "error", "message": "Missing required fields"}
+        
+        # Find the customer by phone number
+        customer_booking = await db.bookings.find_one(
+            {"customer_phone": from_phone},
+            {"_id": 0}
+        )
+        
+        customer_name = "Unknown Customer"
+        booking_id = None
+        if customer_booking:
+            customer_name = customer_booking.get("customer_name", "Unknown Customer")
+            booking_id = customer_booking.get("id")
+        
+        # Find contractor who last messaged this customer
+        last_conversation = await db.sms_conversations.find_one(
+            {"customer_phone": from_phone, "direction": "outbound"},
+            {"_id": 0}
+        )
+        contractor_id = last_conversation.get("contractor_id") if last_conversation else None
+        
+        # Store incoming message
+        incoming_msg = {
+            "id": str(uuid.uuid4()),
+            "from_phone": from_phone,
+            "to_phone": to_phone,
+            "customer_name": customer_name,
+            "booking_id": booking_id,
+            "contractor_id": contractor_id,
+            "message": message_body,
+            "message_sid": message_sid,
+            "direction": "inbound",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.sms_conversations.insert_one(incoming_msg)
+        
+        # Create notification for contractor if found
+        if contractor_id:
+            notification = {
+                "id": str(uuid.uuid4()),
+                "contractor_id": contractor_id,
+                "type": "customer_sms_reply",
+                "title": f"SMS from {customer_name}",
+                "message": message_body[:100] + ("..." if len(message_body) > 100 else ""),
+                "full_message": message_body,
+                "from_phone": from_phone,
+                "booking_id": booking_id,
+                "read": False,
+                "play_sound": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.notifications.insert_one(notification)
+        
+        # Also notify admin
+        admin_notif = {
+            "id": str(uuid.uuid4()),
+            "type": "incoming_sms",
+            "title": f"SMS from {customer_name}",
+            "message": f"{from_phone}: {message_body[:100]}...",
+            "full_message": message_body,
+            "from_phone": from_phone,
+            "booking_id": booking_id,
+            "read": False,
+            "play_sound": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.admin_notifications.insert_one(admin_notif)
+        
+        # Return TwiML response (empty to acknowledge receipt)
+        return {"status": "received", "message_id": incoming_msg["id"]}
+        
+    except Exception as e:
+        logging.error(f"Twilio webhook error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/contractor/sms/inbox")
+async def get_contractor_sms_inbox(current_user: dict = Depends(get_contractor_user)):
+    """Get incoming SMS messages for contractor"""
+    messages = await db.sms_conversations.find(
+        {"contractor_id": current_user["user_id"], "direction": "inbound"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return {"messages": messages}
+
+@api_router.get("/admin/sms/inbox")
+async def get_admin_sms_inbox(current_user: dict = Depends(get_admin_user)):
+    """Get all incoming SMS messages for admin"""
+    messages = await db.sms_conversations.find(
+        {"direction": "inbound"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    
+    return {"messages": messages}
+
 @api_router.post("/admin/notify-clients")
 async def notify_clients_for_route(route_id: str, current_user: dict = Depends(get_admin_user)):
     """Send SMS notifications to all clients on a route"""
