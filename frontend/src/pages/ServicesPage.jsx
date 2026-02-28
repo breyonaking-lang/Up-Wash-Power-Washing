@@ -17,8 +17,12 @@ import {
 const ServicesPage = () => {
   const navigate = useNavigate();
   
-  const handleBookService = (serviceId, quantity = 1) => {
-    navigate(`/booking?service=${serviceId}&qty=${quantity}`);
+  const handleBookService = (serviceId, quantity = 1, isQuote = false) => {
+    if (isQuote) {
+      navigate(`/quote?service=${serviceId}`);
+    } else {
+      navigate(`/booking?service=${serviceId}&qty=${quantity}`);
+    }
   };
 
   const services = [
@@ -57,10 +61,13 @@ const ServicesPage = () => {
       icon: Sparkles,
       color: "bg-pink-500",
       pricing: [
-        { label: "Each", price: 5, qty: 1 }
+        { label: "1 Scent Bomb", price: 5, qty: 1 },
+        { label: "2 Scent Bombs", price: 10, qty: 2 },
+        { label: "3 Scent Bombs", price: 15, qty: 3 },
+        { label: "4 Scent Bombs", price: 20, qty: 4 }
       ],
       features: ["Long-lasting freshness", "Multiple scent options", "Eco-friendly formula", "Works with any bin"],
-      isAddon: true,
+      isAddon: false, // Changed to false so it's clickable like bins
       availableDays: "Any day"
     },
     {
