@@ -68,6 +68,186 @@ class ETANotificationAPITester:
         print(f"\n🔍 Testing Contractor Login...")
         try:
             response = requests.post(
+    def get_contractor_headers(self):
+        """Get headers for contractor requests"""
+        return {
+            'Authorization': f'Bearer {self.contractor_token}',
+            'Content-Type': 'application/json'
+        }
+
+    def get_admin_headers(self):
+        """Get headers for admin requests"""
+        return {
+            'Authorization': f'Bearer {self.admin_token}',
+            'Content-Type': 'application/json'
+        }
+
+    def test_eta_alert_endpoint(self):
+        """Test POST /api/contractor/sms/eta-alert endpoint"""
+        print(f"\n🔍 Testing ETA Alert Endpoint...")
+        
+        if not self.contractor_token:
+            self.log_test("ETA Alert Test", False, "No contractor token available")
+            return False
+
+        # Test data
+        eta_data = {
+            "booking_id": "test-booking-123",
+            "contractor_lat": 32.5421,
+            "contractor_lng": -97.3208
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/sms/eta-alert",
+                json=eta_data,
+                headers=self.get_contractor_headers()
+            )
+            
+            # Expecting 404 since booking doesn't exist, but endpoint should work
+            if response.status_code in [404, 400]:  # 404 for missing booking, 400 for missing phone
+                self.log_test("ETA Alert Endpoint", True, f"Status: {response.status_code} (expected - no booking exists)")
+                return True
+            elif response.status_code == 401:
+                self.log_test("ETA Alert Endpoint", False, "Authentication failed")
+                return False
+            else:
+                self.log_test("ETA Alert Endpoint", False, f"Unexpected status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("ETA Alert Endpoint", False, f"Error: {str(e)}")
+            return False
+
+    def test_check_proximity_endpoint(self):
+        """Test POST /api/contractor/check-proximity endpoint"""
+        print(f"\n🔍 Testing Check Proximity Endpoint...")
+        
+        if not self.contractor_token:
+            self.log_test("Check Proximity Test", False, "No contractor token available")
+            return False
+
+        # Test data
+        proximity_data = {
+            "booking_id": "test-booking-123", 
+            "contractor_lat": 32.5421,
+            "contractor_lng": -97.3208
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/check-proximity",
+                json=proximity_data,
+                headers=self.get_contractor_headers()
+            )
+            
+            # Expecting 404 since booking doesn't exist, but endpoint should work
+            if response.status_code in [404, 400]:  # 404 for missing booking
+                self.log_test("Check Proximity Endpoint", True, f"Status: {response.status_code} (expected - no booking exists)")
+                return True
+            elif response.status_code == 401:
+                self.log_test("Check Proximity Endpoint", False, "Authentication failed")
+                return False
+            else:
+                self.log_test("Check Proximity Endpoint", False, f"Unexpected status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Check Proximity Endpoint", False, f"Error: {str(e)}")
+            return False
+
+    def test_eta_endpoints_without_auth(self):
+        """Test ETA endpoints without authentication (should fail)"""
+        print(f"\n🔍 Testing ETA Endpoints Without Auth...")
+        
+        eta_data = {
+            "booking_id": "test-booking-123",
+            "contractor_lat": 32.5421,
+            "contractor_lng": -97.3208
+        }
+        
+        # Test ETA alert without auth
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/sms/eta-alert",
+                json=eta_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code == 401:
+                self.log_test("ETA Alert No Auth", True, "Correctly rejected unauthorized request")
+            else:
+                self.log_test("ETA Alert No Auth", False, f"Expected 401, got {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("ETA Alert No Auth", False, f"Error: {str(e)}")
+
+        # Test proximity check without auth
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/check-proximity",
+                json=eta_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code == 401:
+                self.log_test("Check Proximity No Auth", True, "Correctly rejected unauthorized request")
+            else:
+                self.log_test("Check Proximity No Auth", False, f"Expected 401, got {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Check Proximity No Auth", False, f"Error: {str(e)}")
+
+    def test_eta_validation(self):
+        """Test ETA endpoint input validation"""
+        print(f"\n🔍 Testing ETA Endpoint Validation...")
+        
+        if not self.contractor_token:
+            self.log_test("ETA Validation Test", False, "No contractor token available")
+            return False
+
+        # Test missing booking_id
+        invalid_data = {
+            "contractor_lat": 32.5421,
+            "contractor_lng": -97.3208
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/sms/eta-alert",
+                json=invalid_data,
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code == 422:  # Validation error
+                self.log_test("ETA Alert Validation", True, "Correctly rejected missing booking_id")
+            else:
+                self.log_test("ETA Alert Validation", False, f"Expected 422, got {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("ETA Alert Validation", False, f"Error: {str(e)}")
+
+        # Test invalid coordinates
+        invalid_coords = {
+            "booking_id": "test-booking",
+            "contractor_lat": "invalid",
+            "contractor_lng": -97.3208
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/contractor/check-proximity",
+                json=invalid_coords,
+                headers=self.get_contractor_headers()
+            )
+            
+            if response.status_code == 422:  # Validation error
+                self.log_test("Proximity Check Validation", True, "Correctly rejected invalid coordinates")
+            else:
+                self.log_test("Proximity Check Validation", False, f"Expected 422, got {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Proximity Check Validation", False, f"Error: {str(e)}")
                 f"{self.base_url}/api/auth/login",
                 json={"username": self.contractor_username, "password": self.contractor_password},
                 headers={'Content-Type': 'application/json'}
