@@ -301,3 +301,40 @@ Power washing business website with booking system, admin dashboard, contractor 
 ### Contractor ETA Notifications (NEW)
 - POST /api/contractor/sms/eta-alert - Send ETA notification to customer
 - POST /api/contractor/check-proximity - Check if contractor is close enough to send ETA
+
+### Feb 28, 2026 - Session 2 Updates
+
+#### SMS Opt-Out System ✅ NEW
+- [x] STOP/UNSUBSCRIBE/CANCEL/END/QUIT keywords trigger opt-out
+- [x] START/YES/SUBSCRIBE keywords re-subscribe
+- [x] Opted-out customers not sent SMS
+- [x] GET /api/admin/sms/optouts - View opted out list
+- [x] POST/DELETE /api/admin/sms/optout/{phone} - Manual opt-out management
+
+#### Customer & Contractor Editing ✅ NEW
+- [x] PUT /api/admin/customers/{booking_id} - Edit customer info (name, email, phone, address, notes)
+- [x] PUT /api/admin/contractors/{contractor_id} - Edit contractor info (name, email, phone, address, pay_rate, notes, is_active)
+- [x] Edit Contractor modal in Admin Dashboard
+
+#### Quote System with Images ✅ NEW
+- [x] Customers can send images via SMS for quotes
+- [x] Images stored from Twilio webhook
+- [x] GET /api/admin/quotes - View quote requests with images
+- [x] POST /api/admin/quotes/respond - Respond with price and payment link
+
+#### Booking Price Modification ✅ NEW
+- [x] PUT /api/admin/bookings/{id}/price - Modify booking prices (subtotal, travel_fee, tax, discount, total)
+- [x] POST /api/admin/bookings/send-payment-link - Send payment link via SMS
+
+#### Separated SMS Threads ✅ NEW
+- [x] POST /api/admin/sms/direct - Send to specific contractor only (private thread)
+- [x] POST /api/admin/sms/group - Send to multiple contractors (group chat)
+- [x] GET /api/admin/sms/threads - View all threads (direct + group)
+- [x] GET /api/admin/sms/thread/{contractor_id} - View specific conversation
+
+#### Contractor Portal Updates ✅ NEW
+- [x] My Routes "Purchase Route" now redirects to "Request Routes"
+- [x] Earnings page shows ONLY today's and this week's earnings
+- [x] Weekly earnings reset every Monday
+- [x] "Resets in X days" countdown displayed
+- [x] CNS stops shown for current week only
