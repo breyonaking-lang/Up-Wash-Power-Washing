@@ -5,11 +5,11 @@ import {
   LayoutDashboard, ClipboardList, CheckCircle, DollarSign, 
   Droplets, Users, MapPin, MessageSquare, LogOut, Menu, X,
   Clock, UserPlus, Key, FileText, Send, Route as RouteIcon,
-  ChevronRight, Search, Filter, Eye, Edit, Trash2, Plus, Bell,
+  ChevronRight, Search, Filter, Eye, Edit, Trash2, Plus, Bell, BellRing,
   Copy, ExternalLink, Phone, Mail, Navigation, Inbox, Building2,
   Home, Car, Sparkles, Warehouse, HardHat, Calendar as CalendarIcon,
   AlertCircle, ChevronLeft, AlertTriangle, Banknote, MessageCircle,
-  Settings, Truck, UserCheck, PlusCircle, FileQuestion, Camera, Image
+  Settings, Truck, UserCheck, PlusCircle, FileQuestion, Camera, Image, User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DailyBibleVerse from '../components/shared/DailyBibleVerse';
