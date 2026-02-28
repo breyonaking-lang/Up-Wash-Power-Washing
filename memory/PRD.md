@@ -278,3 +278,7 @@ Power washing business website with booking system, admin dashboard, contractor 
 - POST /api/contractor/sms/admin - Contractor reply to admin
 - GET /api/admin/sms/contractor/history/{contractor_id} - SMS conversation history
 - GET /api/admin/sms/contractors/all - All admin-contractor messages
+
+### Contractor ETA Notifications (NEW)
+- POST /api/contractor/sms/eta-alert - Send ETA notification to customer
+- POST /api/contractor/check-proximity - Check if contractor is close enough to send ETA
