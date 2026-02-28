@@ -721,7 +721,7 @@ class ETANotificationAPITester:
             return False
 
         direct_sms_data = {
-            "contractor_id": self.contractor_id,
+            "recipient_id": self.contractor_id,
             "message": "Direct message test - specific contractor only"
         }
         
