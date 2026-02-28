@@ -4261,6 +4261,75 @@ async def cron_payment_reminders():
     logging.info(f"Payment reminders sent: {sent_count}")
     return {"sent": sent_count, "target_date": target_date}
 
+# Day-before bin placement reminder (sent at 4pm the day before)
+@api_router.post("/cron/bin-placement-reminders")
+async def cron_bin_placement_reminders():
+    """Send bin placement reminder at 4pm the day before service"""
+    from datetime import timedelta
+    
+    # Target is tomorrow's date
+    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    # Find bin cleaning bookings for tomorrow
+    bookings = await db.bookings.find({
+        "booking_dates": tomorrow,
+        "subscription_status": {"$ne": "cancelled"},
+        f"bin_reminder_sent_{tomorrow}": {"$ne": True}
+    }, {"_id": 0}).to_list(200)
+    
+    sent_count = 0
+    
+    for booking in bookings:
+        # Check if it's a bin service
+        services = booking.get("services", [])
+        has_bin_service = any(s.get("service_id") in ["recycling_bin", "trash_bin_cleaning"] for s in services)
+        
+        if not has_bin_service:
+            continue
+        
+        phone = booking.get("customer_phone")
+        if not phone:
+            continue
+        
+        optout = await db.sms_optouts.find_one({"phone": phone, "opted_out": True})
+        if optout:
+            continue
+        
+        customer_name = booking.get("customer_name", "Valued Customer")
+        
+        message = f"Hi {customer_name}! Reminder: Your Up-Wash bin cleaning is scheduled for tomorrow ({tomorrow}). Please place your bins on the driveway tonight for service. We'll clean them during our hours of operation (8am-6pm). Thank you! Reply STOP to opt out."
+        
+        result = await send_sms(phone, message)
+        
+        if result["status"] == "sent":
+            sent_count += 1
+            await db.bookings.update_one(
+                {"id": booking["id"]},
+                {"$set": {f"bin_reminder_sent_{tomorrow}": True}}
+            )
+            
+            # Store in customer messages
+            msg_record = {
+                "id": str(uuid.uuid4()),
+                "booking_id": booking["id"],
+                "customer_phone": phone,
+                "customer_name": customer_name,
+                "type": "bin_placement_reminder",
+                "message": message,
+                "message_type": "bin_reminder",
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.customer_messages.insert_one(msg_record)
+    
+    logging.info(f"Bin placement reminders sent: {sent_count}")
+    return {"sent": sent_count, "target_date": tomorrow}
+
+@api_router.post("/admin/send-bin-reminders")
+async def admin_send_bin_reminders(current_user: dict = Depends(get_admin_user)):
+    """Manually trigger bin placement reminders"""
+    return await cron_bin_placement_reminders()
+
 # ===================== SMS TEMPLATES FOR CONTRACTORS =====================
 
 @api_router.get("/contractor/sms/templates")
