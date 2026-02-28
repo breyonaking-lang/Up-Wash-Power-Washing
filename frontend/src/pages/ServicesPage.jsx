@@ -61,13 +61,9 @@ const ServicesPage = () => {
       icon: Sparkles,
       color: "bg-pink-500",
       pricing: [
-        { label: "1 Scent Bomb", price: 5, qty: 1 },
-        { label: "2 Scent Bombs", price: 10, qty: 2 },
-        { label: "3 Scent Bombs", price: 15, qty: 3 },
-        { label: "4 Scent Bombs", price: 20, qty: 4 }
+        { label: "Each", price: 3.5, qty: 1 }
       ],
       features: ["Long-lasting freshness", "Multiple scent options", "Eco-friendly formula", "Works with any bin"],
-      isAddon: false, // Changed to false so it's clickable like bins
       availableDays: "Any day"
     },
     {
