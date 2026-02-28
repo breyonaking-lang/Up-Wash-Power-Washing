@@ -11,40 +11,6 @@ import { BIBLE_VERSES } from '../data/bibleVerses';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-// Bible Verses
-const BIBLE_VERSES = [
-  { verse: "I can do all things through Christ who strengthens me.", reference: "Philippians 4:13" },
-  { verse: "Trust in the LORD with all your heart.", reference: "Proverbs 3:5" },
-  { verse: "The LORD is my shepherd; I shall not want.", reference: "Psalm 23:1" },
-  { verse: "Be strong and courageous. Do not be afraid.", reference: "Joshua 1:9" },
-  { verse: "Come to me, all you who are weary and burdened, and I will give you rest.", reference: "Matthew 11:28" },
-  { verse: "The joy of the LORD is your strength.", reference: "Nehemiah 8:10" },
-  { verse: "Cast all your anxiety on him because he cares for you.", reference: "1 Peter 5:7" },
-  { verse: "God is our refuge and strength.", reference: "Psalm 46:1" },
-  { verse: "Be still, and know that I am God.", reference: "Psalm 46:10" },
-  { verse: "For I know the plans I have for you, declares the LORD.", reference: "Jeremiah 29:11" },
-  { verse: "The LORD is my light and my salvation—whom shall I fear?", reference: "Psalm 27:1" },
-  { verse: "And we know that in all things God works for the good of those who love him.", reference: "Romans 8:28" },
-  { verse: "Do not be anxious about anything, but in every situation, by prayer and petition, present your requests to God.", reference: "Philippians 4:6" },
-  { verse: "But those who hope in the LORD will renew their strength.", reference: "Isaiah 40:31" },
-  { verse: "The name of the LORD is a fortified tower; the righteous run to it and are safe.", reference: "Proverbs 18:10" },
-  { verse: "Have I not commanded you? Be strong and courageous. Do not be afraid; do not be discouraged.", reference: "Joshua 1:9" },
-  { verse: "Delight yourself in the LORD, and he will give you the desires of your heart.", reference: "Psalm 37:4" },
-  { verse: "The LORD bless you and keep you.", reference: "Numbers 6:24" },
-  { verse: "Greater love has no one than this: to lay down one's life for one's friends.", reference: "John 15:13" },
-  { verse: "In the beginning God created the heavens and the earth.", reference: "Genesis 1:1" },
-  { verse: "For God so loved the world that he gave his one and only Son.", reference: "John 3:16" },
-  { verse: "Jesus answered, 'I am the way and the truth and the life.'", reference: "John 14:6" },
-  { verse: "This is the day the LORD has made; let us rejoice and be glad in it.", reference: "Psalm 118:24" },
-  { verse: "Love is patient, love is kind. It does not envy, it does not boast.", reference: "1 Corinthians 13:4" },
-  { verse: "Give thanks to the LORD, for he is good; his love endures forever.", reference: "Psalm 107:1" },
-  { verse: "He heals the brokenhearted and binds up their wounds.", reference: "Psalm 147:3" },
-  { verse: "The LORD is close to the brokenhearted and saves those who are crushed in spirit.", reference: "Psalm 34:18" },
-  { verse: "Faith is confidence in what we hope for and assurance about what we do not see.", reference: "Hebrews 11:1" },
-  { verse: "I have told you these things, so that in me you may have peace.", reference: "John 16:33" },
-  { verse: "Create in me a pure heart, O God, and renew a steadfast spirit within me.", reference: "Psalm 51:10" }
-];
-
 const CrossIcon = ({ className, size = 16 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M10 2h4v6h6v4h-6v10h-4V12H4V8h6V2z"/>
