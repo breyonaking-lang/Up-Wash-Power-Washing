@@ -56,6 +56,7 @@ const navItems = [
   { path: 'pending-routes', icon: RouteIcon, label: 'Pending Routes' },
   { path: 'released-routes', icon: AlertTriangle, label: 'Released Routes' },
   { path: 'route-requests', icon: ClipboardList, label: 'Route Requests' },
+  { path: 'quotes', icon: FileQuestion, label: 'Quote Requests' },
   { path: 'sms-logs', icon: MessageCircle, label: 'SMS Logs' },
   { path: 'messages', icon: MessageSquare, label: 'Messages' },
   { path: 'inquiries', icon: Inbox, label: 'Inquiry Messages' },
