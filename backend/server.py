@@ -1843,6 +1843,9 @@ async def reschedule_booking(booking_id: str, reschedule: RescheduleRequest, cur
         sms_message = f"Hi {customer_name}! Your Up-Wash Power Washing service has been rescheduled from {old_date} to {new_date}. If you have any questions, please contact us. Thank you!"
     
     if reschedule.send_sms and customer_phone:
+        # Send actual SMS via Twilio
+        sms_result = await send_sms(customer_phone, sms_message)
+        
         # Create in-app message record
         message_record = {
             "id": str(uuid.uuid4()),
@@ -1853,6 +1856,7 @@ async def reschedule_booking(booking_id: str, reschedule: RescheduleRequest, cur
             "booking_id": booking_id,
             "message": sms_message,
             "message_type": "reschedule",
+            "sms_status": sms_result.get("status", "unknown"),
             "read": False,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
@@ -1864,7 +1868,7 @@ async def reschedule_booking(booking_id: str, reschedule: RescheduleRequest, cur
             "to_phone": customer_phone,
             "message": sms_message,
             "message_type": "reschedule",
-            "status": "delivered_in_app",
+            "status": sms_result.get("status", "unknown"),
             "booking_id": booking_id,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
