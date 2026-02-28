@@ -396,9 +396,28 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] POST /api/cron/bin-placement-reminders - Send at 4pm day before
 - [x] Reminds customers to place bins on driveway
 
+### Feb 28, 2026 - Session 4 Updates
+
+#### Services Page - Hide Available Days ✅ NEW
+- [x] Removed "Available: Monday & Tuesday" display from Services page
+- [x] Availability shown only during booking calendar selection
+
+#### Pending Routes - Search & Grouping ✅ NEW
+- [x] Search bar to filter routes by name, address, customer, zip
+- [x] Group by dropdown: Zip Code, City, or State
+- [x] Dynamic grouping with filtered results count
+- [x] Backend alias routes for /admin/documentors endpoints
+
+#### Booking Flow - Back Navigation ✅ NEW
+- [x] Back button on Step 2 (Schedule) → returns to Step 1 (Services)
+- [x] Back button on Step 3 (Customer Info) → returns to Step 2 (Schedule)
+- [x] Proper navigation flow with ArrowLeft icons
+
+#### Bug Fixes ✅ NEW
+- [x] Fixed duplicate BIBLE_VERSES declaration in ClientPortal.jsx
+- [x] Added /admin/documentors alias routes to match frontend calls
+
 #### Still TODO (Next Session):
-- [ ] Admin dashboard tabs clickable with route management
-- [ ] Route combining and assignment by city/state/zip
+- [ ] Admin dashboard "All" tabs clickable with filterable lists
 - [ ] Subscription auto-populate nearest day
-- [ ] Allow customers to go back during booking
 - [ ] Quote service click-through to quote form
