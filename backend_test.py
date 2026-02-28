@@ -427,26 +427,53 @@ class ETANotificationAPITester:
             self.log_test("Basic API Health", False, f"- Error: {str(e)}")
 
     def run_all_tests(self):
-        """Run all SMS API tests"""
+        """Run all ETA notification and SMS API tests"""
         print("=" * 80)
-        print("🚀 STARTING TWILIO SMS API TESTING")
+        print("🚀 STARTING ETA NOTIFICATION & SMS API TESTING")
         print("=" * 80)
         print(f"Testing Backend URL: {self.base_url}")
         print(f"Admin Credentials: {self.admin_username}")
+        print(f"Contractor Credentials: {self.contractor_username}")
         print(f"Test Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Test basic API health
         self.test_basic_endpoints()
         
-        # Login first
-        if not self.login_admin():
-            print("\n❌ Cannot proceed with SMS tests - Admin login failed")
-            return False
+        # Login admin first
+        admin_login_success = self.login_admin()
+        
+        # Login contractor
+        contractor_login_success = self.login_contractor()
+        
+        if not contractor_login_success:
+            print("\n❌ Cannot proceed with ETA tests - Contractor login failed")
+        else:
+            # Test ETA notification endpoints
+            print("\n" + "="*50)
+            print("🎯 TESTING ETA NOTIFICATION FEATURES")
+            print("="*50)
             
-        # Get contractors for testing
-        if not self.get_contractors():
-            print("\n❌ Cannot proceed with SMS tests - No contractors available")
-            return False
+            self.test_eta_alert_endpoint()
+            self.test_check_proximity_endpoint()
+            self.test_eta_endpoints_without_auth()
+            self.test_eta_validation()
+        
+        if admin_login_success:
+            # Get contractors for testing
+            if self.get_contractors():
+                # Test existing SMS functionality
+                print("\n" + "="*50)
+                print("📱 TESTING SMS FUNCTIONALITY")  
+                print("="*50)
+                
+                self.test_send_sms()
+                self.test_sms_validation()
+                self.test_sms_logs()
+                self.test_sms_stats()
+            else:
+                print("\n⚠️  Skipping SMS tests - No contractors available")
+        else:
+            print("\n⚠️  Skipping SMS tests - Admin login failed")
             
         # Test all SMS endpoints
         print("\n" + "=" * 60)
