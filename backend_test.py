@@ -751,13 +751,36 @@ class ETANotificationAPITester:
         if admin_login_success:
             # Get contractors for testing
             if self.get_contractors():
-                # Test existing SMS functionality
+                # Test comprehensive SMS functionality
                 print("\n" + "="*50)
-                print("📱 TESTING SMS FUNCTIONALITY")  
+                print("📱 TESTING COMPREHENSIVE SMS FUNCTIONALITY")  
                 print("="*50)
                 
-                self.test_send_sms()
-                self.test_sms_validation()
+                # Test SMS templates API
+                self.test_sms_templates_endpoint()
+                
+                # Test templated SMS sending
+                self.test_send_template_sms_endpoint()
+                
+                # Test incoming SMS webhook
+                self.test_twilio_incoming_webhook()
+                
+                # Test contractor SMS inbox
+                if contractor_login_success:
+                    self.test_contractor_sms_inbox()
+                
+                # Test admin SMS inbox
+                self.test_admin_sms_inbox()
+                
+                # Test basic SMS functionality
+                if contractor_login_success:
+                    self.test_send_sms()
+                
+                # Test SMS validation
+                if contractor_login_success:
+                    self.test_sms_validation()
+                
+                # Test SMS logs and stats
                 self.test_sms_logs()
                 self.test_sms_stats()
             else:
