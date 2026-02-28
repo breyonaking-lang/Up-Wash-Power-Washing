@@ -7325,7 +7325,7 @@ async def send_in_app_message(msg: InAppMessage, request: Request):
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         sender_id = payload.get("user_id") or payload.get("sub")
         sender_role = payload.get("role", "client")
     except JWTError:
@@ -7389,7 +7389,7 @@ async def get_inbox_messages(request: Request):
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id") or payload.get("sub")
         user_role = payload.get("role", "client")
     except JWTError:
@@ -7417,7 +7417,7 @@ async def get_message_thread(other_user_id: str, request: Request):
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id") or payload.get("sub")
         user_role = payload.get("role", "client")
     except JWTError:
@@ -7451,7 +7451,7 @@ async def get_message_notifications(request: Request):
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id") or payload.get("sub")
         user_role = payload.get("role", "client")
     except JWTError:
@@ -7485,7 +7485,7 @@ async def get_message_contacts(request: Request):
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id") or payload.get("sub")
         user_role = payload.get("role", "client")
     except JWTError:
@@ -7564,7 +7564,7 @@ async def subscribe_to_push(subscription: PushSubscription, request: Request):
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id") or payload.get("sub")
         user_role = payload.get("role", "client")
     except JWTError:
@@ -7596,7 +7596,7 @@ async def unsubscribe_from_push(request: Request):
     
     token = auth_header.split(" ")[1]
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id") or payload.get("sub")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
