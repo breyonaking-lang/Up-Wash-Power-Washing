@@ -1681,25 +1681,32 @@ function ReleasedRoutesPage() {
               route.status === 'claimed' ? 'border-green-500/30' : 
               route.status === 'dispatched' ? 'border-yellow-500/30' : 'border-white/20'
             }`}>
-              {/* Selection indicator for available routes */}
+              {/* Large selection button for available routes */}
               {route.status === 'available' && (
-                <div className="bg-purple-500/30 text-purple-200 text-xs px-3 py-1 rounded-full inline-flex items-center gap-1 mb-3">
-                  <span>☑</span> Click checkbox to select for mass dispatch
+                <div 
+                  onClick={() => toggleRouteSelection(route.id)}
+                  className={`mb-4 p-4 rounded-xl cursor-pointer flex items-center gap-4 ${
+                    selectedRoutes.includes(route.id) 
+                      ? 'bg-purple-500 text-white' 
+                      : 'bg-purple-500/30 text-purple-200 hover:bg-purple-500/50'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center ${
+                    selectedRoutes.includes(route.id) 
+                      ? 'bg-white border-white' 
+                      : 'border-purple-300'
+                  }`}>
+                    {selectedRoutes.includes(route.id) && (
+                      <CheckCircle className="w-6 h-6 text-purple-500" />
+                    )}
+                  </div>
+                  <span className="font-bold text-lg">
+                    {selectedRoutes.includes(route.id) ? '✓ SELECTED FOR DISPATCH' : 'CLICK HERE TO SELECT FOR MASS DISPATCH'}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-start gap-4">
-                  {route.status === 'available' && (
-                    <div className="flex-shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={selectedRoutes.includes(route.id)}
-                        onChange={() => toggleRouteSelection(route.id)}
-                        className="w-6 h-6 rounded cursor-pointer accent-purple-500 border-2 border-purple-400"
-                        style={{ minWidth: '24px', minHeight: '24px' }}
-                      />
-                    </div>
-                  )}
                   <div>
                     <h3 className="text-xl font-bold text-white">{route.route_name}</h3>
                     <p className="text-white/60">Area: {route.route_area || route.zip_code || 'Not specified'}</p>
