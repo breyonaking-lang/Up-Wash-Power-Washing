@@ -1240,6 +1240,47 @@ async def send_payment_link_core(req: PaymentLinkRequest):
             "amount": amount
         }
 
+class GeneratePaymentLinkRequest(BaseModel):
+    booking_id: str
+    custom_amount: Optional[float] = None
+
+@api_router.post("/admin/generate-payment-link")
+async def generate_payment_link(req: GeneratePaymentLinkRequest, current_user: dict = Depends(get_admin_user)):
+    """Generate a payment link without sending it - for Quick Pay / Copy to clipboard"""
+    booking = await db.bookings.find_one({"id": req.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    customer_name = booking.get("customer_name", "Valued Customer")
+    amount = req.custom_amount or booking.get("total", 0)
+    
+    # Generate payment token
+    payment_token = str(uuid.uuid4())[:8]
+    
+    # Store payment link data
+    await db.payment_links.insert_one({
+        "id": str(uuid.uuid4()),
+        "token": payment_token,
+        "booking_id": req.booking_id,
+        "amount": amount,
+        "customer_phone": booking.get("customer_phone"),
+        "customer_email": booking.get("customer_email"),
+        "customer_name": customer_name,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Get correct preview URL from environment or use default
+    base_url = os.environ.get("FRONTEND_URL", "https://github-link-finder.preview.emergentagent.com")
+    payment_url = f"{base_url}/pay/{payment_token}"
+    
+    return {
+        "message": "Payment link generated",
+        "payment_url": payment_url,
+        "amount": amount,
+        "token": payment_token
+    }
+
 # ===================== PAYMENT ROUTES =====================
 
 @api_router.post("/payments/process")

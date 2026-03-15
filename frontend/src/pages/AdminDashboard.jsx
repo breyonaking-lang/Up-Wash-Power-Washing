@@ -285,6 +285,7 @@ function BookingCard({ booking, onUpdateStatus, onRefresh }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState(booking.customer_email ? 'email' : 'sms');
   const [sendingPayment, setSendingPayment] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
   const [quoteData, setQuoteData] = useState({
     date: booking.booking_dates?.[0] || '',
     time: '09:00',
@@ -332,6 +333,30 @@ function BookingCard({ booking, onUpdateStatus, onRefresh }) {
       toast.error('Failed to send payment link');
     } finally {
       setSendingPayment(false);
+    }
+  };
+
+  // Quick Pay - Generate link and copy to clipboard
+  const quickPayCopyLink = async () => {
+    setGeneratingLink(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/generate-payment-link`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ booking_id: booking.id })
+      });
+      if (!res.ok) throw new Error('Failed to generate');
+      const data = await res.json();
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(data.payment_url);
+      toast.success('Payment link copied to clipboard!', {
+        description: `$${booking.total?.toFixed(2)} - ${data.payment_url.slice(-20)}...`
+      });
+    } catch (err) {
+      toast.error('Failed to generate payment link');
+    } finally {
+      setGeneratingLink(false);
     }
   };
 
@@ -448,6 +473,18 @@ function BookingCard({ booking, onUpdateStatus, onRefresh }) {
             )}
             
             <div className="flex gap-2 pt-2 flex-wrap">
+              {/* Quick Pay - Copy link to clipboard */}
+              {booking.payment_status !== 'paid' && booking.payment_status !== 'waived' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); quickPayCopyLink(); }}
+                  disabled={generatingLink}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm hover:bg-purple-600 flex items-center gap-2 disabled:opacity-50"
+                  data-testid="quick-pay-btn"
+                >
+                  <Copy className="w-4 h-4" />
+                  {generatingLink ? 'Generating...' : 'Quick Pay'}
+                </button>
+              )}
               {/* Send Payment Link button - only for unpaid bookings */}
               {booking.payment_status !== 'paid' && booking.payment_status !== 'waived' && (
                 <button
