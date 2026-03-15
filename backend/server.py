@@ -2713,6 +2713,174 @@ async def add_bookings_to_route(route_id: str, booking_ids: List[str], current_u
     
     return {"message": "Bookings added to route"}
 
+# ===================== STOP MANAGEMENT ENDPOINTS =====================
+
+@api_router.get("/admin/routes/{route_id}")
+async def get_route_details(route_id: str, current_user: dict = Depends(get_admin_user)):
+    """Get detailed route information including stop statuses"""
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    return {"route": route}
+
+class StopStatusUpdate(BaseModel):
+    status: str  # 'pending', 'completed', 'incomplete'
+
+@api_router.patch("/admin/routes/{route_id}/stops/{booking_id}/status")
+async def update_stop_status(route_id: str, booking_id: str, update: StopStatusUpdate, current_user: dict = Depends(get_admin_user)):
+    """Update the status of a stop in a route"""
+    if update.status not in ['pending', 'completed', 'incomplete']:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be: pending, completed, or incomplete")
+    
+    # Find the route and update the specific booking's status
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    # Update the booking within the route's bookings array
+    result = await db.routes.update_one(
+        {"id": route_id, "bookings.booking_id": booking_id},
+        {"$set": {
+            "bookings.$.stop_status": update.status,
+            "bookings.$.status_updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Stop not found in route")
+    
+    # Also update the main booking record
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {
+            "stop_status": update.status,
+            "status_updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Check if all stops are completed to mark route as completed
+    updated_route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if updated_route and updated_route.get("bookings"):
+        all_completed = all(b.get("stop_status") == "completed" for b in updated_route["bookings"])
+        if all_completed:
+            await db.routes.update_one(
+                {"id": route_id},
+                {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+            )
+    
+    return {
+        "message": f"Stop marked as {update.status}",
+        "route_id": route_id,
+        "booking_id": booking_id,
+        "new_status": update.status
+    }
+
+class StopReschedule(BaseModel):
+    new_date: str  # Format: YYYY-MM-DD
+
+@api_router.post("/admin/routes/{route_id}/stops/{booking_id}/reschedule")
+async def reschedule_stop(route_id: str, booking_id: str, reschedule: StopReschedule, current_user: dict = Depends(get_admin_user)):
+    """Reschedule a stop to a different date (moves to appropriate route)"""
+    # Validate date format
+    try:
+        new_date = datetime.strptime(reschedule.new_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    # Get current route and booking
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    # Find the booking in the route
+    booking_to_move = None
+    for b in route.get("bookings", []):
+        if b.get("booking_id") == booking_id:
+            booking_to_move = b
+            break
+    
+    if not booking_to_move:
+        raise HTTPException(status_code=404, detail="Stop not found in route")
+    
+    # Remove from current route
+    await db.routes.update_one(
+        {"id": route_id},
+        {"$pull": {"bookings": {"booking_id": booking_id}}}
+    )
+    
+    # Extract zip code from address
+    address = booking_to_move.get("customer_address", "")
+    zip_code = ""
+    for part in address.split():
+        if len(part) == 5 and part.isdigit():
+            zip_code = part
+            break
+    if not zip_code:
+        zip_code = route.get("zip_code", "00000")
+    
+    # Find or create a route for the new date
+    new_date_str = reschedule.new_date
+    existing_route = await db.routes.find_one({
+        "zip_code": zip_code,
+        "service_date": new_date_str,
+        "status": {"$ne": "completed"}
+    }, {"_id": 0})
+    
+    # Update the booking's date and status
+    booking_to_move["stop_status"] = "pending"
+    booking_to_move["rescheduled_from"] = route_id
+    booking_to_move["rescheduled_at"] = datetime.now(timezone.utc).isoformat()
+    
+    if existing_route:
+        # Add to existing route
+        await db.routes.update_one(
+            {"id": existing_route["id"]},
+            {"$push": {"bookings": booking_to_move}}
+        )
+        new_route_id = existing_route["id"]
+    else:
+        # Create new route
+        new_route = {
+            "id": str(uuid.uuid4()),
+            "name": f"Route {zip_code} - {new_date_str}",
+            "zip_code": zip_code,
+            "service_date": new_date_str,
+            "status": "pending",
+            "bookings": [booking_to_move],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.routes.insert_one(new_route)
+        new_route_id = new_route["id"]
+    
+    # Update the main booking record
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {
+            "route_id": new_route_id,
+            "rescheduled_to": new_date_str,
+            "rescheduled_from_route": route_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        "$push": {
+            "booking_dates": new_date_str
+        }}
+    )
+    
+    # Send SMS to customer about rescheduling
+    customer_phone = booking_to_move.get("customer_phone")
+    if customer_phone:
+        sms_message = f"Hi {booking_to_move.get('customer_name', 'Customer')}, your Up-Wash service has been rescheduled to {new_date_str}. Thank you for your understanding!"
+        await send_sms(customer_phone, sms_message)
+    
+    return {
+        "message": "Stop rescheduled successfully",
+        "booking_id": booking_id,
+        "old_route_id": route_id,
+        "new_route_id": new_route_id,
+        "new_date": new_date_str
+    }
+
 # ===================== BULK DELETE & MANAGEMENT ENDPOINTS =====================
 
 class BulkDeleteRequest(BaseModel):

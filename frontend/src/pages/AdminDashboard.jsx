@@ -1348,6 +1348,11 @@ function ContractorsPage() {
   const [reassignToContractor, setReassignToContractor] = useState('');
   // Expanded Route View
   const [expandedRoutes, setExpandedRoutes] = useState({});
+  // Route Management Modal States
+  const [showRouteManageModal, setShowRouteManageModal] = useState(false);
+  const [managingRoute, setManagingRoute] = useState(null);
+  const [showRescheduleStop, setShowRescheduleStop] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
 
   useEffect(() => {
     fetchContractors();
@@ -1642,6 +1647,77 @@ function ContractorsPage() {
     setShowReassignModal(true);
   };
 
+  const openRouteManageModal = async (route) => {
+    // Fetch latest route data with stop statuses
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes/${route.id}`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setManagingRoute(data.route || route);
+      } else {
+        setManagingRoute(route);
+      }
+    } catch (err) {
+      setManagingRoute(route);
+    }
+    setShowRouteManageModal(true);
+  };
+
+  const updateStopStatus = async (routeId, bookingId, newStatus) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes/${routeId}/stops/${bookingId}/status`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      
+      toast.success(`Stop marked as ${newStatus}`);
+      
+      // Update local state
+      setManagingRoute(prev => ({
+        ...prev,
+        bookings: prev.bookings.map(b => 
+          b.booking_id === bookingId ? { ...b, stop_status: newStatus } : b
+        )
+      }));
+      fetchRoutes();
+    } catch (err) {
+      toast.error('Failed to update stop status');
+    }
+  };
+
+  const rescheduleStop = async (routeId, bookingId) => {
+    if (!rescheduleDate) {
+      toast.error('Please select a date');
+      return;
+    }
+    
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes/${routeId}/stops/${bookingId}/reschedule`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ new_date: rescheduleDate })
+      });
+      if (!res.ok) throw new Error('Failed to reschedule');
+      
+      const data = await res.json();
+      toast.success(`Stop rescheduled to ${rescheduleDate}`);
+      
+      setShowRescheduleStop(null);
+      setRescheduleDate('');
+      
+      // Update local state - remove from current route
+      setManagingRoute(prev => ({
+        ...prev,
+        bookings: prev.bookings.filter(b => b.booking_id !== bookingId)
+      }));
+      fetchRoutes();
+    } catch (err) {
+      toast.error('Failed to reschedule stop');
+    }
+  };
+
   const reassignRouteToContractor = async () => {
     if (!reassignRoute || !reassignToContractor) {
       toast.error('Please select a contractor');
@@ -1744,6 +1820,13 @@ function ContractorsPage() {
                                   </span>
                                 </div>
                                 <div className="flex gap-2">
+                                  <button
+                                    onClick={() => openRouteManageModal(route)}
+                                    className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-sm hover:bg-purple-500/30"
+                                    data-testid={`manage-route-${route.id}`}
+                                  >
+                                    Manage Stops
+                                  </button>
                                   <button
                                     onClick={() => toggleRouteExpanded(route.id)}
                                     className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30"
@@ -2374,6 +2457,176 @@ function ContractorsPage() {
                 data-testid="confirm-reassign-btn"
               >
                 Reassign Route
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Route Management Modal - Edit Stops */}
+      {showRouteManageModal && managingRoute && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 max-w-2xl w-full my-8"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Manage Route Stops</h2>
+              <button
+                onClick={() => { setShowRouteManageModal(false); setManagingRoute(null); }}
+                className="text-white/60 hover:text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Route Info */}
+            <div className="bg-white/10 rounded-xl p-4 mb-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-white font-medium text-lg">{managingRoute.name}</p>
+                  <p className="text-white/60 text-sm">
+                    {managingRoute.bookings?.length || 0} stops | 
+                    ${((managingRoute.bookings?.length || 0) * 11).toFixed(2)} potential earnings
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-green-400 text-sm">
+                    {managingRoute.bookings?.filter(b => b.stop_status === 'completed').length || 0} Completed
+                  </p>
+                  <p className="text-yellow-400 text-sm">
+                    {managingRoute.bookings?.filter(b => !b.stop_status || b.stop_status === 'pending').length || 0} Pending
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Stops List */}
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {managingRoute.bookings && managingRoute.bookings.length > 0 ? (
+                managingRoute.bookings.map((booking, idx) => (
+                  <div 
+                    key={booking.booking_id || idx} 
+                    className={`rounded-xl p-4 border ${
+                      booking.stop_status === 'completed' 
+                        ? 'bg-green-500/10 border-green-500/30' 
+                        : booking.stop_status === 'incomplete'
+                          ? 'bg-red-500/10 border-red-500/30'
+                          : 'bg-white/5 border-white/10'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-white font-medium">{idx + 1}. {booking.customer_name}</span>
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${
+                            booking.stop_status === 'completed' 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : booking.stop_status === 'incomplete'
+                                ? 'bg-red-500/20 text-red-400'
+                                : 'bg-yellow-500/20 text-yellow-400'
+                          }`}>
+                            {booking.stop_status || 'Pending'}
+                          </span>
+                        </div>
+                        <p className="text-white/60 text-sm flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {booking.customer_address}
+                        </p>
+                        {booking.customer_phone && (
+                          <p className="text-white/60 text-sm flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> {booking.customer_phone}
+                          </p>
+                        )}
+                        {booking.services && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {booking.services.map((svc, i) => (
+                              <span key={i} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
+                                {svc.name || svc.service_id}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Status Actions */}
+                      <div className="flex flex-col gap-2 ml-4">
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => updateStopStatus(managingRoute.id, booking.booking_id, 'completed')}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                              booking.stop_status === 'completed'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-green-500/20 text-green-400 hover:bg-green-500/40'
+                            }`}
+                            data-testid={`complete-stop-${booking.booking_id}`}
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => updateStopStatus(managingRoute.id, booking.booking_id, 'incomplete')}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                              booking.stop_status === 'incomplete'
+                                ? 'bg-red-500 text-white'
+                                : 'bg-red-500/20 text-red-400 hover:bg-red-500/40'
+                            }`}
+                            data-testid={`incomplete-stop-${booking.booking_id}`}
+                          >
+                            <AlertCircle className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => setShowRescheduleStop(booking.booking_id)}
+                          className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs hover:bg-orange-500/40 flex items-center gap-1"
+                          data-testid={`reschedule-stop-${booking.booking_id}`}
+                        >
+                          <CalendarIcon className="w-3 h-3" />
+                          Reschedule
+                        </button>
+                        
+                        {/* Reschedule Date Picker */}
+                        {showRescheduleStop === booking.booking_id && (
+                          <div className="mt-2 p-2 bg-black/30 rounded-lg">
+                            <input
+                              type="date"
+                              value={rescheduleDate}
+                              onChange={(e) => setRescheduleDate(e.target.value)}
+                              min={new Date().toISOString().split('T')[0]}
+                              className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs"
+                            />
+                            <div className="flex gap-1 mt-2">
+                              <button
+                                onClick={() => { setShowRescheduleStop(null); setRescheduleDate(''); }}
+                                className="flex-1 px-2 py-1 bg-white/10 text-white text-xs rounded"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => rescheduleStop(managingRoute.id, booking.booking_id)}
+                                disabled={!rescheduleDate}
+                                className="flex-1 px-2 py-1 bg-orange-500 text-white text-xs rounded disabled:opacity-50"
+                              >
+                                Confirm
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-white/60 text-center py-8">No stops in this route</p>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => { setShowRouteManageModal(false); setManagingRoute(null); }}
+                className="px-6 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+              >
+                Done
               </button>
             </div>
           </motion.div>
