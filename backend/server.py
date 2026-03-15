@@ -7325,6 +7325,99 @@ async def get_route_requests(current_user: dict = Depends(get_admin_user)):
     requests = await db.route_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return {"requests": requests}
 
+@api_router.get("/admin/route-requests/export")
+async def export_route_requests(
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Export route requests as CSV for accounting"""
+    import csv
+    from io import StringIO
+    from fastapi.responses import StreamingResponse
+    
+    # Build query filter
+    query = {}
+    if status and status != "all":
+        query["status"] = status
+    if start_date:
+        query["created_at"] = {"$gte": start_date}
+    if end_date:
+        if "created_at" in query:
+            query["created_at"]["$lte"] = end_date + "T23:59:59"
+        else:
+            query["created_at"] = {"$lte": end_date + "T23:59:59"}
+    
+    requests = await db.route_requests.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Create CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Header row
+    writer.writerow([
+        "Request ID",
+        "Contractor Name",
+        "Contractor Phone",
+        "Zip Codes",
+        "Routes Requested",
+        "Truck Rental",
+        "Route Cost ($)",
+        "Truck Cost ($)",
+        "Total Price ($)",
+        "Status",
+        "Created Date",
+        "Approved Date",
+        "Paid Date",
+        "Denied Date"
+    ])
+    
+    # Data rows
+    for req in requests:
+        writer.writerow([
+            req.get("id", ""),
+            req.get("contractor_name", ""),
+            req.get("contractor_phone", ""),
+            ", ".join(req.get("zip_codes", [])),
+            req.get("num_routes_requested", 1),
+            "Yes" if req.get("truck_rental") else "No",
+            f"{req.get('route_cost', 0):.2f}",
+            f"{req.get('truck_cost', 0):.2f}",
+            f"{req.get('total_price', 0):.2f}",
+            req.get("status", "pending").upper(),
+            req.get("created_at", "")[:10] if req.get("created_at") else "",
+            req.get("approved_at", "")[:10] if req.get("approved_at") else "",
+            req.get("paid_at", "")[:10] if req.get("paid_at") else "",
+            req.get("denied_at", "")[:10] if req.get("denied_at") else ""
+        ])
+    
+    # Calculate totals for paid requests only
+    paid_requests = [r for r in requests if r.get("status") == "paid"]
+    total_revenue = sum(r.get("total_price", 0) for r in paid_requests)
+    total_routes = sum(r.get("num_routes_requested", 0) for r in paid_requests)
+    total_trucks = sum(1 for r in paid_requests if r.get("truck_rental"))
+    
+    # Add summary rows
+    writer.writerow([])
+    writer.writerow(["--- SUMMARY (PAID ONLY) ---"])
+    writer.writerow(["Total Paid Requests", len(paid_requests)])
+    writer.writerow(["Total Routes Sold", total_routes])
+    writer.writerow(["Total Truck Rentals", total_trucks])
+    writer.writerow(["Total Revenue", f"${total_revenue:.2f}"])
+    
+    output.seek(0)
+    
+    # Generate filename with date
+    from datetime import datetime
+    filename = f"route_requests_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @api_router.post("/admin/route-requests/{request_id}/approve")
 async def approve_route_request(request_id: str, current_user: dict = Depends(get_admin_user)):
     """Approve route request - generates payment link for contractor"""

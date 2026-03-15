@@ -721,3 +721,10 @@ Power washing business website with booking system, admin dashboard, contractor 
 #### Payment Processing Note
 Square payment integration is MOCKED for testing. The `/complete` endpoint creates routes without actual payment nonce. Production deployment requires full Square payment form integration.
 
+#### Route Request Export Feature ✅ NEW
+- [x] Admin can export route requests to CSV for accounting
+- [x] Filter by status: All, Paid, Pending, Awaiting Payment, Denied
+- [x] CSV includes: Request ID, Contractor, Zip Codes, Routes, Truck, Costs, Status, Dates
+- [x] Summary section shows: Total Paid Requests, Routes Sold, Truck Rentals, Revenue
+- [x] GET /api/admin/route-requests/export - Export CSV with optional status filter
+

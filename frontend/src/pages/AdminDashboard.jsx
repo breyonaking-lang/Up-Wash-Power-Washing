@@ -1979,6 +1979,8 @@ function RouteRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportFilter, setExportFilter] = useState('all');
 
   useEffect(() => {
     fetchRouteRequests();
@@ -1994,6 +1996,35 @@ function RouteRequestsPage() {
       console.error('Failed to load route requests');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const exportToCSV = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (exportFilter !== 'all') params.append('status', exportFilter);
+      
+      const res = await fetch(`${API_URL}/api/admin/route-requests/export?${params}`, { 
+        headers: getAuthHeaders() 
+      });
+      if (!res.ok) throw new Error('Export failed');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `route_requests_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      
+      toast.success('Export downloaded successfully!');
+    } catch (err) {
+      toast.error('Failed to export data');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -2074,6 +2105,42 @@ function RouteRequestsPage() {
           <p className="text-3xl font-bold text-red-400">{deniedRequests.length}</p>
           <p className="text-white/60 text-sm">Denied</p>
         </div>
+      </div>
+
+      {/* Export Section */}
+      <div className="bg-white/10 rounded-xl p-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <span className="text-white/60">Export Report:</span>
+          <select
+            value={exportFilter}
+            onChange={(e) => setExportFilter(e.target.value)}
+            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+          >
+            <option value="all">All Requests</option>
+            <option value="paid">Paid Only</option>
+            <option value="pending">Pending Only</option>
+            <option value="approved">Awaiting Payment</option>
+            <option value="denied">Denied Only</option>
+          </select>
+        </div>
+        <button
+          onClick={exportToCSV}
+          disabled={exporting}
+          className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold flex items-center gap-2 disabled:opacity-50"
+          data-testid="export-csv-btn"
+        >
+          {exporting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              Exporting...
+            </>
+          ) : (
+            <>
+              <FileText className="w-4 h-4" />
+              Export CSV
+            </>
+          )}
+        </button>
       </div>
 
       {requests.length === 0 ? (
