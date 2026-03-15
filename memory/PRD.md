@@ -581,3 +581,24 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [x] SMS notification sent to old contractor (if any)
 - [x] API: POST /api/admin/routes/{route_id}/reassign
 
+#### Stop Management ✅ NEW
+- [x] "Manage Stops" button on each route card
+- [x] Route management modal shows:
+  - Route name, date, stop count, earnings
+  - Summary: Completed/Pending counts
+  - All stops with customer details (name, address, phone, services)
+- [x] Stop status management:
+  - Mark as Completed (green checkmark)
+  - Mark as Incomplete (red X)
+  - Status badges: Pending (yellow), Completed (green), Incomplete (red)
+- [x] Reschedule stop:
+  - Date picker to select new date
+  - Stop moves to appropriate route for that date
+  - SMS notification sent to customer
+  - Creates new route if needed
+- [x] APIs:
+  - GET /api/admin/routes/{id} - Get route details
+  - PATCH /api/admin/routes/{id}/stops/{booking_id}/status - Update status
+  - POST /api/admin/routes/{id}/stops/{booking_id}/reschedule - Reschedule stop
+
+
