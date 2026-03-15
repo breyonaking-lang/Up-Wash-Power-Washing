@@ -1252,41 +1252,25 @@ function MyRoutes() {
 function RequestRoutes() {
   const [zipCodes, setZipCodes] = useState(['']);
   const [numRoutes, setNumRoutes] = useState('1');
-  const [truckRental, setTruckRental] = useState(null);
-  const [truckPrices, setTruckPrices] = useState({ small: 75, large: 125 });
-  const [activeRentals, setActiveRentals] = useState([]);
+  const [wantsTruck, setWantsTruck] = useState(false);
   const [loading, setLoading] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
-  const [payPerStop, setPayPerStop] = useState(11);
+  const [pricing, setPricing] = useState({ route_price: 400, truck_price: 95 });
 
   useEffect(() => {
     fetchMyRequests();
-    fetchTruckPrices();
-    fetchPayRate();
+    fetchPricing();
   }, []);
 
-  const fetchPayRate = async () => {
+  const fetchPricing = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/contractor/earnings`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/api/contractor/route-pricing`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setPayPerStop(data.pay_per_stop || 11);
+        setPricing(data);
       }
     } catch (err) {
-      console.error('Failed to load pay rate');
-    }
-  };
-
-  const fetchTruckPrices = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/contractor/truck-rentals`, { headers: getAuthHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        setTruckPrices(data.prices || { small: 75, large: 125 });
-        setActiveRentals(data.active_rentals || []);
-      }
-    } catch (err) {
-      console.error('Failed to load truck prices');
+      console.error('Failed to load pricing');
     }
   };
 
@@ -1318,32 +1302,12 @@ function RequestRoutes() {
     setZipCodes(updated);
   };
 
-  const rentTruck = async (truckType) => {
-    try {
-      const res = await fetch(`${API_URL}/api/contractor/truck-rentals?truck_type=${truckType}`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      });
-      if (!res.ok) throw new Error('Failed');
-      toast.success(`${truckType.charAt(0).toUpperCase() + truckType.slice(1)} truck rented!`);
-      fetchTruckPrices();
-    } catch (err) {
-      toast.error('Failed to rent truck');
-    }
-  };
-
-  const cancelRental = async (rentalId) => {
-    try {
-      const res = await fetch(`${API_URL}/api/contractor/truck-rentals/${rentalId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-      if (!res.ok) throw new Error('Failed');
-      toast.success('Truck rental cancelled');
-      fetchTruckPrices();
-    } catch (err) {
-      toast.error('Failed to cancel rental');
-    }
+  // Calculate total price dynamically
+  const calculateTotal = () => {
+    const routeCount = parseInt(numRoutes) || 0;
+    const routeCost = routeCount * pricing.route_price;
+    const truckCost = wantsTruck ? pricing.truck_price : 0;
+    return { routeCost, truckCost, total: routeCost + truckCost };
   };
 
   const submitRequest = async () => {
@@ -1367,19 +1331,15 @@ function RequestRoutes() {
         body: JSON.stringify({
           zip_codes: validZipCodes,
           num_routes: routeCount,
-          truck_rental: truckRental
+          truck_rental: wantsTruck
         })
       });
       if (!res.ok) throw new Error('Failed to submit');
       const data = await res.json();
-      let successMsg = 'Route request submitted! Admin will review and approve.';
-      if (data.truck_rental_cost > 0) {
-        successMsg += ` Truck rental: $${data.truck_rental_cost}/week`;
-      }
-      toast.success(successMsg);
+      toast.success(`Route request submitted! Total: $${data.total_price?.toFixed(2)}. Admin will review.`);
       setZipCodes(['']);
       setNumRoutes('1');
-      setTruckRental(null);
+      setWantsTruck(false);
       fetchMyRequests();
     } catch (err) {
       toast.error('Failed to submit request');
@@ -1388,6 +1348,8 @@ function RequestRoutes() {
     }
   };
 
+  const { routeCost, truckCost, total } = calculateTotal();
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white flex items-center gap-3">
@@ -1395,60 +1357,27 @@ function RequestRoutes() {
         Request Routes
       </h1>
 
-      <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-2xl p-4 mb-6">
-        <p className="text-yellow-200">
-          Request routes by zip code. Admin will approve and charge you <strong>${payPerStop.toFixed(2)} per stop</strong> in the route.
-        </p>
+      {/* Pricing Info */}
+      <div className="bg-gradient-to-r from-emerald-500/20 to-green-500/20 rounded-2xl p-4 border border-emerald-500/30">
+        <h3 className="text-emerald-400 font-semibold mb-2">Route Pricing</h3>
+        <div className="flex gap-6">
+          <div>
+            <p className="text-3xl font-bold text-white">${pricing.route_price}</p>
+            <p className="text-white/60 text-sm">per route</p>
+          </div>
+          <div>
+            <p className="text-3xl font-bold text-white">${pricing.truck_price}</p>
+            <p className="text-white/60 text-sm">truck rental (optional)</p>
+          </div>
+        </div>
       </div>
 
-      {/* Truck Rental Section */}
-      <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur rounded-2xl p-6 border border-blue-500/30">
-        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <Car className="text-blue-400" />
-          Truck Rental
-        </h3>
-        
-        {activeRentals.length > 0 && (
-          <div className="mb-4 p-4 bg-green-500/20 rounded-xl">
-            <p className="text-green-400 font-semibold mb-2">Active Rentals:</p>
-            {activeRentals.map((rental) => (
-              <div key={rental.id} className="flex justify-between items-center">
-                <span className="text-white">{rental.truck_type.charAt(0).toUpperCase() + rental.truck_type.slice(1)} Truck - ${rental.weekly_cost}/week</span>
-                <button
-                  onClick={() => cancelRental(rental.id)}
-                  className="text-red-400 text-sm hover:underline"
-                >
-                  Cancel
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-white/5 rounded-xl p-4 text-center">
-            <h4 className="text-white font-semibold">Small Truck</h4>
-            <p className="text-3xl font-bold text-green-400 my-2">${truckPrices.small}</p>
-            <p className="text-white/60 text-sm">/week</p>
-            <button
-              onClick={() => rentTruck('small')}
-              className="mt-3 w-full py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
-            >
-              Rent Small Truck
-            </button>
-          </div>
-          
-          <div className="bg-white/5 rounded-xl p-4 text-center">
-            <h4 className="text-white font-semibold">Large Truck</h4>
-            <p className="text-3xl font-bold text-green-400 my-2">${truckPrices.large}</p>
-            <p className="text-white/60 text-sm">/week</p>
-            <button
-              onClick={() => rentTruck('large')}
-              className="mt-3 w-full py-2 bg-purple-500 text-white rounded-xl hover:bg-purple-600"
-            >
-              Rent Large Truck
-            </button>
-          </div>
+      {/* No Refunds Warning */}
+      <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
+        <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0" />
+        <div>
+          <p className="text-red-400 font-semibold">NO REFUNDS</p>
+          <p className="text-white/60 text-sm">All route purchases are final. Please review your request carefully before submitting.</p>
         </div>
       </div>
 
@@ -1458,7 +1387,7 @@ function RequestRoutes() {
         
         <div className="space-y-4">
           <div>
-            <label className="text-white/60 text-sm mb-2 block">Zip Codes</label>
+            <label className="text-white/60 text-sm mb-2 block">Zip Codes (for route areas)</label>
             {zipCodes.map((zip, index) => (
               <div key={index} className="flex gap-2 mb-2">
                 <input
@@ -1498,34 +1427,53 @@ function RequestRoutes() {
               placeholder="Enter number of routes"
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
             />
-            <p className="text-white/40 text-xs mt-1">Enter the number of routes you want to request</p>
+            <p className="text-white/40 text-xs mt-1">${pricing.route_price} × {parseInt(numRoutes) || 0} routes = ${routeCost.toFixed(2)}</p>
           </div>
 
-          {/* Optional truck rental with request */}
+          {/* Truck Rental Toggle */}
           <div>
-            <label className="text-white/60 text-sm mb-2 block">Include Truck Rental (Optional)</label>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setTruckRental(truckRental === 'small' ? null : 'small')}
-                className={`flex-1 py-3 rounded-xl ${truckRental === 'small' ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/60'}`}
-              >
-                Small (${truckPrices.small}/wk)
-              </button>
-              <button
-                onClick={() => setTruckRental(truckRental === 'large' ? null : 'large')}
-                className={`flex-1 py-3 rounded-xl ${truckRental === 'large' ? 'bg-purple-500 text-white' : 'bg-white/10 text-white/60'}`}
-              >
-                Large (${truckPrices.large}/wk)
-              </button>
+            <label className="text-white/60 text-sm mb-2 block">Include Truck Rental</label>
+            <button
+              onClick={() => setWantsTruck(!wantsTruck)}
+              className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 transition-all ${
+                wantsTruck 
+                  ? 'bg-blue-500 text-white border-2 border-blue-400' 
+                  : 'bg-white/10 text-white/60 border border-white/20'
+              }`}
+            >
+              <Truck className={wantsTruck ? 'text-white' : 'text-white/40'} />
+              <span className="font-semibold">
+                {wantsTruck ? `Truck Rental Included (+$${pricing.truck_price})` : `Add Truck Rental (+$${pricing.truck_price})`}
+              </span>
+            </button>
+          </div>
+
+          {/* Total Price Display */}
+          <div className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 rounded-xl p-4 border border-yellow-500/30">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white/60">Routes ({parseInt(numRoutes) || 0})</span>
+              <span className="text-white">${routeCost.toFixed(2)}</span>
+            </div>
+            {wantsTruck && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-white/60">Truck Rental</span>
+                <span className="text-white">${truckCost.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="border-t border-white/20 pt-2 mt-2">
+              <div className="flex justify-between items-center">
+                <span className="text-yellow-400 font-bold text-lg">TOTAL</span>
+                <span className="text-yellow-400 font-bold text-2xl">${total.toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
           <button
             onClick={submitRequest}
-            disabled={loading}
-            className="w-full py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold disabled:opacity-50"
+            disabled={loading || total === 0}
+            className="w-full py-4 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Submitting...' : 'Submit Request'}
+            {loading ? 'Submitting...' : `Submit Request - $${total.toFixed(2)}`}
           </button>
         </div>
       </div>
@@ -1537,28 +1485,67 @@ function RequestRoutes() {
           {myRequests.map((request) => (
             <div key={request.id} className={`bg-white/10 backdrop-blur rounded-2xl p-4 border ${
               request.status === 'pending' ? 'border-yellow-500/30' :
-              request.status === 'approved' ? 'border-green-500/30' : 'border-red-500/30'
+              request.status === 'approved' ? 'border-blue-500/30' :
+              request.status === 'paid' ? 'border-green-500/30' :
+              'border-red-500/30'
             }`}>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-start">
                 <div>
                   <p className="text-white font-semibold">Zip Codes: {request.zip_codes?.join(', ')}</p>
                   <p className="text-white/60 text-sm">{request.num_routes_requested} route(s) requested</p>
                   {request.truck_rental && (
-                    <p className="text-blue-400 text-sm">+ {request.truck_rental} truck (${request.truck_rental_cost}/wk)</p>
+                    <p className="text-blue-400 text-sm flex items-center gap-1">
+                      <Truck className="w-4 h-4" /> + Truck Rental (${request.truck_cost || pricing.truck_price})
+                    </p>
                   )}
+                  <p className="text-white/60 text-sm mt-1">Total: <span className="text-white font-semibold">${request.total_price?.toFixed(2) || 0}</span></p>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
                   request.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                  request.status === 'approved' ? 'bg-green-500/20 text-green-400' :
+                  request.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
+                  request.status === 'paid' ? 'bg-green-500/20 text-green-400' :
                   'bg-red-500/20 text-red-400'
                 }`}>
-                  {request.status}
+                  {request.status === 'approved' ? 'Payment Pending' : request.status}
                 </div>
               </div>
-              {request.status === 'approved' && (
-                <p className="text-green-400 text-sm mt-2">
-                  ✓ {request.total_stops || 0} stops assigned - Charged ${request.charge_amount?.toFixed(2) || 0}
-                </p>
+              
+              {/* Denied Badge with Reason */}
+              {request.status === 'denied' && (
+                <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                  <p className="text-red-400 font-semibold flex items-center gap-2">
+                    <XCircle className="w-5 h-5" /> Request Denied
+                  </p>
+                  <p className="text-white/60 text-sm mt-1">Please contact admin for more information.</p>
+                </div>
+              )}
+              
+              {/* Approved - Show Payment Link */}
+              {request.status === 'approved' && request.payment_url && (
+                <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-blue-400 font-semibold mb-2">Ready to Pay!</p>
+                  <a 
+                    href={request.payment_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full py-3 bg-blue-500 text-white text-center rounded-xl hover:bg-blue-600 font-semibold"
+                  >
+                    Pay ${request.total_price?.toFixed(2)} Now
+                  </a>
+                  <p className="text-white/40 text-xs mt-2 text-center">No refunds - All sales are final</p>
+                </div>
+              )}
+              
+              {/* Paid - Success */}
+              {request.status === 'paid' && (
+                <div className="mt-3 bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                  <p className="text-green-400 font-semibold flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" /> Purchase Complete!
+                  </p>
+                  <p className="text-white/60 text-sm mt-1">
+                    {request.num_routes_requested} route(s) have been added to your My Routes.
+                  </p>
+                </div>
               )}
             </div>
           ))}

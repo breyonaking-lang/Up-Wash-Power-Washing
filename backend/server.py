@@ -1208,7 +1208,7 @@ async def send_payment_link_core(req: PaymentLinkRequest):
     base_url = os.environ.get("FRONTEND_URL", "https://github-link-finder.preview.emergentagent.com")
     payment_url = f"{base_url}/pay/{payment_token}"
     
-    custom_message = req.message or f"Your Up-Wash service is ready for payment."
+    custom_message = req.message or "Your Up-Wash service is ready for payment."
     
     if method == "sms":
         sms_message = f"Hi {customer_name}! {custom_message}\n\nAmount Due: ${amount:.2f}\n\nPay Now: {payment_url}\n\nReply STOP to opt out."
@@ -5097,7 +5097,7 @@ async def send_payment_reminders(current_user: dict = Depends(get_admin_user)):
             failed_count += 1
     
     return {
-        "message": f"Payment reminders processed",
+        "message": "Payment reminders processed",
         "target_date": target_date,
         "sent": sent_count,
         "failed": failed_count,
@@ -7192,50 +7192,62 @@ async def mark_admin_notification_read(notification_id: str, current_user: dict 
 
 # ===================== ROUTE REQUEST SYSTEM =====================
 
+# Route Request Pricing
+ROUTE_PRICE = 400.0  # $400 per route
+TRUCK_RENTAL_PRICE = 95.0  # $95 for truck rental (flat fee)
+
 class RouteRequest(BaseModel):
     zip_codes: List[str]
     num_routes: int = 1
-    truck_rental: Optional[str] = None  # "small", "large", or None
+    truck_rental: bool = False  # Now a boolean - do they want a truck?
 
 @api_router.post("/contractor/route-requests")
 async def create_route_request(request: RouteRequest, current_user: dict = Depends(get_contractor_user)):
-    """Contractor requests routes by zip code with optional truck rental"""
+    """Contractor requests routes by zip code with optional truck rental - NEW PRICING MODEL"""
     
-    # Get truck rental price if selected
-    truck_rental_cost = 0
-    if request.truck_rental:
-        truck_settings = await db.settings.find_one({"key": "truck_rentals"})
-        truck_prices = truck_settings.get("value") if truck_settings else TRUCK_RENTAL_PRICES
-        truck_rental_cost = truck_prices.get(request.truck_rental, 0)
+    # Calculate total price: $400 per route + $95 for truck if selected
+    route_cost = request.num_routes * ROUTE_PRICE
+    truck_cost = TRUCK_RENTAL_PRICE if request.truck_rental else 0
+    total_price = route_cost + truck_cost
     
     route_request = {
         "id": str(uuid.uuid4()),
         "contractor_id": current_user["user_id"],
         "contractor_name": current_user.get("full_name", current_user.get("username")),
+        "contractor_phone": current_user.get("phone"),
         "zip_codes": request.zip_codes,
         "num_routes_requested": request.num_routes,
-        "total_stops": 0,  # Will be calculated when approved
         "truck_rental": request.truck_rental,
-        "truck_rental_cost": truck_rental_cost,
-        "status": "pending",  # pending, approved, denied
+        "route_cost": route_cost,
+        "truck_cost": truck_cost,
+        "total_price": total_price,
+        "status": "pending",  # pending, approved, denied, payment_pending, paid
+        "payment_token": None,  # Will be set when admin sends payment link
+        "payment_url": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.route_requests.insert_one(route_request)
     
     # Notify admin
-    truck_info = f" + {request.truck_rental.title()} Truck Rental (${truck_rental_cost}/week)" if request.truck_rental else ""
+    truck_info = " + Truck Rental ($95)" if request.truck_rental else ""
     notification = {
         "id": str(uuid.uuid4()),
         "type": "route_request",
         "title": "New Route Request",
-        "message": f"{current_user.get('full_name')} requested {request.num_routes} route(s) in zip codes: {', '.join(request.zip_codes)}{truck_info}",
+        "message": f"{current_user.get('full_name')} requested {request.num_routes} route(s) in zip codes: {', '.join(request.zip_codes)}{truck_info} - Total: ${total_price:.2f}",
         "request_id": route_request["id"],
         "read": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.admin_notifications.insert_one(notification)
     
-    return {"message": "Route request submitted", "request_id": route_request["id"], "truck_rental_cost": truck_rental_cost}
+    return {
+        "message": "Route request submitted", 
+        "request_id": route_request["id"], 
+        "route_cost": route_cost,
+        "truck_cost": truck_cost,
+        "total_price": total_price
+    }
 
 @api_router.get("/contractor/truck-rentals")
 async def get_truck_rental_prices(current_user: dict = Depends(get_contractor_user)):
@@ -7315,94 +7327,51 @@ async def get_route_requests(current_user: dict = Depends(get_admin_user)):
 
 @api_router.post("/admin/route-requests/{request_id}/approve")
 async def approve_route_request(request_id: str, current_user: dict = Depends(get_admin_user)):
-    """Approve route request and assign routes to contractor - charges only for APPROVED routes"""
+    """Approve route request - generates payment link for contractor"""
     request = await db.route_requests.find_one({"id": request_id}, {"_id": 0})
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     
-    if request.get("status") != "pending":
+    if request.get("status") not in ["pending"]:
         raise HTTPException(status_code=400, detail="Request already processed")
     
-    # Find pending routes matching zip codes
-    zip_codes = request.get("zip_codes", [])
-    num_requested = request.get("num_routes_requested", 1)
+    # Generate payment token and URL
+    payment_token = str(uuid.uuid4())[:12]
+    base_url = os.environ.get("FRONTEND_URL", "https://github-link-finder.preview.emergentagent.com")
+    payment_url = f"{base_url}/contractor/pay/{payment_token}"
     
-    # Get available routes (not assigned) - ONLY from pending routes
-    available_routes = await db.routes.find(
-        {
-            "assigned_contractor_id": None,
-            "status": "pending",  # Only pending routes
-            "zip_code": {"$in": zip_codes} if zip_codes else {"$exists": True}
-        },
-        {"_id": 0}
-    ).limit(num_requested).to_list(num_requested)
-    
-    total_stops = 0
-    assigned_routes = []
-    
-    for route in available_routes:
-        # Calculate stops in this route
-        route_stops = len(route.get("bookings", []))
-        total_stops += route_stops
-        
-        # Assign route to contractor AND move out of pending
-        await db.routes.update_one(
-            {"id": route["id"]},
-            {"$set": {
-                "assigned_contractor_id": request["contractor_id"],
-                "status": "assigned",  # Move out of pending
-                "assigned_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        assigned_routes.append(route["id"])
-    
-    # Calculate charge - ONLY for the approved/assigned stops
-    pay_per_stop = await get_pay_per_stop()
-    charge_amount = total_stops * pay_per_stop
-    
-    # Update request with actual approved data
+    # Update request with approved status and payment link
     await db.route_requests.update_one(
         {"id": request_id},
         {"$set": {
             "status": "approved",
-            "total_stops": total_stops,
-            "charge_amount": charge_amount,
-            "pay_per_stop": pay_per_stop,
-            "assigned_routes": assigned_routes,
+            "payment_token": payment_token,
+            "payment_url": payment_url,
             "approved_at": datetime.now(timezone.utc).isoformat()
         }}
     )
     
-    # Notify contractor
+    total_price = request.get("total_price", 0)
+    truck_info = " (includes truck rental)" if request.get("truck_rental") else ""
+    
+    # Notify contractor - Request approved, payment pending
     contractor_notification = {
         "id": str(uuid.uuid4()),
         "contractor_id": request["contractor_id"],
         "type": "route_approved",
         "title": "Route Request Approved!",
-        "message": f"Your route request has been approved. {len(assigned_routes)} route(s) with {total_stops} stops. Charge: ${charge_amount:.2f} (${pay_per_stop}/stop)",
+        "message": f"Your route request has been approved! Total: ${total_price:.2f}{truck_info}. Check the Request Routes page for the payment link.",
         "read": False,
         "play_sound": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.notifications.insert_one(contractor_notification)
     
-    # Create admin notification for route assignment
-    admin_notif = {
-        "id": str(uuid.uuid4()),
-        "type": "route_assigned",
-        "title": "Route Request Approved",
-        "message": f"Approved {len(assigned_routes)} route(s) for contractor. {total_stops} stops = ${charge_amount:.2f} charged.",
-        "read": False,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.admin_notifications.insert_one(admin_notif)
-    
     return {
-        "message": "Request approved - routes moved from pending",
-        "routes_assigned": len(assigned_routes),
-        "total_stops": total_stops,
-        "charge_amount": charge_amount,
-        "pay_per_stop": pay_per_stop
+        "message": "Request approved - payment link generated",
+        "payment_url": payment_url,
+        "payment_token": payment_token,
+        "total_price": total_price
     }
 
 @api_router.post("/admin/route-requests/{request_id}/deny")
@@ -7411,6 +7380,9 @@ async def deny_route_request(request_id: str, current_user: dict = Depends(get_a
     request = await db.route_requests.find_one({"id": request_id})
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
+    
+    if request.get("status") == "paid":
+        raise HTTPException(status_code=400, detail="Cannot deny a paid request")
     
     await db.route_requests.update_one(
         {"id": request_id},
@@ -7433,6 +7405,140 @@ async def deny_route_request(request_id: str, current_user: dict = Depends(get_a
     await db.notifications.insert_one(contractor_notification)
     
     return {"message": "Request denied"}
+
+# ===================== CONTRACTOR ROUTE PURCHASE PAYMENT =====================
+
+@api_router.get("/contractor/route-purchase/{payment_token}")
+async def get_route_purchase_details(payment_token: str):
+    """Get route purchase details by payment token - for contractor payment page"""
+    request = await db.route_requests.find_one({"payment_token": payment_token}, {"_id": 0})
+    if not request:
+        raise HTTPException(status_code=404, detail="Payment link not found or expired")
+    
+    if request.get("status") == "paid":
+        raise HTTPException(status_code=400, detail="This purchase has already been paid")
+    
+    if request.get("status") == "denied":
+        raise HTTPException(status_code=400, detail="This request was denied")
+    
+    return {
+        "request_id": request["id"],
+        "contractor_name": request.get("contractor_name"),
+        "num_routes": request.get("num_routes_requested", 1),
+        "zip_codes": request.get("zip_codes", []),
+        "truck_rental": request.get("truck_rental", False),
+        "route_cost": request.get("route_cost", 0),
+        "truck_cost": request.get("truck_cost", 0),
+        "total_price": request.get("total_price", 0),
+        "status": request.get("status")
+    }
+
+@api_router.post("/contractor/route-purchase/{payment_token}/complete")
+async def complete_route_purchase(payment_token: str, payment_nonce: Optional[str] = None):
+    """Complete the route purchase payment - creates routes for contractor"""
+    request = await db.route_requests.find_one({"payment_token": payment_token}, {"_id": 0})
+    if not request:
+        raise HTTPException(status_code=404, detail="Payment link not found")
+    
+    if request.get("status") == "paid":
+        raise HTTPException(status_code=400, detail="Already paid")
+    
+    if request.get("status") != "approved":
+        raise HTTPException(status_code=400, detail="Request not approved")
+    
+    # In production, process Square payment here using payment_nonce
+    # For now, we'll mark as paid and create the routes
+    
+    contractor_id = request["contractor_id"]
+    num_routes = request.get("num_routes_requested", 1)
+    zip_codes = request.get("zip_codes", [])
+    truck_rental = request.get("truck_rental", False)
+    total_price = request.get("total_price", 0)
+    
+    # Create routes for the contractor based on their request
+    created_routes = []
+    for i in range(num_routes):
+        zip_code = zip_codes[i % len(zip_codes)] if zip_codes else "00000"
+        route = {
+            "id": str(uuid.uuid4()),
+            "name": f"Purchased Route {i+1}",
+            "zip_code": zip_code,
+            "service_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "stops": [],  # Empty route - will be filled by admin with stops
+            "bookings": [],
+            "assigned_contractor_id": contractor_id,
+            "status": "assigned",
+            "created_from_purchase": True,
+            "purchase_request_id": request["id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.routes.insert_one(route)
+        created_routes.append(route["id"])
+    
+    # Update the request as paid
+    await db.route_requests.update_one(
+        {"id": request["id"]},
+        {"$set": {
+            "status": "paid",
+            "assigned_routes": created_routes,
+            "paid_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Notify contractor - Routes added to My Routes
+    contractor_notification = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": contractor_id,
+        "type": "routes_purchased",
+        "title": "Routes Purchased Successfully!",
+        "message": f"Payment complete! {num_routes} route(s) have been added to your My Routes. NO REFUNDS - All sales are final.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(contractor_notification)
+    
+    # If truck was rented, send pickup notification
+    if truck_rental:
+        truck_notification = {
+            "id": str(uuid.uuid4()),
+            "contractor_id": contractor_id,
+            "type": "truck_pickup",
+            "title": "Truck Ready for Pickup!",
+            "message": "Your truck rental is confirmed. Please pick up the truck before 8:00 AM tomorrow. Contact admin for pickup location.",
+            "read": False,
+            "play_sound": True,
+            "urgent": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(truck_notification)
+    
+    # Notify admin
+    admin_notif = {
+        "id": str(uuid.uuid4()),
+        "type": "route_purchase_complete",
+        "title": "Route Purchase Completed",
+        "message": f"{request.get('contractor_name')} purchased {num_routes} route(s) for ${total_price:.2f}" + (" + truck rental" if truck_rental else ""),
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_notifications.insert_one(admin_notif)
+    
+    return {
+        "message": "Payment successful! Routes added to My Routes.",
+        "routes_created": len(created_routes),
+        "total_paid": total_price,
+        "truck_rental": truck_rental,
+        "no_refunds": True
+    }
+
+@api_router.get("/contractor/route-pricing")
+async def get_route_pricing(current_user: dict = Depends(get_contractor_user)):
+    """Get current route and truck pricing for contractors"""
+    return {
+        "route_price": ROUTE_PRICE,
+        "truck_price": TRUCK_RENTAL_PRICE
+    }
 
 @api_router.get("/contractor/route-requests")
 async def get_contractor_route_requests(current_user: dict = Depends(get_contractor_user)):

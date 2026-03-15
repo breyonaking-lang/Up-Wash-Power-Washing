@@ -13,6 +13,7 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ContractorLoginPage from "./pages/ContractorLoginPage";
 import ContractorDashboard from "./pages/ContractorDashboard";
+import ContractorPaymentPage from "./pages/ContractorPaymentPage";
 import ClientPortal, { ClientLogin, ClientRegister } from "./pages/ClientPortal";
 import QuoteRequestPage from "./pages/QuoteRequestPage";
 
@@ -37,6 +38,7 @@ function App() {
           {/* Contractor Portal */}
           <Route path="/contractor/login" element={<ContractorLoginPage />} />
           <Route path="/contractor/dashboard/*" element={<ContractorDashboard />} />
+          <Route path="/contractor/pay/:paymentToken" element={<ContractorPaymentPage />} />
           {/* Client Portal */}
           <Route path="/client/login" element={<ClientLogin />} />
           <Route path="/client/register" element={<ClientRegister />} />

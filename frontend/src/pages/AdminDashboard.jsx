@@ -9,7 +9,7 @@ import {
   Copy, ExternalLink, Phone, Mail, Navigation, Inbox, Building2,
   Home, Car, Sparkles, Warehouse, HardHat, Calendar as CalendarIcon,
   AlertCircle, ChevronLeft, AlertTriangle, Banknote, MessageCircle,
-  Settings, Truck, UserCheck, PlusCircle, FileQuestion, Camera, Image, User, CreditCard
+  Settings, Truck, UserCheck, PlusCircle, FileQuestion, Camera, Image, User, CreditCard, XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DailyBibleVerse from '../components/shared/DailyBibleVerse';
@@ -1974,10 +1974,11 @@ function ReleasedRoutesPage() {
   );
 }
 
-// Route Requests Page - View and approve contractor route requests
+// Route Requests Page - View and approve contractor route requests with payment link flow
 function RouteRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [copiedLink, setCopiedLink] = useState(null);
 
   useEffect(() => {
     fetchRouteRequests();
@@ -2003,7 +2004,8 @@ function RouteRequestsPage() {
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error('Failed to approve');
-      toast.success('Route request approved!');
+      const data = await res.json();
+      toast.success('Request approved! Payment link generated.');
       fetchRouteRequests();
     } catch (err) {
       toast.error('Failed to approve request');
@@ -2024,7 +2026,20 @@ function RouteRequestsPage() {
     }
   };
 
+  const copyPaymentLink = (url) => {
+    navigator.clipboard.writeText(url);
+    setCopiedLink(url);
+    toast.success('Payment link copied to clipboard!');
+    setTimeout(() => setCopiedLink(null), 3000);
+  };
+
   if (loading) return <LoadingSpinner />;
+
+  // Separate requests by status
+  const pendingRequests = requests.filter(r => r.status === 'pending');
+  const approvedRequests = requests.filter(r => r.status === 'approved');
+  const paidRequests = requests.filter(r => r.status === 'paid');
+  const deniedRequests = requests.filter(r => r.status === 'denied');
 
   return (
     <div className="space-y-6">
@@ -2033,62 +2048,162 @@ function RouteRequestsPage() {
         Route Requests
       </h1>
       
-      <div className="bg-yellow-500/20 rounded-xl p-4 text-yellow-200 text-sm">
-        <p>Contractors request routes by zip code. Approve requests to assign routes and charge <strong>$11 per stop</strong>.</p>
+      {/* Pricing Info */}
+      <div className="bg-emerald-500/20 rounded-xl p-4 border border-emerald-500/30">
+        <p className="text-emerald-200 text-sm">
+          <strong>Route Pricing:</strong> $400 per route + $95 for truck rental (if requested). 
+          Approve requests to generate payment links for contractors.
+        </p>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-yellow-500/20 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-yellow-400">{pendingRequests.length}</p>
+          <p className="text-white/60 text-sm">Pending</p>
+        </div>
+        <div className="bg-blue-500/20 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-blue-400">{approvedRequests.length}</p>
+          <p className="text-white/60 text-sm">Awaiting Payment</p>
+        </div>
+        <div className="bg-green-500/20 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-green-400">{paidRequests.length}</p>
+          <p className="text-white/60 text-sm">Paid</p>
+        </div>
+        <div className="bg-red-500/20 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-red-400">{deniedRequests.length}</p>
+          <p className="text-white/60 text-sm">Denied</p>
+        </div>
       </div>
 
       {requests.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
           <ClipboardList className="w-12 h-12 text-white/40 mx-auto mb-4" />
-          <p className="text-white/60">No pending route requests</p>
+          <p className="text-white/60">No route requests yet</p>
         </div>
       ) : (
         <div className="space-y-4">
           {requests.map((request) => (
-            <div key={request.id} className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-yellow-500/30">
+            <div key={request.id} className={`bg-white/10 backdrop-blur rounded-2xl p-6 border ${
+              request.status === 'pending' ? 'border-yellow-500/30' :
+              request.status === 'approved' ? 'border-blue-500/30' :
+              request.status === 'paid' ? 'border-green-500/30' :
+              'border-red-500/30'
+            }`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-white">{request.contractor_name}</h3>
-                  <p className="text-white/60">Requested: {new Date(request.created_at).toLocaleDateString()}</p>
+                  <p className="text-white/60 text-sm">Requested: {new Date(request.created_at).toLocaleDateString()}</p>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
                   request.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                  request.status === 'approved' ? 'bg-green-500/20 text-green-400' :
+                  request.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
+                  request.status === 'paid' ? 'bg-green-500/20 text-green-400' :
                   'bg-red-500/20 text-red-400'
                 }`}>
-                  {request.status}
+                  {request.status === 'approved' ? 'Payment Pending' : request.status}
                 </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              {/* Request Details */}
+              <div className="grid grid-cols-4 gap-4 mb-4">
                 <div className="bg-white/5 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-400">{request.zip_codes?.join(', ') || 'All'}</p>
-                  <p className="text-white/60 text-sm">Zip Codes</p>
+                  <p className="text-lg font-bold text-blue-400">{request.zip_codes?.join(', ') || 'Any'}</p>
+                  <p className="text-white/60 text-xs">Zip Codes</p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-white">{request.num_routes_requested || 1}</p>
-                  <p className="text-white/60 text-sm">Routes Requested</p>
+                  <p className="text-lg font-bold text-white">{request.num_routes_requested || 1}</p>
+                  <p className="text-white/60 text-xs">Routes</p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-green-400">${((request.total_stops || 0) * 11).toFixed(2)}</p>
-                  <p className="text-white/60 text-sm">Charge ($11/stop)</p>
+                  <p className="text-lg font-bold text-purple-400">{request.truck_rental ? 'Yes' : 'No'}</p>
+                  <p className="text-white/60 text-xs">Truck</p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-green-400">${request.total_price?.toFixed(2) || 0}</p>
+                  <p className="text-white/60 text-xs">Total</p>
                 </div>
               </div>
+
+              {/* Price Breakdown */}
+              <div className="bg-white/5 rounded-xl p-3 mb-4">
+                <p className="text-white/60 text-sm">
+                  {request.num_routes_requested} route(s) × $400 = ${request.route_cost?.toFixed(2) || 0}
+                  {request.truck_rental && <span className="text-purple-400"> + Truck $95</span>}
+                  <span className="text-green-400 font-semibold"> = ${request.total_price?.toFixed(2) || 0}</span>
+                </p>
+              </div>
               
+              {/* Action Buttons based on status */}
               {request.status === 'pending' && (
                 <div className="flex gap-3">
                   <button
                     onClick={() => denyRequest(request.id)}
-                    className="flex-1 py-3 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30"
+                    className="flex-1 py-3 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 font-semibold"
                   >
                     Deny
                   </button>
                   <button
                     onClick={() => approveRequest(request.id)}
-                    className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600"
+                    className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-semibold"
                   >
-                    Approve & Charge
+                    Approve (Generate Payment Link)
                   </button>
+                </div>
+              )}
+
+              {/* Approved - Show Payment Link */}
+              {request.status === 'approved' && request.payment_url && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                  <p className="text-blue-400 font-semibold mb-2">Payment Link Ready</p>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={request.payment_url} 
+                      readOnly 
+                      className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                    />
+                    <button
+                      onClick={() => copyPaymentLink(request.payment_url)}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                        copiedLink === request.payment_url 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                      }`}
+                    >
+                      {copiedLink === request.payment_url ? 'Copied!' : 'Copy Link'}
+                    </button>
+                  </div>
+                  <p className="text-white/40 text-xs mt-2">Share this link with the contractor to complete payment.</p>
+                </div>
+              )}
+
+              {/* Paid - Success Info */}
+              {request.status === 'paid' && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                  <p className="text-green-400 font-semibold flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" /> Payment Complete
+                  </p>
+                  <p className="text-white/60 text-sm mt-1">
+                    Paid ${request.total_price?.toFixed(2)} on {request.paid_at ? new Date(request.paid_at).toLocaleDateString() : 'N/A'}
+                  </p>
+                  {request.truck_rental && (
+                    <p className="text-purple-400 text-sm mt-1">
+                      <Truck className="w-4 h-4 inline mr-1" /> Truck pickup notification sent to contractor
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Denied Info */}
+              {request.status === 'denied' && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                  <p className="text-red-400 font-semibold flex items-center gap-2">
+                    <XCircle className="w-5 h-5" /> Request Denied
+                  </p>
+                  <p className="text-white/60 text-sm mt-1">
+                    Denied on {request.denied_at ? new Date(request.denied_at).toLocaleDateString() : 'N/A'}
+                  </p>
                 </div>
               )}
             </div>
