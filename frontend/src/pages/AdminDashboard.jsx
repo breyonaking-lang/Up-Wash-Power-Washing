@@ -198,6 +198,9 @@ function BookingsList({ status, title, paymentStatus }) {
       if (paymentStatus === 'paid') {
         // Use the paid bookings endpoint
         url = `${API_URL}/api/admin/bookings/paid`;
+      } else if (paymentStatus === 'unpaid') {
+        // Get all unpaid bookings (pending services)
+        url = `${API_URL}/api/admin/bookings/unpaid`;
       } else {
         url = status ? `${API_URL}/api/admin/bookings?status=${status}` : `${API_URL}/api/admin/bookings`;
       }
@@ -286,6 +289,7 @@ function BookingCard({ booking, onUpdateStatus, onRefresh }) {
   const [paymentMethod, setPaymentMethod] = useState(booking.customer_email ? 'email' : 'sms');
   const [sendingPayment, setSendingPayment] = useState(false);
   const [generatingLink, setGeneratingLink] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
   const [quoteData, setQuoteData] = useState({
     date: booking.booking_dates?.[0] || '',
     time: '09:00',
@@ -357,6 +361,27 @@ function BookingCard({ booking, onUpdateStatus, onRefresh }) {
       toast.error('Failed to generate payment link');
     } finally {
       setGeneratingLink(false);
+    }
+  };
+
+  // Mark booking as paid manually
+  const markAsPaid = async () => {
+    setMarkingPaid(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/bookings/${booking.id}/mark-paid`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to mark as paid');
+      const data = await res.json();
+      toast.success('Booking marked as paid!', {
+        description: data.added_to_route ? 'Added to route automatically' : undefined
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      toast.error('Failed to mark as paid');
+    } finally {
+      setMarkingPaid(false);
     }
   };
 
@@ -494,6 +519,18 @@ function BookingCard({ booking, onUpdateStatus, onRefresh }) {
                 >
                   <CreditCard className="w-4 h-4" />
                   Send Payment Link
+                </button>
+              )}
+              {/* Mark as Paid button - for manual payments */}
+              {booking.payment_status !== 'paid' && booking.payment_status !== 'waived' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); markAsPaid(); }}
+                  disabled={markingPaid}
+                  className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 flex items-center gap-2 disabled:opacity-50"
+                  data-testid="mark-paid-btn"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {markingPaid ? 'Processing...' : 'Mark Paid'}
                 </button>
               )}
               {booking.status !== 'completed' && (
@@ -7592,7 +7629,7 @@ export default function AdminDashboard() {
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="create-booking" element={<CreateBookingPage />} />
           <Route path="clients" element={<ClientsPage />} />
-          <Route path="pending" element={<BookingsList status="pending" title="Pending Services" />} />
+          <Route path="pending" element={<BookingsList paymentStatus="unpaid" title="Pending Services" />} />
           <Route path="paid" element={<BookingsList paymentStatus="paid" title="Paid Services" />} />
           <Route path="completed" element={<BookingsList status="completed" title="Completed Services" />} />
           <Route path="unpaid-subscriptions" element={<UnpaidSubscriptionsPage />} />

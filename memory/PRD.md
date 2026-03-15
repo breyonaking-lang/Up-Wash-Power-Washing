@@ -629,4 +629,29 @@ Power washing business website with booking system, admin dashboard, contractor 
   - PATCH /api/admin/routes/{id}/stops/{booking_id}/status - Update status
   - POST /api/admin/routes/{id}/stops/{booking_id}/reschedule - Reschedule stop
 
+### Mar 15, 2026 - Session 11 Updates
+
+#### Pending & Paid Services System Overhaul ✅
+- [x] Pending Services now shows ALL unpaid bookings (not just status=pending)
+- [x] Added new endpoint GET /api/admin/bookings/unpaid
+- [x] Paid Services tab shows all paid bookings organized by service category
+- [x] "Mark Paid" button allows admin to manually mark bookings as paid
+- [x] When marked paid, bookings auto-add to routes by zip code
+
+#### Auto-Route Assignment for Paid Services ✅
+- [x] All paid bookings automatically create/join routes by zipcode + service date
+- [x] Full booking details stored in routes (customer_name, phone, address, services)
+- [x] Route shows on calendar and in Pending Routes for contractor assignment
+- [x] Rescheduled stops properly update calendar and route assignments
+
+#### Payment Action Buttons ✅
+- [x] Quick Pay - Copies payment link to clipboard instantly
+- [x] Send Payment Link - Modal to send via SMS or Email
+- [x] Mark Paid - Manual payment confirmation (cash/check/external)
+- [x] All buttons auto-refresh the bookings list after action
+
+#### New API Endpoints
+- GET /api/admin/bookings/unpaid - All unpaid bookings for Pending Services
+- POST /api/admin/bookings/{id}/mark-paid - Mark booking paid manually, auto-add to route
+
 

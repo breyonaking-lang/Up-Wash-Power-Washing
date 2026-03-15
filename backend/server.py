@@ -1325,34 +1325,61 @@ async def process_payment(payment_req: SquarePaymentRequest):
             if zip_match:
                 zip_code = zip_match.group(1)
             
-            # Find or create a pending route for this zip code
+            # Get the first booking date for the route
+            booking_dates = booking.get("booking_dates", [])
+            service_date = booking_dates[0] if booking_dates else datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            
+            # Find or create a pending route for this zip code and date
             existing_route = await db.routes.find_one({
                 "zip_code": zip_code,
+                "service_date": service_date,
                 "status": "pending",
-                "assigned_contractor_id": None,
                 "$expr": {"$lt": [{"$size": {"$ifNull": ["$bookings", []]}}, 120]}
             })
+            
+            # Create booking data for the route
+            route_booking_data = {
+                "booking_id": payment_req.booking_id,
+                "customer_name": booking.get("customer_name"),
+                "customer_phone": booking.get("customer_phone"),
+                "customer_email": booking.get("customer_email"),
+                "customer_address": address,
+                "services": booking.get("services", []),
+                "total": booking.get("total", 0),
+                "stop_status": "pending",
+                "payment_status": "paid",
+                "added_at": datetime.now(timezone.utc).isoformat()
+            }
             
             if existing_route:
                 # Add to existing route
                 await db.routes.update_one(
                     {"id": existing_route["id"]},
-                    {"$push": {"bookings": payment_req.booking_id}}
+                    {"$push": {"bookings": route_booking_data}}
                 )
+                route_id = existing_route["id"]
             else:
                 # Create new pending route
+                route_id = str(uuid.uuid4())
                 new_route = {
-                    "id": str(uuid.uuid4()),
-                    "name": f"Route - {zip_code or 'Unknown'}",
+                    "id": route_id,
+                    "name": f"Route {zip_code} - {service_date}",
                     "area": zip_code or "Unassigned",
                     "zip_code": zip_code,
+                    "service_date": service_date,
                     "description": f"Auto-generated route for zip code {zip_code}",
-                    "bookings": [payment_req.booking_id],
+                    "bookings": [route_booking_data],
                     "status": "pending",
                     "assigned_contractor_id": None,
                     "created_at": datetime.now(timezone.utc).isoformat()
                 }
                 await db.routes.insert_one(new_route)
+            
+            # Update booking with route_id
+            await db.bookings.update_one(
+                {"id": payment_req.booking_id},
+                {"$set": {"route_id": route_id}}
+            )
             
             # Create admin notification for new booking in routes
             admin_notif = {
@@ -1367,15 +1394,10 @@ async def process_payment(payment_req: SquarePaymentRequest):
             }
             await db.admin_notifications.insert_one(admin_notif)
         
-        return {
-            "success": True,
-            "payment_id": result["payment_id"],
-            "receipt_url": result.get("receipt_url")
-        }
-        
         # Send booking confirmation SMS to customer
         customer_phone = booking.get("customer_phone")
         customer_name = booking.get("customer_name", "Valued Customer")
+        sms_sent = False
         if customer_phone:
             service_names = ", ".join([s.get("service_id", "").replace("_", " ").title() for s in booking.get("services", [])])
             booking_dates = booking.get("booking_dates", [])
@@ -1384,6 +1406,7 @@ async def process_payment(payment_req: SquarePaymentRequest):
             confirmation_msg = f"Hi {customer_name}! Your Up-Wash booking is confirmed. Services: {service_names}. Dates: {dates_str}. Total: ${booking.get('total', 0):.2f}. Thank you for choosing Up-Wash Power Washing! Reply STOP to opt out."
             
             await send_sms(customer_phone, confirmation_msg)
+            sms_sent = True
             
             # Store in customer messages
             msg_record = {
@@ -1403,7 +1426,7 @@ async def process_payment(payment_req: SquarePaymentRequest):
             "success": True,
             "payment_id": result["payment_id"],
             "receipt_url": result.get("receipt_url"),
-            "sms_sent": bool(customer_phone)
+            "sms_sent": sms_sent
         }
     else:
         raise HTTPException(status_code=400, detail=result.get("error", "Payment failed"))
@@ -3073,6 +3096,103 @@ async def update_booking_amount(booking_id: str, update: BookingAmountUpdate, cu
     await db.bookings.update_one({"id": booking_id}, {"$set": update_data})
     
     return {"message": "Booking amount updated", "booking_id": booking_id}
+
+@api_router.post("/admin/bookings/{booking_id}/mark-paid")
+async def mark_booking_paid(booking_id: str, current_user: dict = Depends(get_admin_user)):
+    """Admin marks a booking as paid manually (for cash/check payments etc.)"""
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if booking.get("payment_status") == "paid":
+        return {"message": "Booking was already paid", "booking_id": booking_id}
+    
+    # Mark as paid
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {
+            "payment_status": "paid",
+            "status": "confirmed",
+            "paid_manually": True,
+            "paid_by_admin": current_user.get("username"),
+            "paid_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Auto-add to routes (same logic as payment process)
+    routable_services = ["recycling_bin", "patio", "driveway", "home_power_wash", "dumpster"]
+    service_ids = [s.get("service_id") for s in booking.get("services", [])]
+    is_routable = any(sid in routable_services for sid in service_ids)
+    
+    route_id = None
+    if is_routable and not booking.get("is_scent_bomb_only"):
+        address = booking.get("customer_address", "")
+        zip_code = ""
+        import re
+        zip_match = re.search(r'\b(\d{5})\b', address)
+        if zip_match:
+            zip_code = zip_match.group(1)
+        
+        # Get service date
+        booking_dates = booking.get("booking_dates", [])
+        service_date = booking_dates[0] if booking_dates else datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        
+        # Find or create route
+        existing_route = await db.routes.find_one({
+            "zip_code": zip_code,
+            "service_date": service_date,
+            "status": "pending",
+            "$expr": {"$lt": [{"$size": {"$ifNull": ["$bookings", []]}}, 120]}
+        })
+        
+        route_booking_data = {
+            "booking_id": booking_id,
+            "customer_name": booking.get("customer_name"),
+            "customer_phone": booking.get("customer_phone"),
+            "customer_email": booking.get("customer_email"),
+            "customer_address": address,
+            "services": booking.get("services", []),
+            "total": booking.get("total", 0),
+            "stop_status": "pending",
+            "payment_status": "paid",
+            "added_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        if existing_route:
+            await db.routes.update_one(
+                {"id": existing_route["id"]},
+                {"$push": {"bookings": route_booking_data}}
+            )
+            route_id = existing_route["id"]
+        else:
+            route_id = str(uuid.uuid4())
+            new_route = {
+                "id": route_id,
+                "name": f"Route {zip_code} - {service_date}",
+                "area": zip_code or "Unassigned",
+                "zip_code": zip_code,
+                "service_date": service_date,
+                "description": f"Auto-generated route for zip code {zip_code}",
+                "bookings": [route_booking_data],
+                "status": "pending",
+                "assigned_contractor_id": None,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.routes.insert_one(new_route)
+        
+        # Update booking with route_id
+        await db.bookings.update_one(
+            {"id": booking_id},
+            {"$set": {"route_id": route_id}}
+        )
+    
+    return {
+        "message": "Booking marked as paid",
+        "booking_id": booking_id,
+        "route_id": route_id,
+        "added_to_route": route_id is not None
+    }
 
 @api_router.post("/admin/bookings/{booking_id}/pay-link")
 async def generate_pay_link(booking_id: str, current_user: dict = Depends(get_admin_user)):
@@ -6227,6 +6347,15 @@ async def get_paid_bookings(current_user: dict = Depends(get_admin_user)):
     """Get all paid bookings"""
     bookings = await db.bookings.find(
         {"payment_status": "paid"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+    return {"bookings": bookings}
+
+@api_router.get("/admin/bookings/unpaid")
+async def get_unpaid_bookings(current_user: dict = Depends(get_admin_user)):
+    """Get all unpaid bookings (Pending Services)"""
+    bookings = await db.bookings.find(
+        {"payment_status": {"$nin": ["paid", "waived"]}},
         {"_id": 0}
     ).sort("created_at", -1).to_list(1000)
     return {"bookings": bookings}
