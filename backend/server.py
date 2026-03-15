@@ -2431,6 +2431,46 @@ async def reset_contractor_password(contractor_id: str, new_password: str, curre
     
     return {"message": "Password updated"}
 
+class ContractorUpdate(BaseModel):
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+@api_router.patch("/admin/contractors/{contractor_id}")
+async def update_contractor(contractor_id: str, update: ContractorUpdate, current_user: dict = Depends(get_admin_user)):
+    """Update contractor details including username"""
+    contractor = await db.users.find_one({"id": contractor_id, "role": "contractor"}, {"_id": 0})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    
+    update_fields = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    # Check if new username is unique
+    if update.username and update.username != contractor.get("username"):
+        existing = await db.users.find_one({"username": update.username})
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        update_fields["username"] = update.username
+    
+    if update.full_name:
+        update_fields["full_name"] = update.full_name
+    if update.phone:
+        update_fields["phone"] = update.phone
+    if update.email is not None:
+        update_fields["email"] = update.email
+    
+    await db.users.update_one(
+        {"id": contractor_id},
+        {"$set": update_fields}
+    )
+    
+    return {
+        "message": "Contractor updated",
+        "contractor_id": contractor_id,
+        "updated_fields": list(update_fields.keys())
+    }
+
 @api_router.delete("/admin/contractors/{contractor_id}")
 async def delete_contractor(contractor_id: str, current_user: dict = Depends(get_admin_user)):
     result = await db.users.delete_one({"id": contractor_id, "role": "contractor"})

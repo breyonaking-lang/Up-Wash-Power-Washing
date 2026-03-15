@@ -2149,24 +2149,28 @@ function ContractorsPage() {
     if (!editingContractor) return;
     try {
       const res = await fetch(`${API_URL}/api/admin/contractors/${editingContractor.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({
+          username: editingContractor.username,
           full_name: editingContractor.full_name,
           email: editingContractor.email,
-          phone: editingContractor.phone,
-          address: editingContractor.address,
-          pay_rate: editingContractor.pay_rate,
-          is_active: editingContractor.is_active,
-          notes: editingContractor.notes
+          phone: editingContractor.phone
         })
       });
-      if (!res.ok) throw new Error('Failed to update');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to update');
+      }
       toast.success('Contractor information updated!');
       setShowEditModal(false);
       fetchContractors();
+      // Update selected contractor if it's the same one
+      if (selectedContractor?.id === editingContractor.id) {
+        setSelectedContractor({...selectedContractor, ...editingContractor});
+      }
     } catch (err) {
-      toast.error('Failed to update contractor');
+      toast.error(err.message || 'Failed to update contractor');
     }
   };
 
@@ -2514,9 +2518,21 @@ function ContractorsPage() {
             <div className="space-y-6">
               {/* Contact Info */}
               <div className="bg-white/10 rounded-xl p-4">
-                <h3 className="text-white font-semibold mb-3">Contact Information</h3>
-                <p className="text-white/80"><Phone className="w-4 h-4 inline mr-2" />{selectedContractor.phone}</p>
-                <p className="text-white/80"><Mail className="w-4 h-4 inline mr-2" />{selectedContractor.email || 'No email'}</p>
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-white font-semibold">Contact Information</h3>
+                  <button 
+                    onClick={() => { setEditingContractor(selectedContractor); setShowEditModal(true); }}
+                    className="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-lg text-sm hover:bg-indigo-500/30 flex items-center gap-1"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-white/80"><User className="w-4 h-4 inline mr-2" />Username: <span className="text-indigo-400 font-mono">@{selectedContractor.username}</span></p>
+                  <p className="text-white/80"><Phone className="w-4 h-4 inline mr-2" />{selectedContractor.phone}</p>
+                  <p className="text-white/80"><Mail className="w-4 h-4 inline mr-2" />{selectedContractor.email || 'No email'}</p>
+                </div>
               </div>
 
               {/* Earnings Summary */}
@@ -2902,6 +2918,18 @@ function ContractorsPage() {
             </div>
 
             <div className="space-y-4">
+              <div>
+                <label className="block text-white/60 text-sm mb-1">Username (for login)</label>
+                <input
+                  type="text"
+                  value={editingContractor.username || ''}
+                  onChange={(e) => setEditingContractor({...editingContractor, username: e.target.value})}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
+                  placeholder="Login username"
+                  data-testid="edit-contractor-username"
+                />
+                <p className="text-white/40 text-xs mt-1">This is the username for contractor portal login</p>
+              </div>
               <div>
                 <label className="block text-white/60 text-sm mb-1">Full Name</label>
                 <input
