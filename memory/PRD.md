@@ -559,6 +559,34 @@ Power washing business website with booking system, admin dashboard, contractor 
 - [ ] Production VAPID keys for push notifications
 - [ ] Actual Square payment integration in subscription flow
 
+### Mar 15, 2026 - Session 10 Updates
+
+#### Admin Payment Link System ✅ NEW
+- [x] "Send Payment Link" button in Pending Services booking cards
+- [x] Payment link modal with SMS/Email options
+- [x] Shows recipient contact info and amount
+- [x] POST /api/admin/send-payment-link - Send payment link to customer
+- [x] Generates unique payment token and URL
+- [x] SMS sent via Twilio with payment URL
+- [x] Email stores link (Resend integration pending)
+
+#### Paid Services Tab ✅ NEW
+- [x] New "Paid Services" tab in admin sidebar navigation
+- [x] CreditCard icon for the tab
+- [x] GET /api/admin/bookings/paid - Returns all paid bookings
+- [x] Paid bookings auto-added to routes by zipcode (existing functionality)
+
+#### Admin Subscription Creation ✅ NEW
+- [x] POST /api/admin/subscriptions/create - Create subscription for client
+- [x] Accepts: customer_name, phone, address, email, services, service_days
+- [x] Auto-calculates pricing with subscription discount
+- [x] Extracts zipcode from address
+- [x] Returns subscription_id and total for payment link
+
+#### Service Cleanup ✅
+- [x] Removed "Trash Bin Cleaning" references from backend
+- [x] Only "Recycling Bin Cleaning" remains as the bin service
+
 ### Feb 28, 2026 - Session 9 Updates
 
 #### Route Client Details Display ✅ NEW

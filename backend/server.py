@@ -1149,22 +1149,41 @@ class PaymentLinkRequest(BaseModel):
     booking_id: str
     custom_amount: Optional[float] = None
     message: Optional[str] = None
+    method: Optional[str] = "sms"  # 'sms' or 'email'
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
 
 @api_router.post("/admin/bookings/send-payment-link")
+async def send_payment_link_bookings(req: PaymentLinkRequest, current_user: dict = Depends(get_admin_user)):
+    """Send payment link to customer via SMS - alias endpoint"""
+    return await send_payment_link_core(req)
+
+@api_router.post("/admin/send-payment-link")
 async def send_payment_link(req: PaymentLinkRequest, current_user: dict = Depends(get_admin_user)):
-    """Send payment link to customer via SMS"""
+    """Send payment link to customer via SMS or Email"""
+    return await send_payment_link_core(req)
+
+async def send_payment_link_core(req: PaymentLinkRequest):
+    """Core logic for sending payment links"""
     booking = await db.bookings.find_one({"id": req.booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     
-    phone = booking.get("customer_phone")
-    if not phone:
+    phone = req.customer_phone or booking.get("customer_phone")
+    email = req.customer_email or booking.get("customer_email")
+    method = req.method or "sms"
+    
+    if method == "sms" and not phone:
         raise HTTPException(status_code=400, detail="No phone number for customer")
     
-    # Check if opted out
-    optout = await db.sms_optouts.find_one({"phone": phone, "opted_out": True})
-    if optout:
-        raise HTTPException(status_code=400, detail="Customer has opted out of SMS")
+    if method == "email" and not email:
+        raise HTTPException(status_code=400, detail="No email for customer")
+    
+    # Check if opted out (for SMS)
+    if method == "sms":
+        optout = await db.sms_optouts.find_one({"phone": phone, "opted_out": True})
+        if optout:
+            raise HTTPException(status_code=400, detail="Customer has opted out of SMS")
     
     customer_name = booking.get("customer_name", "Valued Customer")
     amount = req.custom_amount or booking.get("total", 0)
@@ -1179,24 +1198,47 @@ async def send_payment_link(req: PaymentLinkRequest, current_user: dict = Depend
         "booking_id": req.booking_id,
         "amount": amount,
         "customer_phone": phone,
+        "customer_email": email,
         "customer_name": customer_name,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    payment_url = f"https://2d2346dc-8745-4260-8e34-088886d923bd.preview.emergentagent.com/pay/{payment_token}"
+    # Get correct preview URL from environment or use default
+    base_url = os.environ.get("FRONTEND_URL", "https://github-link-finder.preview.emergentagent.com")
+    payment_url = f"{base_url}/pay/{payment_token}"
     
     custom_message = req.message or f"Your Up-Wash service is ready for payment."
-    sms_message = f"Hi {customer_name}! {custom_message}\n\nAmount Due: ${amount:.2f}\n\nPay Now: {payment_url}\n\nReply STOP to opt out."
     
-    result = await send_sms(phone, sms_message)
-    
-    return {
-        "message": "Payment link sent",
-        "status": result["status"],
-        "payment_url": payment_url,
-        "amount": amount
-    }
+    if method == "sms":
+        sms_message = f"Hi {customer_name}! {custom_message}\n\nAmount Due: ${amount:.2f}\n\nPay Now: {payment_url}\n\nReply STOP to opt out."
+        result = await send_sms(phone, sms_message)
+        return {
+            "message": "Payment link sent via SMS",
+            "status": result["status"],
+            "payment_url": payment_url,
+            "amount": amount
+        }
+    else:
+        # For email, store in customer messages (Resend integration pending)
+        await db.customer_messages.insert_one({
+            "id": str(uuid.uuid4()),
+            "booking_id": req.booking_id,
+            "customer_email": email,
+            "customer_name": customer_name,
+            "type": "payment_link",
+            "message": f"Payment link: {payment_url} - Amount: ${amount:.2f}",
+            "payment_url": payment_url,
+            "amount": amount,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        return {
+            "message": "Payment link ready (email integration pending - link stored)",
+            "status": "pending_email",
+            "payment_url": payment_url,
+            "amount": amount
+        }
 
 # ===================== PAYMENT ROUTES =====================
 
@@ -4699,7 +4741,7 @@ async def cron_bin_placement_reminders():
     for booking in bookings:
         # Check if it's a bin service
         services = booking.get("services", [])
-        has_bin_service = any(s.get("service_id") in ["recycling_bin", "trash_bin_cleaning"] for s in services)
+        has_bin_service = any(s.get("service_id") == "recycling_bin" for s in services)
         
         if not has_bin_service:
             continue
@@ -6077,6 +6119,76 @@ async def delete_subscription(subscription_id: str, delete_data: SubscriptionDel
     )
     
     return {"message": "Subscription deleted", "deleted_record_id": deleted_record["id"]}
+
+class SubscriptionCreate(BaseModel):
+    customer_name: str
+    customer_email: Optional[str] = None
+    customer_phone: str
+    customer_address: str
+    services: List[Dict]
+    monthly_service_days: List[int]  # 0=Sun, 1=Mon, etc
+    service_days_per_month: int = 1
+
+@api_router.post("/admin/subscriptions/create")
+async def create_subscription(sub: SubscriptionCreate, current_user: dict = Depends(get_admin_user)):
+    """Admin creates a new subscription for a client"""
+    import re
+    
+    # Calculate pricing with subscription discount
+    pricing = calculate_booking_total(
+        sub.services,
+        0,  # distance - can be calculated from address later
+        True,  # is_monthly
+        sub.service_days_per_month
+    )
+    
+    # Extract zip code from address
+    zip_code = ""
+    zip_match = re.search(r'\b(\d{5})\b', sub.customer_address)
+    if zip_match:
+        zip_code = zip_match.group(1)
+    
+    subscription_id = str(uuid.uuid4())
+    
+    # Create booking record
+    booking = {
+        "id": subscription_id,
+        "customer_name": sub.customer_name,
+        "customer_email": sub.customer_email,
+        "customer_phone": sub.customer_phone,
+        "customer_address": sub.customer_address,
+        "zip_code": zip_code,
+        "services": sub.services,
+        "is_monthly": True,
+        "monthly_service_days": sub.monthly_service_days,
+        "service_days_per_month": sub.service_days_per_month,
+        "subtotal": pricing["subtotal"],
+        "tax": pricing["tax"],
+        "discount": pricing["discount"],
+        "total": pricing["total"],
+        "status": "pending",
+        "payment_status": "unpaid",
+        "subscription_status": "pending_payment",
+        "created_by": current_user.get("username", "admin"),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.bookings.insert_one(booking)
+    
+    return {
+        "message": "Subscription created",
+        "subscription_id": subscription_id,
+        "total": pricing["total"]
+    }
+
+@api_router.get("/admin/bookings/paid")
+async def get_paid_bookings(current_user: dict = Depends(get_admin_user)):
+    """Get all paid bookings"""
+    bookings = await db.bookings.find(
+        {"payment_status": "paid"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+    return {"bookings": bookings}
 
 @api_router.get("/admin/deleted-subscriptions")
 async def list_deleted_subscriptions(current_user: dict = Depends(get_admin_user)):

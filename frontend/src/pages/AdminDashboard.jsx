@@ -9,7 +9,7 @@ import {
   Copy, ExternalLink, Phone, Mail, Navigation, Inbox, Building2,
   Home, Car, Sparkles, Warehouse, HardHat, Calendar as CalendarIcon,
   AlertCircle, ChevronLeft, AlertTriangle, Banknote, MessageCircle,
-  Settings, Truck, UserCheck, PlusCircle, FileQuestion, Camera, Image, User
+  Settings, Truck, UserCheck, PlusCircle, FileQuestion, Camera, Image, User, CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DailyBibleVerse from '../components/shared/DailyBibleVerse';
@@ -45,6 +45,7 @@ const navItems = [
   { path: 'create-booking', icon: PlusCircle, label: 'Create Booking' },
   { path: 'clients', icon: UserCheck, label: 'Clients' },
   { path: 'pending', icon: Clock, label: 'Pending Services' },
+  { path: 'paid', icon: CreditCard, label: 'Paid Services' },
   { path: 'completed', icon: CheckCircle, label: 'Completed Services' },
   { path: 'unpaid-subscriptions', icon: AlertCircle, label: 'Unpaid Subscriptions' },
   { path: 'revenue', icon: DollarSign, label: 'Revenue' },
@@ -182,18 +183,24 @@ function groupByCategory(bookings) {
 }
 
 // Bookings List Component with Categories
-function BookingsList({ status, title }) {
+function BookingsList({ status, title, paymentStatus }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategory, setExpandedCategory] = useState(null);
 
   useEffect(() => {
     fetchBookings();
-  }, [status]);
+  }, [status, paymentStatus]);
 
   const fetchBookings = async () => {
     try {
-      const url = status ? `${API_URL}/api/admin/bookings?status=${status}` : `${API_URL}/api/admin/bookings`;
+      let url;
+      if (paymentStatus === 'paid') {
+        // Use the paid bookings endpoint
+        url = `${API_URL}/api/admin/bookings/paid`;
+      } else {
+        url = status ? `${API_URL}/api/admin/bookings?status=${status}` : `${API_URL}/api/admin/bookings`;
+      }
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
@@ -258,7 +265,7 @@ function BookingsList({ status, title }) {
                 {expandedCategory === category && (
                   <div className="border-t border-white/10 p-4 space-y-3">
                     {categoryBookings.map((booking) => (
-                      <BookingCard key={booking.id} booking={booking} onUpdateStatus={updateStatus} />
+                      <BookingCard key={booking.id} booking={booking} onUpdateStatus={updateStatus} onRefresh={fetchBookings} />
                     ))}
                   </div>
                 )}
@@ -271,10 +278,13 @@ function BookingsList({ status, title }) {
   );
 }
 
-// Booking Card with Quote Management
-function BookingCard({ booking, onUpdateStatus }) {
+// Booking Card with Quote Management and Payment Link
+function BookingCard({ booking, onUpdateStatus, onRefresh }) {
   const [expanded, setExpanded] = useState(false);
   const [editingQuote, setEditingQuote] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState(booking.customer_email ? 'email' : 'sms');
+  const [sendingPayment, setSendingPayment] = useState(false);
   const [quoteData, setQuoteData] = useState({
     date: booking.booking_dates?.[0] || '',
     time: '09:00',
@@ -301,6 +311,30 @@ function BookingCard({ booking, onUpdateStatus }) {
     }
   };
 
+  const sendPaymentLink = async () => {
+    setSendingPayment(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/send-payment-link`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          booking_id: booking.id,
+          method: paymentMethod,
+          customer_phone: booking.customer_phone,
+          customer_email: booking.customer_email
+        })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      toast.success(`Payment link sent via ${paymentMethod.toUpperCase()}!`);
+      setShowPaymentModal(false);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      toast.error('Failed to send payment link');
+    } finally {
+      setSendingPayment(false);
+    }
+  };
+
   return (
     <motion.div
       layout
@@ -321,9 +355,19 @@ function BookingCard({ booking, onUpdateStatus }) {
             <p className="text-white/60 text-sm">{booking.customer_phone}</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-white font-bold">${booking.total?.toFixed(2)}</p>
-          <p className="text-white/60 text-sm">{booking.booking_dates?.[0]}</p>
+        <div className="flex items-center gap-4">
+          {/* Payment status badge */}
+          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+            booking.payment_status === 'paid' ? 'bg-green-500/20 text-green-400' :
+            booking.payment_status === 'waived' ? 'bg-purple-500/20 text-purple-400' :
+            'bg-red-500/20 text-red-400'
+          }`}>
+            {booking.payment_status === 'paid' ? 'PAID' : booking.payment_status === 'waived' ? 'WAIVED' : 'UNPAID'}
+          </span>
+          <div className="text-right">
+            <p className="text-white font-bold">${booking.total?.toFixed(2)}</p>
+            <p className="text-white/60 text-sm">{booking.booking_dates?.[0]}</p>
+          </div>
         </div>
       </div>
 
@@ -404,6 +448,17 @@ function BookingCard({ booking, onUpdateStatus }) {
             )}
             
             <div className="flex gap-2 pt-2 flex-wrap">
+              {/* Send Payment Link button - only for unpaid bookings */}
+              {booking.payment_status !== 'paid' && booking.payment_status !== 'waived' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowPaymentModal(true); }}
+                  className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600 flex items-center gap-2"
+                  data-testid="send-payment-link-btn"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  Send Payment Link
+                </button>
+              )}
               {booking.status !== 'completed' && (
                 <button
                   onClick={() => onUpdateStatus(booking.id, 'completed')}
@@ -423,6 +478,85 @@ function BookingCard({ booking, onUpdateStatus }) {
             </div>
           </div>
         </motion.div>
+      )}
+
+      {/* Payment Link Modal */}
+      {showPaymentModal && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60]" 
+          onClick={() => setShowPaymentModal(false)}
+        >
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-white/20"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <CreditCard className="text-emerald-400" />
+              Send Payment Link
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="bg-white/5 rounded-xl p-4">
+                <p className="text-white font-semibold">{booking.customer_name}</p>
+                <p className="text-white/60 text-sm">${booking.total?.toFixed(2)}</p>
+              </div>
+              
+              <div>
+                <label className="text-white/60 text-sm mb-2 block">Send via:</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPaymentMethod('sms')}
+                    className={`flex-1 px-4 py-3 rounded-xl flex items-center justify-center gap-2 ${
+                      paymentMethod === 'sms' 
+                        ? 'bg-emerald-500 text-white' 
+                        : 'bg-white/10 text-white/60 hover:bg-white/20'
+                    }`}
+                  >
+                    <Phone className="w-4 h-4" />
+                    SMS
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod('email')}
+                    disabled={!booking.customer_email}
+                    className={`flex-1 px-4 py-3 rounded-xl flex items-center justify-center gap-2 ${
+                      paymentMethod === 'email' 
+                        ? 'bg-emerald-500 text-white' 
+                        : 'bg-white/10 text-white/60 hover:bg-white/20'
+                    } ${!booking.customer_email ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </button>
+                </div>
+                {paymentMethod === 'sms' && booking.customer_phone && (
+                  <p className="text-white/40 text-sm mt-2">To: {booking.customer_phone}</p>
+                )}
+                {paymentMethod === 'email' && booking.customer_email && (
+                  <p className="text-white/40 text-sm mt-2">To: {booking.customer_email}</p>
+                )}
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={sendPaymentLink}
+                  disabled={sendingPayment || (paymentMethod === 'email' && !booking.customer_email)}
+                  className="flex-1 px-4 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 flex items-center justify-center gap-2 disabled:opacity-50"
+                  data-testid="confirm-send-payment-link"
+                >
+                  {sendingPayment ? 'Sending...' : <><Send className="w-4 h-4" /> Send Link</>}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       )}
     </motion.div>
   );
@@ -7422,6 +7556,7 @@ export default function AdminDashboard() {
           <Route path="create-booking" element={<CreateBookingPage />} />
           <Route path="clients" element={<ClientsPage />} />
           <Route path="pending" element={<BookingsList status="pending" title="Pending Services" />} />
+          <Route path="paid" element={<BookingsList paymentStatus="paid" title="Paid Services" />} />
           <Route path="completed" element={<BookingsList status="completed" title="Completed Services" />} />
           <Route path="unpaid-subscriptions" element={<UnpaidSubscriptionsPage />} />
           <Route path="revenue" element={<RevenuePage />} />
