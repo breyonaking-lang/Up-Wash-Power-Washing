@@ -2772,6 +2772,222 @@ async def combine_routes(combine: RouteCombine, current_user: dict = Depends(get
         "total_stops": len(all_bookings)
     }
 
+class MoveStopRequest(BaseModel):
+    source_route_id: str
+    target_route_id: str
+    booking_id: str
+
+@api_router.post("/admin/routes/move-stop")
+async def move_stop_between_routes(move: MoveStopRequest, current_user: dict = Depends(get_admin_user)):
+    """Move a stop from one route to another"""
+    # Get source route
+    source_route = await db.routes.find_one({"id": move.source_route_id}, {"_id": 0})
+    if not source_route:
+        raise HTTPException(status_code=404, detail="Source route not found")
+    
+    # Get target route
+    target_route = await db.routes.find_one({"id": move.target_route_id}, {"_id": 0})
+    if not target_route:
+        raise HTTPException(status_code=404, detail="Target route not found")
+    
+    # Find the booking in source route
+    booking_to_move = None
+    source_bookings = source_route.get("bookings", [])
+    for i, booking in enumerate(source_bookings):
+        booking_id = booking.get("booking_id") if isinstance(booking, dict) else booking
+        if booking_id == move.booking_id:
+            booking_to_move = booking
+            source_bookings.pop(i)
+            break
+    
+    if not booking_to_move:
+        raise HTTPException(status_code=404, detail="Booking not found in source route")
+    
+    # Add to target route
+    target_bookings = target_route.get("bookings", [])
+    target_bookings.append(booking_to_move)
+    
+    # Update both routes
+    await db.routes.update_one(
+        {"id": move.source_route_id},
+        {"$set": {"bookings": source_bookings, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    await db.routes.update_one(
+        {"id": move.target_route_id},
+        {"$set": {"bookings": target_bookings, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {
+        "message": "Stop moved successfully",
+        "source_route_stops": len(source_bookings),
+        "target_route_stops": len(target_bookings)
+    }
+
+# Service type route limits
+ROUTE_LIMITS = {
+    "recycling_bin": 100,
+    "patio": 4,
+    "driveway": 4,
+    "dumpster": 8,
+    "home_power_wash": 4,
+    "construction": 2,
+    "commercial": 2
+}
+
+@api_router.get("/admin/routes/grouped-by-service")
+async def get_routes_grouped_by_service(current_user: dict = Depends(get_admin_user)):
+    """Get all pending routes grouped by zip code and service type with max limits"""
+    routes = await db.routes.find(
+        {"status": {"$ne": "completed"}, "assigned_contractor_id": None},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Organize by zip code and service type
+    organized = {}
+    
+    for route in routes:
+        zip_code = route.get("zip_code") or "Unassigned"
+        bookings = route.get("bookings", [])
+        
+        if zip_code not in organized:
+            organized[zip_code] = {
+                "zip_code": zip_code,
+                "service_groups": {},
+                "routes": []
+            }
+        
+        organized[zip_code]["routes"].append(route)
+        
+        # Group bookings by primary service
+        for booking in bookings:
+            if isinstance(booking, dict):
+                services = booking.get("services", [])
+                primary_service = services[0].get("service_id") if services else "other"
+            else:
+                primary_service = "other"
+            
+            if primary_service not in organized[zip_code]["service_groups"]:
+                max_limit = ROUTE_LIMITS.get(primary_service, 50)
+                organized[zip_code]["service_groups"][primary_service] = {
+                    "service_type": primary_service,
+                    "max_per_route": max_limit,
+                    "stops": [],
+                    "total_count": 0
+                }
+            
+            organized[zip_code]["service_groups"][primary_service]["stops"].append({
+                "booking": booking,
+                "route_id": route.get("id")
+            })
+            organized[zip_code]["service_groups"][primary_service]["total_count"] += 1
+    
+    return {
+        "grouped_routes": organized,
+        "route_limits": ROUTE_LIMITS
+    }
+
+@api_router.post("/admin/routes/auto-organize")
+async def auto_organize_routes(current_user: dict = Depends(get_admin_user)):
+    """Auto-organize all pending stops into optimal routes by zip code and service type"""
+    # Get all pending routes
+    routes = await db.routes.find(
+        {"status": {"$ne": "completed"}, "assigned_contractor_id": None},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Collect all bookings with their metadata
+    all_bookings = []
+    route_ids_to_delete = []
+    
+    for route in routes:
+        route_ids_to_delete.append(route["id"])
+        for booking in route.get("bookings", []):
+            if isinstance(booking, dict):
+                booking["original_route_id"] = route["id"]
+                all_bookings.append(booking)
+            else:
+                # Legacy format - just booking_id string
+                # Fetch full booking details
+                full_booking = await db.bookings.find_one({"id": booking}, {"_id": 0})
+                if full_booking:
+                    all_bookings.append({
+                        "booking_id": booking,
+                        "customer_name": full_booking.get("customer_name"),
+                        "customer_phone": full_booking.get("customer_phone"),
+                        "customer_address": full_booking.get("customer_address"),
+                        "services": full_booking.get("services", []),
+                        "total": full_booking.get("total", 0),
+                        "stop_status": "pending",
+                        "original_route_id": route["id"]
+                    })
+    
+    # Group by zip code and service type
+    organized = {}
+    
+    for booking in all_bookings:
+        # Extract zip code
+        address = booking.get("customer_address", "")
+        import re
+        zip_match = re.search(r'\b(\d{5})\b', address)
+        zip_code = zip_match.group(1) if zip_match else "00000"
+        
+        # Get primary service
+        services = booking.get("services", [])
+        primary_service = services[0].get("service_id") if services else "other"
+        
+        key = f"{zip_code}_{primary_service}"
+        if key not in organized:
+            organized[key] = {
+                "zip_code": zip_code,
+                "service_type": primary_service,
+                "max_limit": ROUTE_LIMITS.get(primary_service, 50),
+                "bookings": []
+            }
+        organized[key]["bookings"].append(booking)
+    
+    # Create new routes respecting limits
+    new_routes_created = 0
+    
+    for key, group in organized.items():
+        bookings = group["bookings"]
+        max_limit = group["max_limit"]
+        zip_code = group["zip_code"]
+        service_type = group["service_type"]
+        
+        # Split into chunks of max_limit
+        for i in range(0, len(bookings), max_limit):
+            chunk = bookings[i:i + max_limit]
+            route_num = (i // max_limit) + 1
+            
+            service_name = service_type.replace("_", " ").title()
+            new_route = {
+                "id": str(uuid.uuid4()),
+                "name": f"{service_name} Route - {zip_code}" + (f" #{route_num}" if route_num > 1 else ""),
+                "description": f"Auto-organized {service_name} route",
+                "area": zip_code,
+                "zip_code": zip_code,
+                "service_type": service_type,
+                "max_stops": max_limit,
+                "bookings": chunk,
+                "status": "pending",
+                "assigned_contractor_id": None,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.routes.insert_one(new_route)
+            new_routes_created += 1
+    
+    # Delete old routes
+    if route_ids_to_delete:
+        await db.routes.delete_many({"id": {"$in": route_ids_to_delete}})
+    
+    return {
+        "message": f"Reorganized {len(all_bookings)} stops into {new_routes_created} routes",
+        "routes_created": new_routes_created,
+        "routes_deleted": len(route_ids_to_delete),
+        "total_stops": len(all_bookings)
+    }
+
 class RouteReassign(BaseModel):
     new_contractor_id: str
 

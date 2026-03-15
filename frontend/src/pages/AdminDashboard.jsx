@@ -3254,7 +3254,24 @@ function RoutesPage() {
   const [newRoute, setNewRoute] = useState({ name: '', description: '', area: '', price: 350 });
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [groupBy, setGroupBy] = useState('zip'); // 'zip', 'city', 'state'
+  const [groupBy, setGroupBy] = useState('service'); // 'service', 'zip', 'city'
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [movingStop, setMovingStop] = useState(null);
+  const [targetRouteId, setTargetRouteId] = useState('');
+  const [organizing, setOrganizing] = useState(false);
+
+  // Service type route limits
+  const ROUTE_LIMITS = {
+    recycling_bin: { name: 'Recycling Bin', max: 100, color: 'bg-green-500' },
+    patio: { name: 'Patio Cleaning', max: 4, color: 'bg-blue-500' },
+    driveway: { name: 'Driveway Cleaning', max: 4, color: 'bg-amber-500' },
+    dumpster: { name: 'Restaurant Dumpster', max: 8, color: 'bg-red-500' },
+    home_power_wash: { name: 'Home Power Wash', max: 4, color: 'bg-cyan-500' },
+    construction: { name: 'Construction Cleanup', max: 2, color: 'bg-orange-500' },
+    commercial: { name: 'Commercial', max: 2, color: 'bg-purple-500' },
+    other: { name: 'Other Services', max: 50, color: 'bg-gray-500' }
+  };
 
   useEffect(() => {
     fetchRoutes();
@@ -3418,6 +3435,66 @@ function RoutesPage() {
     }
   };
 
+  const moveStop = async () => {
+    if (!movingStop || !targetRouteId) {
+      toast.error('Select a target route');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes/move-stop`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          source_route_id: movingStop.routeId,
+          target_route_id: targetRouteId,
+          booking_id: movingStop.bookingId
+        })
+      });
+      if (!res.ok) throw new Error('Failed to move');
+      toast.success('Stop moved successfully!');
+      setShowMoveModal(false);
+      setMovingStop(null);
+      setTargetRouteId('');
+      fetchRoutes();
+    } catch (err) {
+      toast.error('Failed to move stop');
+    }
+  };
+
+  const autoOrganizeRoutes = async () => {
+    if (!window.confirm('Auto-organize all stops into optimal routes by zip code and service type? This will recreate all pending routes.')) return;
+    
+    setOrganizing(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes/auto-organize`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to organize');
+      const data = await res.json();
+      toast.success(`${data.message}`);
+      fetchRoutes();
+    } catch (err) {
+      toast.error('Failed to auto-organize routes');
+    } finally {
+      setOrganizing(false);
+    }
+  };
+
+  const openMoveModal = (routeId, booking) => {
+    const bookingId = typeof booking === 'string' ? booking : booking.booking_id;
+    setMovingStop({ routeId, bookingId, booking });
+    setShowMoveModal(true);
+  };
+
+  const toggleGroupExpansion = (groupKey) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
+
   const optimizeRoute = async (routeId, e) => {
     e.stopPropagation();
     
@@ -3467,16 +3544,29 @@ function RoutesPage() {
     );
   });
 
+  // Get primary service type from a route
+  const getPrimaryService = (route) => {
+    const bookings = route.bookings || [];
+    if (bookings.length === 0) return 'other';
+    
+    const firstBooking = bookings[0];
+    if (typeof firstBooking === 'object' && firstBooking.services) {
+      return firstBooking.services[0]?.service_id || 'other';
+    }
+    return route.service_type || 'other';
+  };
+
   // Get unique grouping key for a route based on groupBy selection
   const getGroupKey = (route) => {
+    if (groupBy === 'service') {
+      const service = getPrimaryService(route);
+      const zipCode = route.zip_code || 'Unknown';
+      return `${zipCode}_${service}`;
+    }
     if (groupBy === 'zip') return route.zip_code || 'Unassigned';
     if (groupBy === 'city') {
       const booking = route.bookings?.[0];
       return booking?.customer_city || route.area || 'Unknown City';
-    }
-    if (groupBy === 'state') {
-      const booking = route.bookings?.[0];
-      return booking?.customer_state || 'TX';
     }
     return 'All';
   };
@@ -3484,8 +3574,17 @@ function RoutesPage() {
   // Group routes dynamically based on groupBy
   const groupedRoutes = filteredRoutes.reduce((acc, route) => {
     const key = getGroupKey(route);
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(route);
+    if (!acc[key]) {
+      const service = getPrimaryService(route);
+      const serviceInfo = ROUTE_LIMITS[service] || ROUTE_LIMITS.other;
+      acc[key] = {
+        routes: [],
+        service,
+        serviceInfo,
+        zipCode: route.zip_code || 'Unknown'
+      };
+    }
+    acc[key].routes.push(route);
     return acc;
   }, {});
 
@@ -3578,9 +3677,14 @@ function RoutesPage() {
 
       {/* Info Box */}
       <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 text-blue-200 text-sm">
-        <p>📍 Routes are automatically grouped by <strong>zip code</strong> (max 120 bookings per route).</p>
-        <p className="mt-1">💰 Contractor pay: <strong>$11 per stop</strong> | Select routes to combine or delete them.</p>
-        <p className="mt-1">✅ Once assigned, routes automatically move out of this list.</p>
+        <p className="font-semibold mb-2">📍 Route Grouping Limits by Service Type:</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+          <span>🗑️ Recycling Bin: <strong>100</strong> stops/route</span>
+          <span>🏠 Patio/Driveway: <strong>4</strong> stops/route</span>
+          <span>🍽️ Dumpster: <strong>8</strong> stops/route</span>
+          <span>🏗️ Commercial/Construction: <strong>2</strong> stops/route</span>
+        </div>
+        <p>💰 Contractor pay: <strong>$11 per stop</strong> | Select routes to combine or move stops between them.</p>
       </div>
 
       {/* Search and Group Controls */}
@@ -3604,11 +3708,20 @@ function RoutesPage() {
             className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white [&>option]:text-black"
             data-testid="route-group-select"
           >
-            <option value="zip">Zip Code</option>
+            <option value="service">Service Type + Zip</option>
+            <option value="zip">Zip Code Only</option>
             <option value="city">City</option>
-            <option value="state">State</option>
           </select>
         </div>
+        <button
+          onClick={autoOrganizeRoutes}
+          disabled={organizing || routes.length === 0}
+          className="px-4 py-2 bg-purple-500 text-white rounded-xl flex items-center gap-2 hover:bg-purple-600 disabled:opacity-50"
+          data-testid="auto-organize-btn"
+        >
+          <Navigation className="w-5 h-5" />
+          {organizing ? 'Organizing...' : 'Auto-Organize Routes'}
+        </button>
         {searchQuery && (
           <span className="text-white/60 text-sm">
             Found {filteredRoutes.length} route{filteredRoutes.length !== 1 ? 's' : ''}
@@ -3629,99 +3742,191 @@ function RoutesPage() {
           {/* Grouped Routes Display */}
           {Object.entries(groupedRoutes)
             .sort(([a], [b]) => a.localeCompare(b))
-            .map(([groupKey, groupRoutes]) => {
+            .map(([groupKey, groupData]) => {
+              const { routes: groupRoutes, service, serviceInfo, zipCode } = groupData;
               const pendingInGroup = groupRoutes.filter(r => !r.assigned_contractor_id);
               if (pendingInGroup.length === 0) return null;
               
-              const groupLabel = groupBy === 'zip' ? 'Zip Code' : groupBy === 'city' ? 'City' : 'State';
+              const totalStops = pendingInGroup.reduce((sum, r) => sum + (r.bookings?.length || 0), 0);
+              const maxPerRoute = serviceInfo?.max || 50;
+              const isExpanded = expandedGroups[groupKey];
               
               return (
                 <div key={groupKey} className="space-y-3">
-                  <h2 className="text-lg font-bold text-white/80 flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-blue-400" />
-                    {groupLabel}: {groupKey}
-                    <span className="text-white/40 text-sm">({pendingInGroup.length} routes)</span>
-                  </h2>
-                  
-                  <div className="space-y-3">
-                    {pendingInGroup.map((route) => (
-                      <div 
-                        key={route.id} 
-                        className={`bg-white/10 backdrop-blur rounded-2xl p-6 border transition cursor-pointer ${
-                          selectedRoutes.includes(route.id) 
-                            ? 'border-purple-500 bg-purple-500/20' 
-                            : 'border-white/20 hover:border-white/40'
-                        }`}
-                        onClick={() => toggleRouteSelection(route.id)}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start gap-4">
-                            <input
-                              type="checkbox"
-                              checked={selectedRoutes.includes(route.id)}
-                              onChange={() => toggleRouteSelection(route.id)}
-                              className="w-5 h-5 mt-1 rounded"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <div>
-                              <h3 className="text-xl font-bold text-white">{route.name}</h3>
-                              <p className="text-white/60">{route.description || 'Auto-generated route'}</p>
-                              <p className="text-white/60">Area: {route.area || route.zip_code || 'Not specified'}</p>
-                              <div className="flex gap-4 mt-2 flex-wrap">
-                                <p className="text-blue-400 text-sm">
-                                  {route.bookings?.length || 0} / 120 stops
-                                </p>
-                                <p className="text-green-400 text-sm font-bold">
-                                  ${((route.bookings?.length || 0) * 11).toFixed(2)} contractor pay
-                                </p>
-                                {route.optimized && (
-                                  <p className="text-purple-400 text-sm">
-                                    ✓ Optimized ({route.estimated_distance_miles} mi, ~{route.estimated_duration_minutes} min)
-                                  </p>
-                                )}
-                              </div>
-                              {(route.bookings?.length || 0) >= 2 && (
-                                <button
-                                  onClick={(e) => optimizeRoute(route.id, e)}
-                                  className="mt-3 px-4 py-2 bg-purple-500/50 text-white rounded-xl hover:bg-purple-500/70 text-sm flex items-center gap-2"
-                                >
-                                  <Navigation className="w-4 h-4" />
-                                  {route.optimized ? 'Re-Optimize Route' : 'Optimize Route Order'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-3" onClick={(e) => e.stopPropagation()}>
-                            <div>
-                              <p className="text-white/60 text-sm mb-2">Assign to:</p>
-                              <select
-                                value={route.assigned_contractor_id || ''}
-                                onChange={(e) => assignRoute(route.id, e.target.value)}
-                                className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white [&>option]:text-black"
-                              >
-                                <option value="">Unassigned</option>
-                                {contractors.map(c => (
-                                  <option key={c.id} value={c.id}>{c.full_name}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <button
-                              onClick={() => deleteRoute(route.id)}
-                              className="px-3 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 text-sm flex items-center gap-1"
-                              data-testid={`delete-route-${route.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
-                          </div>
+                  <button
+                    onClick={() => toggleGroupExpansion(groupKey)}
+                    className="w-full text-left"
+                  >
+                    <div className={`flex items-center justify-between p-4 rounded-xl ${serviceInfo?.color || 'bg-gray-500'}/20 border border-white/20 hover:border-white/40`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 ${serviceInfo?.color || 'bg-gray-500'} rounded-xl flex items-center justify-center`}>
+                          <MapPin className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold text-white">
+                            {groupBy === 'service' ? `${serviceInfo?.name || service} - Zip ${zipCode}` : `Zip Code: ${groupKey}`}
+                          </h2>
+                          <p className="text-white/60 text-sm">
+                            {pendingInGroup.length} routes • {totalStops} stops • Max {maxPerRoute}/route
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-green-400 font-bold">${(totalStops * 11).toFixed(0)} total</span>
+                        <ChevronRight className={`w-5 h-5 text-white/60 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                      </div>
+                    </div>
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="space-y-3 pl-4">
+                      {pendingInGroup.map((route) => (
+                        <div 
+                          key={route.id} 
+                          className={`bg-white/10 backdrop-blur rounded-2xl p-6 border transition ${
+                            selectedRoutes.includes(route.id) 
+                              ? 'border-purple-500 bg-purple-500/20' 
+                              : 'border-white/20 hover:border-white/40'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-start gap-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedRoutes.includes(route.id)}
+                                onChange={() => toggleRouteSelection(route.id)}
+                                className="w-5 h-5 mt-1 rounded cursor-pointer"
+                              />
+                              <div>
+                                <h3 className="text-xl font-bold text-white">{route.name}</h3>
+                                <p className="text-white/60">{route.description || 'Auto-generated route'}</p>
+                                <div className="flex gap-4 mt-2 flex-wrap">
+                                  <p className={`text-sm ${(route.bookings?.length || 0) >= maxPerRoute ? 'text-red-400' : 'text-blue-400'}`}>
+                                    {route.bookings?.length || 0} / {maxPerRoute} stops
+                                    {(route.bookings?.length || 0) >= maxPerRoute && ' (FULL)'}
+                                  </p>
+                                  <p className="text-green-400 text-sm font-bold">
+                                    ${((route.bookings?.length || 0) * 11).toFixed(2)} contractor pay
+                                  </p>
+                                </div>
+                                
+                                {/* Stops List with Move Option */}
+                                {route.bookings && route.bookings.length > 0 && (
+                                  <div className="mt-4 space-y-2">
+                                    <p className="text-white/60 text-sm font-semibold">Stops:</p>
+                                    {route.bookings.slice(0, 5).map((booking, idx) => {
+                                      const bookingData = typeof booking === 'object' ? booking : { booking_id: booking };
+                                      return (
+                                        <div key={idx} className="flex items-center justify-between bg-white/5 rounded-lg p-2 text-sm">
+                                          <div>
+                                            <span className="text-white">{bookingData.customer_name || 'Customer'}</span>
+                                            <span className="text-white/40 ml-2">{bookingData.customer_address?.slice(0, 30) || ''}...</span>
+                                          </div>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); openMoveModal(route.id, booking); }}
+                                            className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/30"
+                                          >
+                                            Move
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                    {route.bookings.length > 5 && (
+                                      <p className="text-white/40 text-xs">+{route.bookings.length - 5} more stops</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-3">
+                              <div>
+                                <p className="text-white/60 text-sm mb-2">Assign to:</p>
+                                <select
+                                  value={route.assigned_contractor_id || ''}
+                                  onChange={(e) => assignRoute(route.id, e.target.value)}
+                                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white [&>option]:text-black"
+                                  data-testid={`assign-route-${route.id}`}
+                                >
+                                  <option value="">Select contractor...</option>
+                                  {contractors.map(c => (
+                                    <option key={c.id} value={c.id}>{c.full_name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteRoute(route.id); }}
+                                className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
         </>
+      )}
+
+      {/* Move Stop Modal */}
+      {showMoveModal && movingStop && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={() => setShowMoveModal(false)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Navigation className="text-blue-400" />
+              Move Stop to Another Route
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="bg-white/10 rounded-xl p-4">
+                <p className="text-white/60 text-sm">Moving:</p>
+                <p className="text-white font-semibold">
+                  {typeof movingStop.booking === 'object' ? movingStop.booking.customer_name : 'Stop'}
+                </p>
+              </div>
+              
+              <div>
+                <label className="text-white/60 text-sm mb-2 block">Select Target Route:</label>
+                <select
+                  value={targetRouteId}
+                  onChange={(e) => setTargetRouteId(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white [&>option]:text-black"
+                >
+                  <option value="">Select route...</option>
+                  {routes.filter(r => r.id !== movingStop.routeId).map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.bookings?.length || 0} stops)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowMoveModal(false)}
+                  className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={moveStop}
+                  disabled={!targetRouteId}
+                  className="flex-1 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50"
+                >
+                  Move Stop
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       )}
 
       {/* Assigned Routes Section */}
