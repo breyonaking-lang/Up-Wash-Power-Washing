@@ -1675,20 +1675,30 @@ function ReleasedRoutesPage() {
       ) : (
         <div className="space-y-4">
           {releasedRoutes.map((route) => (
-            <div key={route.id} className={`bg-white/10 backdrop-blur rounded-2xl p-6 border ${
+            <div key={route.id} className={`bg-white/10 backdrop-blur rounded-2xl p-6 border-2 transition ${
               selectedRoutes.includes(route.id) ? 'border-purple-500 bg-purple-500/20' :
+              route.status === 'available' ? 'border-purple-400/50 hover:border-purple-400' :
               route.status === 'claimed' ? 'border-green-500/30' : 
-              route.status === 'dispatched' ? 'border-yellow-500/30' : 'border-purple-500/30'
+              route.status === 'dispatched' ? 'border-yellow-500/30' : 'border-white/20'
             }`}>
+              {/* Selection indicator for available routes */}
+              {route.status === 'available' && (
+                <div className="bg-purple-500/30 text-purple-200 text-xs px-3 py-1 rounded-full inline-flex items-center gap-1 mb-3">
+                  <span>☑</span> Click checkbox to select for mass dispatch
+                </div>
+              )}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-start gap-4">
                   {route.status === 'available' && (
-                    <input
-                      type="checkbox"
-                      checked={selectedRoutes.includes(route.id)}
-                      onChange={() => toggleRouteSelection(route.id)}
-                      className="w-5 h-5 mt-1 rounded cursor-pointer"
-                    />
+                    <div className="flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedRoutes.includes(route.id)}
+                        onChange={() => toggleRouteSelection(route.id)}
+                        className="w-6 h-6 rounded cursor-pointer accent-purple-500 border-2 border-purple-400"
+                        style={{ minWidth: '24px', minHeight: '24px' }}
+                      />
+                    </div>
                   )}
                   <div>
                     <h3 className="text-xl font-bold text-white">{route.route_name}</h3>
