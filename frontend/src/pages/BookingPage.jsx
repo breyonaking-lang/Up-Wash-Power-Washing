@@ -232,11 +232,18 @@ const BookingPage = () => {
       if (preselectedService === "recycling_bin" && preselectedQty > 0) {
         setBinQuantity(preselectedQty);
       }
+      if (preselectedService === "trash_bin_cleaning" && preselectedQty > 0) {
+        setBinQuantity(preselectedQty);
+      }
       if (preselectedService === "dumpster" && preselectedQty > 0) {
         setDumpsterQuantity(preselectedQty);
       }
+      if (preselectedService === "scent_bomb" && preselectedQty > 0) {
+        setScentBombs(preselectedQty);
+      }
       
-      toast.success(`${SERVICES.find(s => s.id === preselectedService)?.name} added to your order!`);
+      const serviceName = SERVICES.find(s => s.id === preselectedService)?.name;
+      toast.success(`${serviceName} added to your order!`);
     }
   }, [preselectedService, preselectedQty]);
 

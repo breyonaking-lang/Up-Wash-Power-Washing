@@ -117,11 +117,11 @@ const HomePage = () => {
       
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 hero-gradient opacity-95" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/60" />
         <div 
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0"
           style={{
-            backgroundImage: `url("https://images.unsplash.com/photo-1599427303058-f04cb7815b47?auto=format&fit=crop&q=80")`,
+            backgroundImage: `url("https://static.prod-images.emergentagent.com/jobs/cc387344-04aa-4cc2-931c-8b395a7f28d6/images/f00bede8c9294ee07a6cd65f0bd457e9f962b482bbae2d7587e561e03b923fa7.png")`,
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}
@@ -133,14 +133,14 @@ const HomePage = () => {
             transition={{ duration: 0.6 }}
             className="max-w-3xl"
           >
-            <span className="inline-block bg-white/20 text-white px-4 py-2 rounded-full text-sm font-medium mb-6">
+            <span className="inline-block bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-medium mb-6">
               Serving Burleson, TX & Surrounding Areas
             </span>
-            <h1 className="text-5xl md:text-7xl font-extrabold text-white uppercase tracking-tight leading-none mb-6">
+            <h1 className="text-5xl md:text-7xl font-extrabold text-white uppercase tracking-tight leading-none mb-6 drop-shadow-lg">
               Power Washing<br />
               <span className="text-cyan-300">Done Right</span>
             </h1>
-            <p className="text-xl text-white/90 mb-8 max-w-xl">
+            <p className="text-xl text-white/90 mb-8 max-w-xl drop-shadow-md">
               Professional cleaning services for recycling bins, patios, driveways, and commercial dumpsters. 
               Restore your property's curb appeal today.
             </p>
