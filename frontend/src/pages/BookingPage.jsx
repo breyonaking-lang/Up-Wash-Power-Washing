@@ -55,17 +55,6 @@ const SERVICES = [
     popupMessage: "Please place your bins on the driveway the night before your scheduled service. We'll clean them during our hours of operation (8am-6pm)."
   },
   {
-    id: "trash_bin_cleaning",
-    name: "Trash Bin Cleaning",
-    description: "Power wash trash bins inside and out",
-    icon: Trash2,
-    color: "bg-slate-500",
-    pricingType: "tiered",
-    bookingDays: [1, 2], // Mon, Tue only
-    needsTime: false,
-    popupMessage: "Please place your bins on the driveway the night before your scheduled service. We'll clean them during our hours of operation (8am-6pm)."
-  },
-  {
     id: "scent_bomb",
     name: "Scent Bomb",
     description: "Fresh fragrance for your freshly cleaned bins",
@@ -230,9 +219,6 @@ const BookingPage = () => {
       
       // Set quantity for bin/dumpster services
       if (preselectedService === "recycling_bin" && preselectedQty > 0) {
-        setBinQuantity(preselectedQty);
-      }
-      if (preselectedService === "trash_bin_cleaning" && preselectedQty > 0) {
         setBinQuantity(preselectedQty);
       }
       if (preselectedService === "dumpster" && preselectedQty > 0) {
@@ -523,7 +509,7 @@ const BookingPage = () => {
       setBookingId(response.data.id);
       
       // Show scent bomb upsell for bin/dumpster services (if no scent bombs already added)
-      if ((selectedServices.recycling_bin || selectedServices.trash_bin_cleaning || selectedServices.dumpster) && scentBombs === 0) {
+      if ((selectedServices.recycling_bin || selectedServices.dumpster) && scentBombs === 0) {
         setUpsellScentBombs(selectedServices.dumpster ? 2 : binQuantity || 1);
         setShowScentBombUpsell(true);
       } else {

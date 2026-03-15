@@ -41,20 +41,6 @@ const ServicesPage = () => {
       availableDays: "Monday & Tuesday"
     },
     {
-      id: "trash_bin_cleaning",
-      name: "Trash Bin Cleaning",
-      description: "Keep your trash bins fresh and sanitary with our professional cleaning service. We eliminate foul odors, bacteria, and residue buildup that attracts pests. A clean trash bin means a healthier home environment.",
-      icon: Trash2,
-      color: "bg-slate-600",
-      pricing: [
-        { label: "1 Bin", price: 15, qty: 1 },
-        { label: "2 Bins", price: 25, qty: 2 },
-        { label: "Each Additional", price: 8, qty: 3 }
-      ],
-      features: ["Interior & exterior deep clean", "Hospital-grade sanitization", "Odor elimination treatment", "Pest prevention"],
-      availableDays: "Monday & Tuesday"
-    },
-    {
       id: "scent_bomb",
       name: "Scent Bomb",
       description: "Add a fresh, long-lasting fragrance to your freshly cleaned bins! Our scent bombs keep your bins smelling amazing for weeks. Perfect add-on for any bin cleaning service.",
