@@ -5,7 +5,7 @@ import {
   LayoutDashboard, MapPin, CheckCircle, MessageSquare, 
   LogOut, Menu, X, Navigation, Camera, AlertTriangle,
   Phone, Clock, DollarSign, Users, ShoppingCart, ChevronRight,
-  Send, Route as RouteIcon, Bell, BellRing, Wallet, XCircle, Upload, Car
+  Send, Route as RouteIcon, Bell, BellRing, Wallet, XCircle, Upload, Car, Truck, Mail
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,6 +48,7 @@ const getAuthHeaders = () => ({
 const navItems = [
   { path: '', icon: LayoutDashboard, label: "Today's Route" },
   { path: 'routes', icon: RouteIcon, label: 'My Routes' },
+  { path: 'available', icon: Truck, label: 'Available Routes' },
   { path: 'earnings', icon: Wallet, label: 'Earnings' },
   { path: 'request-routes', icon: ShoppingCart, label: 'Request Routes' },
   { path: 'notifications', icon: Bell, label: 'Notifications' },
@@ -2113,6 +2114,207 @@ function TeamPage() {
   );
 }
 
+// Available Routes Page - Shows routes dispatched to this contractor
+function AvailableRoutesPage() {
+  const [routes, setRoutes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [claiming, setClaiming] = useState(null);
+  const [denying, setDenying] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchAvailableRoutes();
+  }, []);
+
+  const fetchAvailableRoutes = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/available-routes`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setRoutes(data.available_routes || []);
+    } catch (err) {
+      toast.error('Failed to load available routes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const claimRoute = async (routeId) => {
+    setClaiming(routeId);
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/available-routes/${routeId}/claim`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to claim');
+      const data = await res.json();
+      toast.success('Route claimed successfully!');
+      
+      // Navigate based on whether route is for today or future
+      if (data.is_today) {
+        navigate('/contractor');
+      } else {
+        navigate('/contractor/routes');
+      }
+      fetchAvailableRoutes();
+    } catch (err) {
+      toast.error('Failed to claim route');
+    } finally {
+      setClaiming(null);
+    }
+  };
+
+  const denyRoute = async (routeId) => {
+    if (!window.confirm('Are you sure you want to deny this route? It will be sent back to Released Routes.')) return;
+    
+    setDenying(routeId);
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/available-routes/${routeId}/deny`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to deny');
+      toast.success('Route denied - moved back to Released Routes');
+      fetchAvailableRoutes();
+    } catch (err) {
+      toast.error('Failed to deny route');
+    } finally {
+      setDenying(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <Truck className="text-green-400" />
+          Available Routes
+        </h1>
+        <button
+          onClick={fetchAvailableRoutes}
+          className="px-4 py-2 bg-white/10 text-white rounded-xl hover:bg-white/20"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {routes.length === 0 ? (
+        <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center border border-white/20">
+          <Truck className="w-16 h-16 text-white/30 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">No Routes Available</h3>
+          <p className="text-white/60">Routes dispatched to you by admin will appear here.</p>
+          <p className="text-white/40 text-sm mt-2">Check back later or contact admin for available work.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {routes.map((route) => {
+            const today = new Date().toISOString().split('T')[0];
+            const isToday = route.service_date === today;
+            const numStops = route.bookings?.length || route.num_stops || 0;
+            const contractorPay = numStops * PAY_PER_STOP;
+            
+            return (
+              <motion.div
+                key={route.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur rounded-2xl p-6 border border-green-500/30"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-xl font-bold text-white">{route.route_name || route.name}</h3>
+                      {isToday && (
+                        <span className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded-full animate-pulse">
+                          TODAY
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <p className="text-white/60 text-sm">Area</p>
+                        <p className="text-white font-semibold">{route.route_area || route.zip_code || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-white/60 text-sm">Service Date</p>
+                        <p className="text-white font-semibold">{route.service_date || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-white/60 text-sm">Stops</p>
+                        <p className="text-white font-semibold">{numStops}</p>
+                      </div>
+                      <div>
+                        <p className="text-white/60 text-sm">Your Pay</p>
+                        <p className="text-green-400 font-bold text-lg">${contractorPay.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    
+                    {route.dispatch_message && (
+                      <div className="bg-white/10 rounded-lg p-3 mb-4">
+                        <p className="text-white/80 text-sm">
+                          <strong>Message from Admin:</strong> {route.dispatch_message}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Stops Preview */}
+                    {route.bookings && route.bookings.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-white/60 text-sm font-semibold">Stops Preview:</p>
+                        {route.bookings.slice(0, 3).map((booking, idx) => {
+                          const b = typeof booking === 'object' ? booking : { customer_name: 'Customer' };
+                          return (
+                            <div key={idx} className="flex items-center gap-2 text-sm">
+                              <MapPin className="w-4 h-4 text-green-400" />
+                              <span className="text-white">{b.customer_name}</span>
+                              <span className="text-white/40">- {b.customer_address?.slice(0, 30) || 'Address'}...</span>
+                            </div>
+                          );
+                        })}
+                        {route.bookings.length > 3 && (
+                          <p className="text-white/40 text-xs">+{route.bookings.length - 3} more stops</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => claimRoute(route.id)}
+                      disabled={claiming === route.id}
+                      className="px-6 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      {claiming === route.id ? 'Claiming...' : 'Claim Route'}
+                    </button>
+                    <button
+                      onClick={() => denyRoute(route.id)}
+                      disabled={denying === route.id}
+                      className="px-6 py-3 bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl font-bold hover:bg-red-500/30 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <XCircle className="w-5 h-5" />
+                      {denying === route.id ? 'Denying...' : 'Deny'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Notifications Page
 function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -2456,6 +2658,7 @@ export default function ContractorDashboard() {
         <Routes>
           <Route path="/" element={<TodayRoute />} />
           <Route path="routes" element={<MyRoutes />} />
+          <Route path="available" element={<AvailableRoutesPage />} />
           <Route path="earnings" element={<EarningsDashboard />} />
           <Route path="request-routes" element={<RequestRoutes />} />
           <Route path="notifications" element={<NotificationsPage />} />

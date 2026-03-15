@@ -6969,6 +6969,212 @@ async def get_available_routes_for_contractor(current_user: dict = Depends(get_c
     ).to_list(50)
     return {"available_routes": available}
 
+@api_router.post("/contractor/available-routes/{route_id}/claim")
+async def claim_available_route(route_id: str, current_user: dict = Depends(get_contractor_user)):
+    """Contractor claims an available/dispatched route"""
+    # Find the released route
+    released_route = await db.released_routes.find_one(
+        {"id": route_id, "dispatched_to": current_user["user_id"], "status": "dispatched"},
+        {"_id": 0}
+    )
+    
+    if not released_route:
+        raise HTTPException(status_code=404, detail="Route not found or not available to you")
+    
+    # Get or create the actual route
+    original_route_id = released_route.get("original_route_id") or released_route.get("route_id")
+    route = await db.routes.find_one({"id": original_route_id}, {"_id": 0})
+    
+    # Determine if route is for today or future
+    service_date = released_route.get("service_date") or route.get("service_date") if route else None
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    is_today = service_date == today if service_date else False
+    
+    # Update or create the route with contractor assignment
+    if route:
+        await db.routes.update_one(
+            {"id": original_route_id},
+            {"$set": {
+                "assigned_contractor_id": current_user["user_id"],
+                "assigned_contractor_name": current_user.get("full_name", current_user.get("username")),
+                "status": "assigned",
+                "claimed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+    else:
+        # Create route from released route data
+        new_route = {
+            "id": original_route_id or str(uuid.uuid4()),
+            "name": released_route.get("route_name"),
+            "area": released_route.get("route_area"),
+            "zip_code": released_route.get("zip_code"),
+            "service_date": service_date,
+            "bookings": released_route.get("bookings", []),
+            "assigned_contractor_id": current_user["user_id"],
+            "assigned_contractor_name": current_user.get("full_name"),
+            "status": "assigned",
+            "claimed_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.routes.insert_one(new_route)
+    
+    # Mark released route as claimed
+    await db.released_routes.update_one(
+        {"id": route_id},
+        {"$set": {
+            "status": "claimed",
+            "claimed_by_contractor_id": current_user["user_id"],
+            "claimed_by_contractor_name": current_user.get("full_name"),
+            "claimed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Remove from all other contractors' available routes (if mass dispatched)
+    await db.released_routes.update_many(
+        {
+            "original_route_id": original_route_id,
+            "id": {"$ne": route_id},
+            "status": "dispatched"
+        },
+        {"$set": {"status": "claimed_by_other", "claimed_by": current_user["user_id"]}}
+    )
+    
+    # Notify admin
+    admin_notif = {
+        "id": str(uuid.uuid4()),
+        "type": "route_claimed",
+        "title": "Route Claimed",
+        "message": f"{current_user.get('full_name')} claimed route: {released_route.get('route_name')}",
+        "route_id": original_route_id,
+        "contractor_id": current_user["user_id"],
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_notifications.insert_one(admin_notif)
+    
+    return {
+        "message": "Route claimed successfully",
+        "route_id": original_route_id,
+        "is_today": is_today,
+        "service_date": service_date
+    }
+
+@api_router.post("/contractor/available-routes/{route_id}/deny")
+async def deny_available_route(route_id: str, current_user: dict = Depends(get_contractor_user)):
+    """Contractor denies/declines an available route - sends back to released routes"""
+    # Find the released route
+    released_route = await db.released_routes.find_one(
+        {"id": route_id, "dispatched_to": current_user["user_id"], "status": "dispatched"},
+        {"_id": 0}
+    )
+    
+    if not released_route:
+        raise HTTPException(status_code=404, detail="Route not found or not available to you")
+    
+    # Update released route back to available status
+    await db.released_routes.update_one(
+        {"id": route_id},
+        {"$set": {
+            "status": "available",
+            "dispatched_to": None,
+            "dispatched_at": None,
+            "denied_by": current_user["user_id"],
+            "denied_by_name": current_user.get("full_name"),
+            "denied_at": datetime.now(timezone.utc).isoformat(),
+            "is_new": True  # Re-trigger alert
+        }}
+    )
+    
+    # Notify admin
+    admin_notif = {
+        "id": str(uuid.uuid4()),
+        "type": "route_denied",
+        "title": "Route Denied",
+        "message": f"{current_user.get('full_name')} denied route: {released_route.get('route_name')}. Route moved back to Released Routes.",
+        "route_id": released_route.get("original_route_id"),
+        "contractor_id": current_user["user_id"],
+        "read": False,
+        "is_urgent": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_notifications.insert_one(admin_notif)
+    
+    return {
+        "message": "Route denied - moved back to Released Routes",
+        "route_name": released_route.get("route_name")
+    }
+
+class MassDispatchRequest(BaseModel):
+    route_ids: List[str]
+    contractor_ids: List[str]
+    message: Optional[str] = None
+
+@api_router.post("/admin/released-routes/mass-dispatch")
+async def mass_dispatch_released_routes(dispatch: MassDispatchRequest, current_user: dict = Depends(get_admin_user)):
+    """Mass dispatch multiple released routes to multiple contractors"""
+    dispatched_count = 0
+    
+    for route_id in dispatch.route_ids:
+        released_route = await db.released_routes.find_one({"id": route_id}, {"_id": 0})
+        if not released_route:
+            continue
+        
+        for contractor_id in dispatch.contractor_ids:
+            contractor = await db.users.find_one({"id": contractor_id}, {"_id": 0})
+            if not contractor:
+                continue
+            
+            # Create a dispatch record for each contractor
+            dispatch_id = str(uuid.uuid4())
+            dispatch_record = {
+                **released_route,
+                "id": dispatch_id,
+                "original_route_id": released_route.get("original_route_id") or released_route.get("route_id") or route_id,
+                "status": "dispatched",
+                "dispatched_to": contractor_id,
+                "dispatched_to_name": contractor.get("full_name"),
+                "dispatched_by": current_user.get("username"),
+                "dispatched_at": datetime.now(timezone.utc).isoformat(),
+                "dispatch_message": dispatch.message
+            }
+            
+            # Only create new record if not already dispatched to this contractor
+            existing = await db.released_routes.find_one({
+                "original_route_id": dispatch_record["original_route_id"],
+                "dispatched_to": contractor_id,
+                "status": "dispatched"
+            })
+            
+            if not existing:
+                await db.released_routes.insert_one(dispatch_record)
+                dispatched_count += 1
+                
+                # Notify contractor
+                notif = {
+                    "id": str(uuid.uuid4()),
+                    "contractor_id": contractor_id,
+                    "type": "route_dispatched",
+                    "title": "New Route Available!",
+                    "message": f"Route '{released_route.get('route_name')}' is available for you to claim! {dispatch.message or ''}",
+                    "route_id": dispatch_record["original_route_id"],
+                    "read": False,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.notifications.insert_one(notif)
+        
+        # Update original released route status
+        await db.released_routes.update_one(
+            {"id": route_id},
+            {"$set": {"status": "dispatched", "mass_dispatched": True}}
+        )
+    
+    return {
+        "message": f"Routes dispatched to {len(dispatch.contractor_ids)} contractors",
+        "total_dispatches": dispatched_count,
+        "routes_count": len(dispatch.route_ids),
+        "contractors_count": len(dispatch.contractor_ids)
+    }
+
 @api_router.get("/admin/notifications")
 async def get_admin_notifications(current_user: dict = Depends(get_admin_user)):
     """Get admin notifications"""

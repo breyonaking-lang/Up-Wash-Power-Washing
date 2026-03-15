@@ -1479,6 +1479,10 @@ function ReleasedRoutesPage() {
   const [dispatchModal, setDispatchModal] = useState(null);
   const [selectedContractor, setSelectedContractor] = useState('');
   const [dispatchMessage, setDispatchMessage] = useState('');
+  const [selectedRoutes, setSelectedRoutes] = useState([]);
+  const [showMassDispatchModal, setShowMassDispatchModal] = useState(false);
+  const [selectedContractors, setSelectedContractors] = useState([]);
+  const [massDispatching, setMassDispatching] = useState(false);
 
   useEffect(() => {
     fetchReleasedRoutes();
@@ -1506,6 +1510,67 @@ function ReleasedRoutesPage() {
       setContractors(data.contractors || []);
     } catch (err) {
       console.error('Failed to load contractors');
+    }
+  };
+
+  const toggleRouteSelection = (routeId) => {
+    setSelectedRoutes(prev => 
+      prev.includes(routeId) 
+        ? prev.filter(id => id !== routeId)
+        : [...prev, routeId]
+    );
+  };
+
+  const toggleContractorSelection = (contractorId) => {
+    setSelectedContractors(prev =>
+      prev.includes(contractorId)
+        ? prev.filter(id => id !== contractorId)
+        : [...prev, contractorId]
+    );
+  };
+
+  const selectAllRoutes = () => {
+    const availableRoutes = releasedRoutes.filter(r => r.status === 'available');
+    setSelectedRoutes(availableRoutes.map(r => r.id));
+  };
+
+  const selectAllContractors = () => {
+    setSelectedContractors(contractors.map(c => c.id));
+  };
+
+  const massDispatchRoutes = async () => {
+    if (selectedRoutes.length === 0) {
+      toast.error('Select at least one route');
+      return;
+    }
+    if (selectedContractors.length === 0) {
+      toast.error('Select at least one contractor');
+      return;
+    }
+
+    setMassDispatching(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/released-routes/mass-dispatch`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          route_ids: selectedRoutes,
+          contractor_ids: selectedContractors,
+          message: dispatchMessage
+        })
+      });
+      if (!res.ok) throw new Error('Failed to dispatch');
+      const data = await res.json();
+      toast.success(`${data.message}! ${data.total_dispatches} dispatch notifications sent.`);
+      setShowMassDispatchModal(false);
+      setSelectedRoutes([]);
+      setSelectedContractors([]);
+      setDispatchMessage('');
+      fetchReleasedRoutes();
+    } catch (err) {
+      toast.error('Failed to mass dispatch routes');
+    } finally {
+      setMassDispatching(false);
     }
   };
 
@@ -1537,17 +1602,70 @@ function ReleasedRoutesPage() {
 
   if (loading) return <LoadingSpinner />;
 
+  const availableRoutes = releasedRoutes.filter(r => r.status === 'available');
+  const dispatchedRoutes = releasedRoutes.filter(r => r.status === 'dispatched');
+  const claimedRoutes = releasedRoutes.filter(r => r.status === 'claimed');
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-        <Navigation className="text-purple-400" />
-        Released Routes
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <Navigation className="text-purple-400" />
+          Released Routes
+        </h1>
+        
+        {selectedRoutes.length > 0 && (
+          <button
+            onClick={() => setShowMassDispatchModal(true)}
+            className="px-6 py-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center gap-2 animate-pulse"
+          >
+            <Send className="w-5 h-5" />
+            Mass Dispatch ({selectedRoutes.length} routes)
+          </button>
+        )}
+      </div>
       
       <div className="bg-purple-500/20 rounded-xl p-4 text-purple-200 text-sm">
-        <p><strong>Released routes</strong> are routes that contractors have released back to you. 
-        You can dispatch them to other contractors. Contractors earn <strong>$10 per stop</strong>.</p>
+        <p><strong>Released routes</strong> are routes that contractors have released or admins have unassigned.</p>
+        <p className="mt-1">💡 <strong>Mass Dispatch:</strong> Select multiple routes with checkboxes, then dispatch to multiple contractors at once. First contractor to claim gets the route!</p>
+        <p className="mt-1">💰 Contractor pay: <strong>$11 per stop</strong></p>
       </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-purple-500/20 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-purple-400">{availableRoutes.length}</p>
+          <p className="text-white/60 text-sm">Available</p>
+        </div>
+        <div className="bg-yellow-500/20 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-yellow-400">{dispatchedRoutes.length}</p>
+          <p className="text-white/60 text-sm">Dispatched (Pending)</p>
+        </div>
+        <div className="bg-green-500/20 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-green-400">{claimedRoutes.length}</p>
+          <p className="text-white/60 text-sm">Claimed</p>
+        </div>
+      </div>
+
+      {/* Select All Available Button */}
+      {availableRoutes.length > 0 && (
+        <div className="flex items-center gap-4">
+          <button
+            onClick={selectAllRoutes}
+            className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 text-sm"
+          >
+            Select All Available ({availableRoutes.length})
+          </button>
+          {selectedRoutes.length > 0 && (
+            <button
+              onClick={() => setSelectedRoutes([])}
+              className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 text-sm"
+            >
+              Clear Selection
+            </button>
+          )}
+        </div>
+      )}
 
       {releasedRoutes.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
@@ -1558,23 +1676,37 @@ function ReleasedRoutesPage() {
         <div className="space-y-4">
           {releasedRoutes.map((route) => (
             <div key={route.id} className={`bg-white/10 backdrop-blur rounded-2xl p-6 border ${
+              selectedRoutes.includes(route.id) ? 'border-purple-500 bg-purple-500/20' :
               route.status === 'claimed' ? 'border-green-500/30' : 
               route.status === 'dispatched' ? 'border-yellow-500/30' : 'border-purple-500/30'
             }`}>
               <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-white">{route.route_name}</h3>
-                  <p className="text-white/60">Area: {route.route_area || 'Not specified'}</p>
-                  <p className="text-white/40 text-sm">
-                    Released by {route.released_by_contractor_name} on {new Date(route.released_at).toLocaleDateString()}
-                  </p>
+                <div className="flex items-start gap-4">
+                  {route.status === 'available' && (
+                    <input
+                      type="checkbox"
+                      checked={selectedRoutes.includes(route.id)}
+                      onChange={() => toggleRouteSelection(route.id)}
+                      className="w-5 h-5 mt-1 rounded cursor-pointer"
+                    />
+                  )}
+                  <div>
+                    <h3 className="text-xl font-bold text-white">{route.route_name}</h3>
+                    <p className="text-white/60">Area: {route.route_area || route.zip_code || 'Not specified'}</p>
+                    <p className="text-white/40 text-sm">
+                      Released by {route.released_by_contractor_name || route.released_by_admin || 'Admin'} on {new Date(route.released_at).toLocaleDateString()}
+                    </p>
+                    {route.service_date && (
+                      <p className="text-blue-400 text-sm mt-1">Service Date: {route.service_date}</p>
+                    )}
+                  </div>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                   route.status === 'claimed' ? 'bg-green-500/20 text-green-400' :
                   route.status === 'dispatched' ? 'bg-yellow-500/20 text-yellow-400' :
                   'bg-purple-500/20 text-purple-400'
                 }`}>
-                  {route.status}
+                  {route.status.toUpperCase()}
                 </div>
               </div>
               
@@ -1714,6 +1846,109 @@ function ReleasedRoutesPage() {
                   Send Offer
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Mass Dispatch Modal */}
+      {showMassDispatchModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setShowMassDispatchModal(false)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+              <Send className="text-purple-400" />
+              Mass Dispatch Routes
+            </h2>
+            <p className="text-white/60 mb-6">
+              Dispatch <strong>{selectedRoutes.length}</strong> routes to multiple contractors. First contractor to claim each route gets it!
+            </p>
+            
+            <div className="bg-purple-500/20 rounded-xl p-4 mb-6">
+              <p className="text-purple-200 text-sm">
+                📍 Selected routes will be sent to ALL selected contractors below.
+                When one contractor claims a route, it will be removed from all other contractors' Available Routes.
+              </p>
+            </div>
+            
+            {/* Selected Routes Summary */}
+            <div className="mb-6">
+              <h3 className="text-white font-semibold mb-2">Selected Routes ({selectedRoutes.length}):</h3>
+              <div className="bg-white/5 rounded-xl p-3 max-h-32 overflow-y-auto">
+                {releasedRoutes.filter(r => selectedRoutes.includes(r.id)).map(route => (
+                  <div key={route.id} className="text-white/80 text-sm py-1">
+                    • {route.route_name} ({route.num_stops || 0} stops)
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Contractor Selection */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-white font-semibold">Select Contractors:</h3>
+                <button
+                  onClick={selectAllContractors}
+                  className="text-purple-400 text-sm hover:underline"
+                >
+                  Select All ({contractors.length})
+                </button>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3 max-h-48 overflow-y-auto space-y-2">
+                {contractors.map(c => (
+                  <label key={c.id} className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={selectedContractors.includes(c.id)}
+                      onChange={() => toggleContractorSelection(c.id)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-white">{c.full_name}</span>
+                    <span className="text-white/40 text-sm">@{c.username}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-white/40 text-sm mt-2">
+                {selectedContractors.length} contractor(s) selected
+              </p>
+            </div>
+            
+            {/* Optional Message */}
+            <div className="mb-6">
+              <label className="text-white/60 text-sm">Message to contractors (optional)</label>
+              <textarea
+                value={dispatchMessage}
+                onChange={(e) => setDispatchMessage(e.target.value)}
+                placeholder="Add a message for contractors..."
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white min-h-[80px] mt-2"
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowMassDispatchModal(false); setSelectedContractors([]); }}
+                className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={massDispatchRoutes}
+                disabled={massDispatching || selectedContractors.length === 0}
+                className="flex-1 py-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {massDispatching ? (
+                  'Dispatching...'
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    Dispatch to {selectedContractors.length} Contractor(s)
+                  </>
+                )}
+              </button>
             </div>
           </motion.div>
         </div>

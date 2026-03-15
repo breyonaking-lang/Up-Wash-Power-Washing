@@ -654,4 +654,37 @@ Power washing business website with booking system, admin dashboard, contractor 
 - GET /api/admin/bookings/unpaid - All unpaid bookings for Pending Services
 - POST /api/admin/bookings/{id}/mark-paid - Mark booking paid manually, auto-add to route
 
+### Mar 15, 2026 - Session 12 Updates
+
+#### Available Routes Tab in Contractor Portal ✅ NEW
+- [x] New "Available Routes" tab in contractor portal sidebar
+- [x] Shows all routes dispatched to the contractor by admin
+- [x] "Claim Route" button - Claims route and adds to My Routes or Today's Route
+- [x] "Deny" button - Sends route back to Released Routes with alert
+- [x] Route details: stops preview, pay amount, service date
+- [x] If route is for today → goes to Today's Route
+- [x] If route is for future date → goes to My Routes
+
+#### Mass Dispatch Feature in Admin Portal ✅ NEW
+- [x] Checkbox selection on available released routes
+- [x] "Select All Available" button for quick selection
+- [x] "Mass Dispatch" button opens modal
+- [x] Select multiple contractors to receive dispatch
+- [x] Optional message to contractors
+- [x] First contractor to claim gets the route
+- [x] Claimed routes removed from all other contractors' Available Routes
+- [x] Stats showing Available/Dispatched/Claimed counts
+
+#### Route Claim/Deny Flow ✅
+- [x] When claimed: Route assigned to contractor, moved to their routes
+- [x] When denied: Route returns to Released Routes with URGENT alert
+- [x] Admin notified when routes are claimed or denied
+- [x] Notifications sent to contractors when routes dispatched
+
+#### New API Endpoints
+- GET /api/contractor/available-routes - Routes dispatched to contractor
+- POST /api/contractor/available-routes/{id}/claim - Claim a route
+- POST /api/contractor/available-routes/{id}/deny - Deny a route
+- POST /api/admin/released-routes/mass-dispatch - Mass dispatch to contractors
+
 
