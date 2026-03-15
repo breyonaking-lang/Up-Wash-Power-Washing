@@ -3942,12 +3942,37 @@ async def get_contractor_earnings(contractor_id: str, current_user: dict = Depen
     total_paid = sum(p.get("amount", 0) for p in payments)
     unpaid_balance = total_earnings - total_paid
     
-    # This week's earnings
+    # This week's earnings from completed stops
     from datetime import timedelta
     week_start = (datetime.now(timezone.utc) - timedelta(days=datetime.now(timezone.utc).weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     
     this_week_stops = [s for s in completed_stops if s.get("completed_at", "") >= week_start.isoformat()]
-    this_week_earnings = len(this_week_stops) * pay_per_stop
+    this_week_completed_earnings = len(this_week_stops) * pay_per_stop
+    
+    # Get assigned routes for this contractor (pending work)
+    assigned_routes = await db.routes.find(
+        {"assigned_contractor_id": contractor_id, "status": {"$ne": "completed"}},
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Calculate pending earnings from assigned routes
+    pending_stops = 0
+    for route in assigned_routes:
+        bookings = route.get("bookings", [])
+        # Count stops that haven't been completed yet
+        for booking in bookings:
+            if isinstance(booking, dict):
+                if booking.get("stop_status") not in ["completed", "cns"]:
+                    pending_stops += 1
+            else:
+                # Legacy: booking might just be a booking_id string
+                pending_stops += 1
+    
+    pending_earnings = pending_stops * pay_per_stop
+    
+    # Total weekly includes both completed and pending from assigned routes
+    this_week_total_stops = len(this_week_stops) + pending_stops
+    this_week_total_earnings = this_week_completed_earnings + pending_earnings
     
     return {
         "contractor_id": contractor_id,
@@ -3956,9 +3981,14 @@ async def get_contractor_earnings(contractor_id: str, current_user: dict = Depen
         "total_earnings": total_earnings,
         "total_paid": total_paid,
         "unpaid_balance": unpaid_balance,
-        "this_week_stops": len(this_week_stops),
-        "this_week_earnings": this_week_earnings,
+        "this_week_stops": this_week_total_stops,
+        "this_week_completed_stops": len(this_week_stops),
+        "this_week_pending_stops": pending_stops,
+        "this_week_earnings": this_week_total_earnings,
+        "this_week_completed_earnings": this_week_completed_earnings,
+        "this_week_pending_earnings": pending_earnings,
         "pay_per_stop": pay_per_stop,
+        "assigned_routes_count": len(assigned_routes),
         "recent_completions": completed_stops[:20],
         "recent_cns": cns_stops[:10],
         "payment_history": payments

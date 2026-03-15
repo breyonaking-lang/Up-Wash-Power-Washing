@@ -2507,12 +2507,17 @@ function ContractorsPage() {
                     <div>
                       <p className="text-white/60 text-sm">This Week</p>
                       <p className="text-2xl font-bold text-green-400">${(contractorEarnings.this_week_earnings || 0).toFixed(2)}</p>
-                      <p className="text-white/40 text-xs">{contractorEarnings.this_week_stops || 0} stops</p>
+                      <p className="text-white/40 text-xs">{contractorEarnings.this_week_stops || 0} stops total</p>
+                      {contractorEarnings.this_week_pending_stops > 0 && (
+                        <p className="text-yellow-400/80 text-xs">
+                          ({contractorEarnings.this_week_completed_stops || 0} done, {contractorEarnings.this_week_pending_stops} pending)
+                        </p>
+                      )}
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Total Earnings</p>
                       <p className="text-2xl font-bold text-white">${(contractorEarnings.total_earnings || 0).toFixed(2)}</p>
-                      <p className="text-white/40 text-xs">{contractorEarnings.total_completed_stops || 0} stops</p>
+                      <p className="text-white/40 text-xs">{contractorEarnings.total_completed_stops || 0} completed stops</p>
                     </div>
                     <div>
                       <p className="text-white/60 text-sm">Total Paid</p>
@@ -2525,6 +2530,15 @@ function ContractorsPage() {
                       </p>
                     </div>
                   </div>
+                  
+                  {/* Pending Earnings from Assigned Routes */}
+                  {contractorEarnings.this_week_pending_earnings > 0 && (
+                    <div className="mt-4 bg-yellow-500/20 rounded-lg p-3">
+                      <p className="text-yellow-400 text-sm">
+                        <strong>${contractorEarnings.this_week_pending_earnings.toFixed(2)}</strong> pending from {contractorEarnings.this_week_pending_stops} assigned stops
+                      </p>
+                    </div>
+                  )}
                   
                   {/* CNS Stops */}
                   {contractorEarnings.total_cns_stops > 0 && (
@@ -2559,7 +2573,7 @@ function ContractorsPage() {
                       <div key={route.id} className="bg-white/5 rounded-lg p-3">
                         <p className="text-white font-semibold">{route.name}</p>
                         <p className="text-white/60 text-sm">{route.area}</p>
-                        <p className="text-green-400 text-sm">{route.bookings?.length || 0} stops × $13 = ${((route.bookings?.length || 0) * 11).toFixed(2)}</p>
+                        <p className="text-green-400 text-sm">{route.bookings?.length || 0} stops × $11 = ${((route.bookings?.length || 0) * 11).toFixed(2)}</p>
                       </div>
                     ))}
                   </div>
