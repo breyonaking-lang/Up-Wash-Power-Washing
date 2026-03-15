@@ -549,6 +549,23 @@ function SubscriptionsPage() {
   const [editingSubscription, setEditingSubscription] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
+  // Create Subscription States
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newSubscription, setNewSubscription] = useState({
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    customer_address: '',
+    services: [],
+    monthly_service_days: [],
+    service_days_per_month: 1
+  });
+  const [creatingSubscription, setCreatingSubscription] = useState(false);
+  // Send Payment Link States
+  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
+  const [paymentLinkSub, setPaymentLinkSub] = useState(null);
+  const [paymentLinkMethod, setPaymentLinkMethod] = useState('sms'); // 'sms' or 'email'
+  const [sendingPaymentLink, setSendingPaymentLink] = useState(false);
 
   useEffect(() => {
     fetchSubscriptions();
@@ -614,14 +631,112 @@ function SubscriptionsPage() {
     }
   };
 
+  const createSubscription = async () => {
+    if (!newSubscription.customer_name || !newSubscription.customer_phone || !newSubscription.customer_address) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    if (newSubscription.monthly_service_days.length === 0) {
+      toast.error('Please select at least one service day');
+      return;
+    }
+    
+    setCreatingSubscription(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/subscriptions/create`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(newSubscription)
+      });
+      if (!res.ok) throw new Error('Failed to create');
+      const data = await res.json();
+      toast.success('Subscription created! Payment link ready to send.');
+      setShowCreateModal(false);
+      setNewSubscription({
+        customer_name: '',
+        customer_email: '',
+        customer_phone: '',
+        customer_address: '',
+        services: [],
+        monthly_service_days: [],
+        service_days_per_month: 1
+      });
+      fetchSubscriptions();
+      
+      // Offer to send payment link
+      if (data.subscription_id) {
+        const newSub = { id: data.subscription_id, ...newSubscription };
+        setPaymentLinkSub(newSub);
+        setShowPaymentLinkModal(true);
+      }
+    } catch (err) {
+      toast.error('Failed to create subscription');
+    } finally {
+      setCreatingSubscription(false);
+    }
+  };
+
+  const sendPaymentLink = async () => {
+    if (!paymentLinkSub) return;
+    
+    setSendingPaymentLink(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/send-payment-link`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          booking_id: paymentLinkSub.id,
+          method: paymentLinkMethod,
+          customer_phone: paymentLinkSub.customer_phone,
+          customer_email: paymentLinkSub.customer_email
+        })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      toast.success(`Payment link sent via ${paymentLinkMethod.toUpperCase()}!`);
+      setShowPaymentLinkModal(false);
+      setPaymentLinkSub(null);
+    } catch (err) {
+      toast.error('Failed to send payment link');
+    } finally {
+      setSendingPaymentLink(false);
+    }
+  };
+
+  const openPaymentLinkModal = (sub) => {
+    setPaymentLinkSub(sub);
+    setPaymentLinkMethod(sub.customer_email ? 'email' : 'sms');
+    setShowPaymentLinkModal(true);
+  };
+
+  const toggleServiceDay = (day) => {
+    setNewSubscription(prev => {
+      const days = prev.monthly_service_days.includes(day)
+        ? prev.monthly_service_days.filter(d => d !== day)
+        : prev.monthly_service_days.length < prev.service_days_per_month
+          ? [...prev.monthly_service_days, day]
+          : prev.monthly_service_days;
+      return { ...prev, monthly_service_days: days };
+    });
+  };
+
   if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-        <Users className="text-blue-400" />
-        Subscriptions
-      </h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <Users className="text-blue-400" />
+          Subscriptions
+        </h1>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2 bg-green-500 text-white rounded-xl flex items-center gap-2 hover:bg-green-600"
+          data-testid="create-subscription-btn"
+        >
+          <Plus className="w-5 h-5" />
+          Create Subscription
+        </button>
+      </div>
 
       {subscriptions.length === 0 ? (
         <div className="bg-white/10 rounded-2xl p-8 text-center">
@@ -659,6 +774,13 @@ function SubscriptionsPage() {
               </div>
               
               <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => openPaymentLinkModal(sub)}
+                  className="flex-1 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 flex items-center justify-center gap-1"
+                  data-testid={`send-payment-link-${sub.id}`}
+                >
+                  <Send className="w-4 h-4" /> Payment Link
+                </button>
                 <button
                   onClick={() => setSelectedSubscription(sub)}
                   className="flex-1 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 flex items-center justify-center gap-1"
@@ -858,6 +980,206 @@ function SubscriptionsPage() {
                 className="flex-1 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600"
               >
                 Delete Subscription
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Create Subscription Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 max-w-2xl w-full my-8"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-white">Create New Subscription</h2>
+              <button onClick={() => setShowCreateModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-white/60 text-sm mb-1 block">Customer Name *</label>
+                  <input
+                    value={newSubscription.customer_name}
+                    onChange={(e) => setNewSubscription({...newSubscription, customer_name: e.target.value})}
+                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/60 text-sm mb-1 block">Phone *</label>
+                  <input
+                    value={newSubscription.customer_phone}
+                    onChange={(e) => setNewSubscription({...newSubscription, customer_phone: e.target.value})}
+                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white"
+                    placeholder="(817) 555-1234"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-white/60 text-sm mb-1 block">Email</label>
+                <input
+                  value={newSubscription.customer_email}
+                  onChange={(e) => setNewSubscription({...newSubscription, customer_email: e.target.value})}
+                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white"
+                  placeholder="john@example.com"
+                />
+              </div>
+              
+              <div>
+                <label className="text-white/60 text-sm mb-1 block">Address *</label>
+                <input
+                  value={newSubscription.customer_address}
+                  onChange={(e) => setNewSubscription({...newSubscription, customer_address: e.target.value})}
+                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white"
+                  placeholder="123 Main St, Burleson, TX 76028"
+                />
+              </div>
+              
+              <div>
+                <label className="text-white/60 text-sm mb-1 block">Services Per Month</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5, 6].map(num => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setNewSubscription({...newSubscription, service_days_per_month: num, monthly_service_days: []})}
+                      className={`px-4 py-2 rounded-lg font-medium ${
+                        newSubscription.service_days_per_month === num
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-white/60 text-sm mb-1 block">
+                  Select Service Days (pick {newSubscription.service_days_per_month})
+                </label>
+                <div className="grid grid-cols-7 gap-2">
+                  {Array.from({length: 31}, (_, i) => i + 1).map(day => (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => toggleServiceDay(day)}
+                      className={`w-10 h-10 rounded-lg text-sm font-medium ${
+                        newSubscription.monthly_service_days.includes(day)
+                          ? 'bg-green-500 text-white'
+                          : newSubscription.monthly_service_days.length >= newSubscription.service_days_per_month
+                            ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                            : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      }`}
+                      disabled={!newSubscription.monthly_service_days.includes(day) && newSubscription.monthly_service_days.length >= newSubscription.service_days_per_month}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+                {newSubscription.monthly_service_days.length > 0 && (
+                  <p className="text-green-400 mt-2 text-sm">
+                    Selected days: {newSubscription.monthly_service_days.sort((a,b) => a-b).join(', ')}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createSubscription}
+                disabled={creatingSubscription}
+                className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50"
+                data-testid="confirm-create-subscription-btn"
+              >
+                {creatingSubscription ? 'Creating...' : 'Create Subscription'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Send Payment Link Modal */}
+      {showPaymentLinkModal && paymentLinkSub && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 max-w-md w-full"
+          >
+            <h2 className="text-xl font-bold text-white mb-4">Send Payment Link</h2>
+            
+            <div className="bg-white/10 rounded-xl p-4 mb-4">
+              <p className="text-white font-medium">{paymentLinkSub.customer_name}</p>
+              <p className="text-white/60 text-sm">{paymentLinkSub.customer_phone}</p>
+              {paymentLinkSub.customer_email && (
+                <p className="text-white/60 text-sm">{paymentLinkSub.customer_email}</p>
+              )}
+            </div>
+            
+            <div className="mb-4">
+              <label className="text-white/60 text-sm mb-2 block">Send via:</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentLinkMethod('sms')}
+                  className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 ${
+                    paymentLinkMethod === 'sms'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  SMS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentLinkMethod('email')}
+                  disabled={!paymentLinkSub.customer_email}
+                  className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 ${
+                    paymentLinkMethod === 'email'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  } ${!paymentLinkSub.customer_email ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <Mail className="w-5 h-5" />
+                  Email
+                </button>
+              </div>
+              {!paymentLinkSub.customer_email && paymentLinkMethod === 'email' && (
+                <p className="text-yellow-400 text-sm mt-2">No email address on file</p>
+              )}
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowPaymentLinkModal(false); setPaymentLinkSub(null); }}
+                className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendPaymentLink}
+                disabled={sendingPaymentLink || (paymentLinkMethod === 'email' && !paymentLinkSub.customer_email)}
+                className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                data-testid="confirm-send-payment-link-btn"
+              >
+                {sendingPaymentLink ? 'Sending...' : <><Send className="w-5 h-5" /> Send Link</>}
               </button>
             </div>
           </motion.div>
@@ -5339,6 +5661,11 @@ function CalendarPage() {
   const [sendSms, setSendSms] = useState(true);
   const [customMessage, setCustomMessage] = useState('');
   const [rescheduling, setRescheduling] = useState(false);
+  // Payment Link States
+  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
+  const [paymentLinkBooking, setPaymentLinkBooking] = useState(null);
+  const [paymentLinkMethod, setPaymentLinkMethod] = useState('sms');
+  const [sendingPaymentLink, setSendingPaymentLink] = useState(false);
 
   useEffect(() => {
     fetchCalendarData();
@@ -5437,6 +5764,38 @@ function CalendarPage() {
     } finally {
       setRescheduling(false);
     }
+  };
+
+  const sendPaymentLinkFromCalendar = async () => {
+    if (!paymentLinkBooking) return;
+    
+    setSendingPaymentLink(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/send-payment-link`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          booking_id: paymentLinkBooking.id,
+          method: paymentLinkMethod,
+          customer_phone: paymentLinkBooking.customer_phone,
+          customer_email: paymentLinkBooking.customer_email
+        })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      toast.success(`Payment link sent via ${paymentLinkMethod.toUpperCase()}!`);
+      setShowPaymentLinkModal(false);
+      setPaymentLinkBooking(null);
+    } catch (err) {
+      toast.error('Failed to send payment link');
+    } finally {
+      setSendingPaymentLink(false);
+    }
+  };
+
+  const openPaymentLinkModal = (booking) => {
+    setPaymentLinkBooking(booking);
+    setPaymentLinkMethod(booking.customer_email ? 'email' : 'sms');
+    setShowPaymentLinkModal(true);
   };
 
   const renderCalendar = () => {
@@ -5669,6 +6028,16 @@ function CalendarPage() {
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 ml-4">
+                        {booking.payment_status !== 'paid' && (
+                          <button
+                            onClick={() => openPaymentLinkModal(booking)}
+                            className="px-3 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 flex items-center gap-1"
+                            data-testid={`payment-link-btn-${booking.id}`}
+                          >
+                            <Send className="w-4 h-4" />
+                            Payment Link
+                          </button>
+                        )}
                         <button
                           onClick={() => openRescheduleModal(booking, selectedDate.date)}
                           className="px-3 py-2 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 flex items-center gap-1"
@@ -5777,6 +6146,78 @@ function CalendarPage() {
                   )}
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Payment Link Modal */}
+      {showPaymentLinkModal && paymentLinkBooking && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60]" onClick={() => setShowPaymentLinkModal(false)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-md"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-white mb-4">Send Payment Link</h2>
+            
+            <div className="bg-white/10 rounded-xl p-4 mb-4">
+              <p className="text-white font-medium">{paymentLinkBooking.customer_name}</p>
+              <p className="text-white/60 text-sm">{paymentLinkBooking.customer_phone}</p>
+              {paymentLinkBooking.customer_email && (
+                <p className="text-white/60 text-sm">{paymentLinkBooking.customer_email}</p>
+              )}
+              {paymentLinkBooking.total && (
+                <p className="text-blue-400 font-bold mt-2">Amount: ${paymentLinkBooking.total.toFixed(2)}</p>
+              )}
+            </div>
+            
+            <div className="mb-4">
+              <label className="text-white/60 text-sm mb-2 block">Send via:</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentLinkMethod('sms')}
+                  className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 ${
+                    paymentLinkMethod === 'sms'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  SMS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentLinkMethod('email')}
+                  disabled={!paymentLinkBooking.customer_email}
+                  className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 ${
+                    paymentLinkMethod === 'email'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  } ${!paymentLinkBooking.customer_email ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <Mail className="w-5 h-5" />
+                  Email
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowPaymentLinkModal(false); setPaymentLinkBooking(null); }}
+                className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendPaymentLinkFromCalendar}
+                disabled={sendingPaymentLink}
+                className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {sendingPaymentLink ? 'Sending...' : <><Send className="w-5 h-5" /> Send Link</>}
+              </button>
             </div>
           </motion.div>
         </div>
