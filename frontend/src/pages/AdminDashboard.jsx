@@ -1995,6 +1995,29 @@ function ContractorsPage() {
     }
   };
 
+  const releaseContractorRoute = async (routeId, routeName) => {
+    const reason = prompt(`Release route "${routeName}"?\n\nEnter reason (optional):`);
+    if (reason === null) return; // User cancelled
+    
+    try {
+      const res = await fetch(`${API_URL}/api/admin/routes/${routeId}/release`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason: reason || 'Released by admin' })
+      });
+      if (!res.ok) throw new Error('Failed to release');
+      const data = await res.json();
+      toast.success(`Route released! ${data.num_stops} stops moved to Released Routes.`);
+      fetchContractors();
+      fetchRoutes();
+      if (selectedContractor) {
+        await fetchContractorEarnings(selectedContractor.id);
+      }
+    } catch (err) {
+      toast.error('Failed to release route');
+    }
+  };
+
   const sendSMS = async (contractor) => {
     setSmsContractor(contractor);
     setShowSMSModal(true);
@@ -2571,9 +2594,21 @@ function ContractorsPage() {
                   <div className="space-y-2">
                     {getContractorRoutes(selectedContractor.id).map(route => (
                       <div key={route.id} className="bg-white/5 rounded-lg p-3">
-                        <p className="text-white font-semibold">{route.name}</p>
-                        <p className="text-white/60 text-sm">{route.area}</p>
-                        <p className="text-green-400 text-sm">{route.bookings?.length || 0} stops × $11 = ${((route.bookings?.length || 0) * 11).toFixed(2)}</p>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-white font-semibold">{route.name}</p>
+                            <p className="text-white/60 text-sm">{route.area}</p>
+                            <p className="text-green-400 text-sm">{route.bookings?.length || 0} stops × $11 = ${((route.bookings?.length || 0) * 11).toFixed(2)}</p>
+                          </div>
+                          <button
+                            onClick={() => releaseContractorRoute(route.id, route.name)}
+                            className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 flex items-center gap-1"
+                            title="Release this route"
+                          >
+                            <AlertTriangle className="w-4 h-4" />
+                            Release
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

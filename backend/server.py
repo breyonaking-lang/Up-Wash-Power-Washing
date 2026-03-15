@@ -6477,6 +6477,86 @@ async def release_route(route_id: str, release: RouteRelease, current_user: dict
         "contractor_pay": contractor_pay
     }
 
+class AdminRouteRelease(BaseModel):
+    reason: Optional[str] = None
+
+@api_router.post("/admin/routes/{route_id}/release")
+async def admin_release_route(route_id: str, release: AdminRouteRelease, current_user: dict = Depends(get_admin_user)):
+    """Admin releases a route from a contractor - moves to released routes"""
+    pay_per_stop = await get_pay_per_stop()
+    
+    route = await db.routes.find_one({"id": route_id}, {"_id": 0})
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    
+    contractor_id = route.get("assigned_contractor_id")
+    contractor_name = "Admin"
+    
+    if contractor_id:
+        contractor = await db.users.find_one({"id": contractor_id}, {"_id": 0})
+        if contractor:
+            contractor_name = contractor.get("full_name", contractor.get("username", "Unknown"))
+    
+    # Calculate contractor payment for this route
+    num_stops = len(route.get("bookings", []))
+    contractor_pay = num_stops * pay_per_stop
+    
+    # Create released route record
+    released_route = {
+        "id": str(uuid.uuid4()),
+        "route_id": route_id,
+        "original_route_id": route_id,
+        "route_name": route.get("name"),
+        "route_area": route.get("area"),
+        "zip_code": route.get("zip_code"),
+        "service_date": route.get("service_date"),
+        "num_stops": num_stops,
+        "contractor_pay": contractor_pay,
+        "pay_per_stop": pay_per_stop,
+        "bookings": route.get("bookings", []),
+        "released_by_contractor_id": contractor_id,
+        "released_by_contractor_name": contractor_name,
+        "released_by_admin": current_user.get("username", "admin"),
+        "release_reason": release.reason or "Released by admin",
+        "status": "available",
+        "claimed_by_contractor_id": None,
+        "released_at": datetime.now(timezone.utc).isoformat(),
+        "is_new": True
+    }
+    await db.released_routes.insert_one(released_route)
+    
+    # Update original route status
+    await db.routes.update_one(
+        {"id": route_id},
+        {"$set": {
+            "assigned_contractor_id": None,
+            "status": "released",
+            "released_at": datetime.now(timezone.utc).isoformat(),
+            "released_by_admin": current_user.get("username", "admin")
+        }}
+    )
+    
+    # Notify the contractor if they were assigned
+    if contractor_id:
+        contractor_notif = {
+            "id": str(uuid.uuid4()),
+            "contractor_id": contractor_id,
+            "type": "route_released_by_admin",
+            "title": "Route Released by Admin",
+            "message": f"Route '{route.get('name')}' has been released by admin. Reason: {release.reason or 'Not specified'}",
+            "route_id": route_id,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(contractor_notif)
+    
+    return {
+        "message": "Route released successfully",
+        "released_route_id": released_route["id"],
+        "num_stops": num_stops,
+        "added_to_released_routes": True
+    }
+
 @api_router.get("/admin/released-routes")
 async def get_released_routes(current_user: dict = Depends(get_admin_user)):
     """Get all released routes available for dispatch"""
