@@ -687,4 +687,37 @@ Power washing business website with booking system, admin dashboard, contractor 
 - POST /api/contractor/available-routes/{id}/deny - Deny a route
 - POST /api/admin/released-routes/mass-dispatch - Mass dispatch to contractors
 
+### Mar 15, 2026 - Session 13 Updates
+
+#### Enhanced Route Request System with Payment Flow ✅ NEW
+- [x] Contractors can request multiple routes at **$400 per route**
+- [x] Optional truck rental for **$95** (flat fee, not per week)
+- [x] Total price dynamically calculated and displayed before submission
+- [x] **NO REFUNDS** warning prominently displayed on Request Routes page
+- [x] Admin "Route Requests" tab shows all requests with pricing details
+- [x] Admin can **Approve** request → generates payment link (not auto-assigned)
+- [x] Admin can **Deny** request → **DENIED** badge shows in contractor portal
+- [x] Payment link displayed in Admin portal with "Copy Link" button
+- [x] Contractor sees "Pay Now" button for approved requests
+- [x] Dedicated contractor payment page (`/contractor/pay/:token`)
+- [x] Payment page shows: Purchase Summary, NO REFUNDS warning, Truck Pickup Required (if applicable)
+- [x] Upon payment completion:
+  - Routes automatically created and added to contractor's "My Routes"
+  - "Routes Purchased Successfully!" notification sent
+  - If truck rental: "Truck Ready for Pickup!" notification with 8:00 AM pickup time
+  - "Purchase Complete!" badge shown in contractor's request history
+
+#### New Route Request Pricing Model
+- Routes: $400 per route (flat fee, not per stop)
+- Truck Rental: $95 (flat fee with route purchase)
+
+#### New API Endpoints
+- GET /api/contractor/route-pricing - Get current route and truck pricing
+- GET /api/contractor/route-purchase/{token} - Get purchase details for payment page
+- POST /api/contractor/route-purchase/{token}/complete - Complete payment, create routes
+- Updated: POST /api/contractor/route-requests - Now accepts `truck_rental: boolean` and calculates total price
+- Updated: POST /api/admin/route-requests/{id}/approve - Now generates payment link instead of auto-assigning
+
+#### Payment Processing Note
+Square payment integration is MOCKED for testing. The `/complete` endpoint creates routes without actual payment nonce. Production deployment requires full Square payment form integration.
 
