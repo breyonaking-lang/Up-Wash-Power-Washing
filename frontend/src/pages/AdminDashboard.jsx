@@ -59,7 +59,6 @@ const navItems = [
   { path: 'released-routes', icon: AlertTriangle, label: 'Released Routes' },
   { path: 'route-requests', icon: ClipboardList, label: 'Route Requests' },
   { path: 'quotes', icon: FileQuestion, label: 'Quote Requests' },
-  { path: 'sms-logs', icon: MessageCircle, label: 'SMS Logs' },
   { path: 'messages', icon: MessageSquare, label: 'Messages' },
   { path: 'inquiries', icon: Inbox, label: 'Inquiry Messages' },
   { path: 'settings', icon: Settings, label: 'Settings' },
@@ -2176,7 +2175,7 @@ function RouteRequestsPage() {
               {/* Request Details */}
               <div className="grid grid-cols-4 gap-4 mb-4">
                 <div className="bg-white/5 rounded-xl p-3 text-center">
-                  <p className="text-lg font-bold text-blue-400">{request.zip_codes?.join(', ') || 'Any'}</p>
+                  <p className="text-lg font-bold text-blue-400">{Array.isArray(request.zip_codes) ? request.zip_codes.join(', ') : (request.zip_codes || 'Any')}</p>
                   <p className="text-white/60 text-xs">Zip Codes</p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-3 text-center">
@@ -2220,29 +2219,55 @@ function RouteRequestsPage() {
                 </div>
               )}
 
-              {/* Approved - Show Payment Link */}
+              {/* Approved - Show SEPARATE Payment Links */}
               {request.status === 'approved' && request.payment_url && (
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                  <p className="text-blue-400 font-semibold mb-2">Payment Link Ready</p>
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={request.payment_url} 
-                      readOnly 
-                      className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                    />
-                    <button
-                      onClick={() => copyPaymentLink(request.payment_url)}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                        copiedLink === request.payment_url 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                      }`}
-                    >
-                      {copiedLink === request.payment_url ? 'Copied!' : 'Copy Link'}
-                    </button>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 space-y-3">
+                  <p className="text-blue-400 font-semibold">Payment Links Ready (separate payments)</p>
+                  <div>
+                    <p className="text-white/50 text-xs mb-1">Route payment — ${(request.route_cost ?? request.total_price)?.toFixed(2)}</p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={request.payment_url} 
+                        readOnly 
+                        className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                      />
+                      <button
+                        onClick={() => copyPaymentLink(request.payment_url)}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                          copiedLink === request.payment_url 
+                            ? 'bg-green-500 text-white' 
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                      >
+                        {copiedLink === request.payment_url ? 'Copied!' : 'Copy Link'}
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-white/40 text-xs mt-2">Share this link with the contractor to complete payment.</p>
+                  {request.truck_payment_url && (
+                    <div>
+                      <p className="text-white/50 text-xs mb-1">Truck rental payment (separate) — ${request.truck_cost?.toFixed(2)}</p>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={request.truck_payment_url} 
+                          readOnly 
+                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                        />
+                        <button
+                          onClick={() => copyPaymentLink(request.truck_payment_url)}
+                          className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                            copiedLink === request.truck_payment_url 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-purple-500 text-white hover:bg-purple-600'
+                          }`}
+                        >
+                          {copiedLink === request.truck_payment_url ? 'Copied!' : 'Copy Link'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-white/40 text-xs">Share these links with the contractor to complete payment.</p>
                 </div>
               )}
 
@@ -2321,6 +2346,12 @@ function ContractorsPage() {
   // Released routes log + suspension
   const [releasedRoutesLog, setReleasedRoutesLog] = useState([]);
   const [suspendLoading, setSuspendLoading] = useState(false);
+  // Completed routes log + infractions
+  const [completedRoutesLog, setCompletedRoutesLog] = useState({ completed_stops: [], incomplete_stops: [] });
+  const [infractions, setInfractions] = useState([]);
+  const [infractionForm, setInfractionForm] = useState({ title: '', description: '', incident_date: '' });
+  const [showInfractionForm, setShowInfractionForm] = useState(false);
+  const [infractionLoading, setInfractionLoading] = useState(false);
 
   useEffect(() => {
     fetchContractors();
@@ -2394,6 +2425,82 @@ function ContractorsPage() {
     setSelectedContractor(contractor);
     await fetchContractorEarnings(contractor.id);
     fetchReleasedRoutesLog(contractor.id);
+    fetchCompletedRoutesLog(contractor.id);
+    fetchInfractions(contractor.id);
+  };
+
+  const fetchCompletedRoutesLog = async (contractorId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/completed-routes`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setCompletedRoutesLog(data);
+    } catch (err) {
+      setCompletedRoutesLog({ completed_stops: [], incomplete_stops: [] });
+    }
+  };
+
+  const fetchInfractions = async (contractorId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/infractions`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setInfractions(data.infractions || []);
+    } catch (err) {
+      setInfractions([]);
+    }
+  };
+
+  const createInfraction = async () => {
+    if (!infractionForm.title.trim() || !infractionForm.description.trim()) {
+      toast.error('Title and description are required');
+      return;
+    }
+    setInfractionLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${selectedContractor.id}/infractions`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(infractionForm)
+      });
+      if (!res.ok) throw new Error('Failed to create');
+      toast.success('Infraction created');
+      setInfractionForm({ title: '', description: '', incident_date: '' });
+      setShowInfractionForm(false);
+      fetchInfractions(selectedContractor.id);
+    } catch (err) {
+      toast.error('Failed to create infraction');
+    } finally {
+      setInfractionLoading(false);
+    }
+  };
+
+  const sendInfraction = async (infractionId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/infractions/${infractionId}/send`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      toast.success('Infraction sent to contractor\'s Messages for signature');
+      fetchInfractions(selectedContractor.id);
+    } catch (err) {
+      toast.error('Failed to send infraction');
+    }
+  };
+
+  const deleteInfraction = async (infractionId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/infractions/${infractionId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      toast.success('Infraction deleted');
+      fetchInfractions(selectedContractor.id);
+    } catch (err) {
+      toast.error('Failed to delete infraction');
+    }
   };
 
   const fetchReleasedRoutesLog = async (contractorId) => {
@@ -3163,6 +3270,165 @@ function ContractorsPage() {
                 )}
               </div>
 
+              {/* Completed Routes Log */}
+              <div className="bg-white/10 rounded-xl p-4" data-testid="completed-routes-log">
+                <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  Completed Routes Log
+                </h3>
+                {completedRoutesLog.completed_stops.length === 0 && completedRoutesLog.incomplete_stops.length === 0 ? (
+                  <p className="text-white/60 text-sm">No stops recorded yet</p>
+                ) : (
+                  <div className="space-y-3 max-h-72 overflow-y-auto">
+                    {completedRoutesLog.completed_stops.map(stop => (
+                      <div key={stop.id} className="bg-white/5 rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="text-white font-medium">{stop.customer_name}</p>
+                            <p className="text-white/50 text-xs">{stop.customer_address}</p>
+                            <p className="text-white/40 text-xs">{stop.completed_at ? new Date(stop.completed_at).toLocaleString() : ''}</p>
+                          </div>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">COMPLETED</span>
+                        </div>
+                        {(stop.before_photo_url || stop.after_photo_url) && (
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div>
+                              <p className="text-white/40 text-xs mb-1">Before</p>
+                              {stop.before_photo_url ? (
+                                <img src={`${API_URL}${stop.before_photo_url}`} alt="Before" className="w-full h-20 object-cover rounded-lg" />
+                              ) : <p className="text-white/30 text-xs">No photo</p>}
+                            </div>
+                            <div>
+                              <p className="text-white/40 text-xs mb-1">After</p>
+                              {stop.after_photo_url ? (
+                                <img src={`${API_URL}${stop.after_photo_url}`} alt="After" className="w-full h-20 object-cover rounded-lg" />
+                              ) : <p className="text-white/30 text-xs">No photo</p>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {completedRoutesLog.incomplete_stops.length > 0 && (
+                      <>
+                        <p className="text-red-400 text-xs font-bold mt-2">INCOMPLETE STOPS</p>
+                        {completedRoutesLog.incomplete_stops.map(stop => (
+                          <div key={stop.id} className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-white font-medium">{stop.customer_name}</p>
+                                <p className="text-white/50 text-xs">{stop.customer_address}</p>
+                                {stop.notes && <p className="text-red-300/80 text-xs mt-1">{stop.notes}</p>}
+                                <p className="text-white/40 text-xs">{stop.completed_at ? new Date(stop.completed_at).toLocaleString() : ''}</p>
+                              </div>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">{(stop.status || 'CNS').toUpperCase()}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Infractions */}
+              <div className="bg-white/10 rounded-xl p-4" data-testid="infractions-section">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-white font-semibold flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-red-400" />
+                    Infractions
+                  </h3>
+                  <button
+                    onClick={() => setShowInfractionForm(!showInfractionForm)}
+                    className="text-xs px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
+                    data-testid="new-infraction-btn"
+                  >
+                    + New Infraction
+                  </button>
+                </div>
+
+                {showInfractionForm && (
+                  <div className="bg-white/5 rounded-lg p-3 mb-3 space-y-2">
+                    <input
+                      value={infractionForm.title}
+                      onChange={(e) => setInfractionForm({ ...infractionForm, title: e.target.value })}
+                      placeholder="Infraction title (e.g. Late arrival, Property damage)"
+                      className="w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-white/40 text-sm"
+                      data-testid="infraction-title-input"
+                    />
+                    <input
+                      type="date"
+                      value={infractionForm.incident_date}
+                      onChange={(e) => setInfractionForm({ ...infractionForm, incident_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white text-sm"
+                      data-testid="infraction-date-input"
+                    />
+                    <textarea
+                      value={infractionForm.description}
+                      onChange={(e) => setInfractionForm({ ...infractionForm, description: e.target.value })}
+                      placeholder="Describe the company incident in detail..."
+                      rows={4}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-white/40 text-sm"
+                      data-testid="infraction-description-input"
+                    />
+                    <button
+                      onClick={createInfraction}
+                      disabled={infractionLoading}
+                      className="w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-semibold disabled:opacity-40"
+                      data-testid="create-infraction-btn"
+                    >
+                      {infractionLoading ? 'Creating...' : 'Create Infraction Document'}
+                    </button>
+                  </div>
+                )}
+
+                {infractions.length === 0 ? (
+                  <p className="text-white/60 text-sm">No infractions on record</p>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto">
+                    {infractions.map(inf => (
+                      <div key={inf.id} className="bg-white/5 rounded-lg p-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{inf.title}</p>
+                            <p className="text-white/50 text-xs">{new Date(inf.created_at).toLocaleDateString()}{inf.incident_date ? ` · Incident: ${inf.incident_date}` : ''}</p>
+                            <p className="text-white/60 text-xs mt-1 line-clamp-2">{inf.description}</p>
+                            {inf.status === 'signed' && (
+                              <p className="text-green-400 text-xs mt-1">Signed by {inf.signature_name} on {new Date(inf.signed_at).toLocaleDateString()}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1 ml-3">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                              inf.status === 'signed' ? 'bg-green-500/20 text-green-400' :
+                              inf.status === 'sent' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-slate-500/20 text-slate-300'
+                            }`}>
+                              {inf.status.toUpperCase()}
+                            </span>
+                            {inf.status === 'draft' && (
+                              <button
+                                onClick={() => sendInfraction(inf.id)}
+                                className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                data-testid={`send-infraction-${inf.id}`}
+                              >
+                                Send for Signature
+                              </button>
+                            )}
+                            {inf.status !== 'signed' && (
+                              <button
+                                onClick={() => deleteInfraction(inf.id)}
+                                className="text-xs text-red-400 hover:underline"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Payment History */}
               {contractorEarnings?.payment_history?.length > 0 && (
                 <div className="bg-white/10 rounded-xl p-4">
@@ -3183,13 +3449,6 @@ function ContractorsPage() {
 
               {/* Quick Actions */}
               <div className="flex gap-3 flex-wrap">
-                <button
-                  onClick={() => sendSMS(selectedContractor)}
-                  className="flex-1 min-w-[140px] py-3 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2"
-                >
-                  <Phone className="w-5 h-5" />
-                  Send SMS
-                </button>
                 <button
                   onClick={() => resetPassword(selectedContractor.id)}
                   className="flex-1 min-w-[140px] py-3 bg-yellow-500 text-white rounded-xl flex items-center justify-center gap-2"
@@ -6274,6 +6533,12 @@ function AdminChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [newMessageNotification, setNewMessageNotification] = useState(null);
+  const [activeTab, setActiveTab] = useState('messages');
+  const [documents, setDocuments] = useState([]);
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [broadcastText, setBroadcastText] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [docTargets, setDocTargets] = useState({});
   const lastMessageIdRef = useRef(null);
   const notificationAudioRef = useRef(null);
   const threadEndRef = useRef(null);
@@ -6299,6 +6564,58 @@ function AdminChatPage() {
       console.error('Failed to load contractors');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contracts/documents`, { headers: getAuthHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setDocuments(data.documents || []);
+    } catch (err) {
+      console.error('Failed to load documents');
+    }
+  };
+
+  const sendBroadcast = async () => {
+    if (!broadcastText.trim()) return;
+    setBroadcastSending(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/chat/broadcast`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content: broadcastText })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed');
+      toast.success(`Broadcast sent to ${data.sent_to} contractor(s)`);
+      setBroadcastText('');
+      setShowBroadcast(false);
+      fetchAllMessages();
+    } catch (err) {
+      toast.error('Failed to send broadcast');
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
+
+  const sendDocument = async (docId) => {
+    const contractorId = docTargets[docId];
+    if (!contractorId) {
+      toast.error('Choose a contractor first');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contracts/documents/${docId}/send`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ contractor_id: contractorId })
+      });
+      if (!res.ok) throw new Error('Failed');
+      toast.success('Document sent via Messages');
+    } catch (err) {
+      toast.error('Failed to send document');
     }
   };
 
@@ -6346,6 +6663,7 @@ function AdminChatPage() {
   useEffect(() => {
     fetchContractors();
     fetchAllMessages();
+    fetchDocuments();
     const poll = setInterval(() => fetchAllMessages(true), 8000);
     return () => clearInterval(poll);
   }, []);
@@ -6424,11 +6742,108 @@ function AdminChatPage() {
         )}
       </AnimatePresence>
 
-      <div>
-        <h1 className="text-3xl font-bold text-white">Messages</h1>
-        <p className="text-white/60">Direct messages between you and your contractors</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Messages</h1>
+          <p className="text-white/60">Direct messages and documents between you and your contractors</p>
+        </div>
+        <button
+          onClick={() => setShowBroadcast(true)}
+          className="px-5 py-3 bg-yellow-500 text-slate-900 rounded-xl font-bold hover:bg-yellow-400 flex items-center gap-2"
+          data-testid="broadcast-btn"
+        >
+          <Bell className="w-4 h-4" />
+          Broadcast to All
+        </button>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('messages')}
+          className={`px-5 py-2.5 rounded-xl font-semibold text-sm ${activeTab === 'messages' ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+          data-testid="chat-tab-messages"
+        >
+          Messages
+        </button>
+        <button
+          onClick={() => setActiveTab('documents')}
+          className={`px-5 py-2.5 rounded-xl font-semibold text-sm ${activeTab === 'documents' ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+          data-testid="chat-tab-documents"
+        >
+          Contractor Documents
+        </button>
+      </div>
+
+      {/* Broadcast Modal */}
+      {showBroadcast && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setShowBroadcast(false)}>
+          <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10" onClick={e => e.stopPropagation()} data-testid="broadcast-modal">
+            <h3 className="text-xl font-bold text-white mb-2">Broadcast to All Contractors</h3>
+            <p className="text-white/50 text-sm mb-4">This message goes to every contractor's Messages tab.</p>
+            <textarea
+              value={broadcastText}
+              onChange={(e) => setBroadcastText(e.target.value)}
+              rows={4}
+              placeholder="Type your announcement..."
+              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 mb-4 focus:outline-none focus:border-yellow-400"
+              data-testid="broadcast-textarea"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowBroadcast(false)} className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20">Cancel</button>
+              <button
+                onClick={sendBroadcast}
+                disabled={broadcastSending || !broadcastText.trim()}
+                className="flex-1 py-3 bg-yellow-500 text-slate-900 rounded-xl font-bold disabled:opacity-40"
+                data-testid="broadcast-send-btn"
+              >
+                {broadcastSending ? 'Sending...' : 'Send to All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'documents' && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6" data-testid="chat-documents-tab">
+          <h2 className="text-white font-semibold mb-1">Stored Contractor Documents</h2>
+          <p className="text-white/50 text-sm mb-4">Choose a document and send it to a contractor through Messages. (Documents are managed from the Documents page.)</p>
+          {documents.length === 0 ? (
+            <p className="text-white/50">No documents stored yet — add some from the Documents page.</p>
+          ) : (
+            <div className="space-y-3">
+              {documents.map(doc => (
+                <div key={doc.id} className="bg-white/5 rounded-xl p-4 flex flex-wrap items-center gap-3">
+                  <div className="flex-1 min-w-[200px]">
+                    <p className="text-white font-medium">{doc.title}</p>
+                    <p className="text-white/40 text-xs line-clamp-1">{doc.content}</p>
+                  </div>
+                  <select
+                    value={docTargets[doc.id] || ''}
+                    onChange={(e) => setDocTargets(prev => ({ ...prev, [doc.id]: e.target.value }))}
+                    className="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                    data-testid={`doc-target-${doc.id}`}
+                  >
+                    <option value="">Choose contractor...</option>
+                    {contractors.map(c => (
+                      <option key={c.id} value={c.id}>{c.full_name || c.username}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => sendDocument(doc.id)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-semibold"
+                    data-testid={`doc-send-${doc.id}`}
+                  >
+                    Send
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'messages' && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ minHeight: '60vh' }}>
         {/* Contractor list */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
@@ -6524,6 +6939,7 @@ function AdminChatPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -8882,7 +9298,6 @@ export default function AdminDashboard() {
           <Route path="contractors" element={<ContractorsPage />} />
           <Route path="disputes" element={<DisputesPage />} />
           <Route path="payroll" element={<PayrollPage />} />
-          <Route path="sms-logs" element={<SMSLogsPage />} />
           <Route path="pending-routes" element={<RoutesPage />} />
           <Route path="released-routes" element={<ReleasedRoutesPage />} />
           <Route path="route-requests" element={<RouteRequestsPage />} />

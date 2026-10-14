@@ -239,20 +239,58 @@ function TodayRoute() {
     }
   };
 
-  const completeStop = async (bookingId, status) => {
-    setProcessingStop(bookingId);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [beforePhoto, setBeforePhoto] = useState(null);
+  const [afterPhoto, setAfterPhoto] = useState(null);
+  const [beforePreview, setBeforePreview] = useState(null);
+  const [afterPreview, setAfterPreview] = useState(null);
+
+  const uploadStopPhoto = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const res = await fetch(`${API_URL}/api/upload/photo-base64`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ data: e.target.result, type: 'stop_proof' })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error('Photo upload failed');
+          resolve(data.photo_url);
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const completeStopWithPhotos = async () => {
+    if (!selectedTask) return;
+    if (!beforePhoto || !afterPhoto) {
+      toast.error('Before and after photos are required per route guidelines');
+      return;
+    }
+    setProcessingStop(selectedTask.id);
     try {
-      const res = await fetch(`${API_URL}/api/contractor/stop/${bookingId}/complete`, {
+      const [beforeUrl, afterUrl] = await Promise.all([uploadStopPhoto(beforePhoto), uploadStopPhoto(afterPhoto)]);
+      const res = await fetch(`${API_URL}/api/contractor/stop/${selectedTask.id}/complete`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ status: 'completed' })
+        body: JSON.stringify({ status: 'completed', before_photo_url: beforeUrl, after_photo_url: afterUrl })
       });
-      if (!res.ok) throw new Error('Failed to complete');
       const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to complete');
       toast.success(`Stop completed! +$${data.pay_amount?.toFixed(2) || PAY_PER_STOP.toFixed(2)}`);
+      setShowCompleteModal(false);
+      setSelectedTask(null);
+      setBeforePhoto(null);
+      setAfterPhoto(null);
+      setBeforePreview(null);
+      setAfterPreview(null);
       fetchTodayTasks();
     } catch (err) {
-      toast.error('Failed to complete stop');
+      toast.error(err.message || 'Failed to complete stop');
     } finally {
       setProcessingStop(null);
     }
@@ -625,7 +663,7 @@ function TodayRoute() {
                         Call
                       </a>
                       <button
-                        onClick={() => completeStop(task.id, 'completed')}
+                        onClick={() => { setSelectedTask(task); setShowCompleteModal(true); }}
                         disabled={processingStop === task.id}
                         className="flex-1 min-w-[140px] py-3 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-green-600 font-bold text-lg disabled:opacity-50"
                         data-testid={`complete-${task.id}`}
@@ -683,6 +721,116 @@ function TodayRoute() {
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Complete Stop Modal - Before & After photos required */}
+      {showCompleteModal && selectedTask && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setShowCompleteModal(false)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+            data-testid="complete-stop-modal"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <CheckCircle className="w-8 h-8 text-green-400" />
+              <div>
+                <h3 className="text-xl font-bold text-white">Complete Stop</h3>
+                <p className="text-white/60 text-sm">{selectedTask.customer_name}</p>
+              </div>
+            </div>
+
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
+              <p className="text-yellow-400 text-sm">
+                <strong>Route guidelines:</strong> You must take a BEFORE and AFTER photo of the cleaning for confirmation.
+              </p>
+            </div>
+
+            {/* Before photo */}
+            <div className="mb-4">
+              <label className="block text-white/60 mb-2 text-sm font-medium">Before Photo * (Required)</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setBeforePhoto(file);
+                    setBeforePreview(URL.createObjectURL(file));
+                  }
+                }}
+                className="hidden"
+                id="before-photo-input"
+              />
+              <label
+                htmlFor="before-photo-input"
+                className="block w-full py-6 border-2 border-dashed border-white/20 rounded-xl text-center cursor-pointer hover:border-green-500/50 transition"
+                data-testid="before-photo-upload"
+              >
+                {beforePreview ? (
+                  <img src={beforePreview} alt="Before" className="max-h-32 mx-auto rounded-lg" />
+                ) : (
+                  <div className="text-white/60">
+                    <Camera className="w-8 h-8 mx-auto mb-2" />
+                    <p className="text-sm">Tap to take/upload BEFORE photo</p>
+                  </div>
+                )}
+              </label>
+            </div>
+
+            {/* After photo */}
+            <div className="mb-6">
+              <label className="block text-white/60 mb-2 text-sm font-medium">After Photo * (Required)</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setAfterPhoto(file);
+                    setAfterPreview(URL.createObjectURL(file));
+                  }
+                }}
+                className="hidden"
+                id="after-photo-input"
+              />
+              <label
+                htmlFor="after-photo-input"
+                className="block w-full py-6 border-2 border-dashed border-white/20 rounded-xl text-center cursor-pointer hover:border-green-500/50 transition"
+                data-testid="after-photo-upload"
+              >
+                {afterPreview ? (
+                  <img src={afterPreview} alt="After" className="max-h-32 mx-auto rounded-lg" />
+                ) : (
+                  <div className="text-white/60">
+                    <Camera className="w-8 h-8 mx-auto mb-2" />
+                    <p className="text-sm">Tap to take/upload AFTER photo</p>
+                  </div>
+                )}
+              </label>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowCompleteModal(false); setSelectedTask(null); }}
+                className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={completeStopWithPhotos}
+                disabled={!beforePhoto || !afterPhoto || processingStop === selectedTask.id}
+                className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-bold disabled:opacity-40"
+                data-testid="confirm-complete-btn"
+              >
+                {processingStop === selectedTask.id ? 'Uploading...' : 'Confirm Complete'}
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 
@@ -952,6 +1100,8 @@ function MyRoutes() {
   useEffect(() => {
     fetchRoutes();
     fetchAvailableRoutes();
+    // Opening My Routes clears the new-assignment flash
+    fetch(`${API_URL}/api/contractor/routes/mark-viewed`, { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
   }, []);
 
   const fetchRoutes = async () => {
@@ -1520,19 +1670,34 @@ function RequestRoutes() {
                 </div>
               )}
               
-              {/* Approved - Show Payment Link */}
+              {/* Approved - Show SEPARATE Payment Links */}
               {request.status === 'approved' && request.payment_url && (
-                <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <p className="text-blue-400 font-semibold mb-2">Ready to Pay!</p>
+                <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 space-y-3">
+                  <p className="text-blue-400 font-semibold">Ready to Pay!</p>
                   <a 
                     href={request.payment_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block w-full py-3 bg-blue-500 text-white text-center rounded-xl hover:bg-blue-600 font-semibold"
+                    data-testid={`pay-route-${request.id}`}
                   >
-                    Pay ${request.total_price?.toFixed(2)} Now
+                    Pay Route — ${(request.route_cost ?? request.total_price)?.toFixed(2)}
                   </a>
-                  <p className="text-white/40 text-xs mt-2 text-center">No refunds - All sales are final</p>
+                  {request.truck_payment_url && !request.truck_paid && (
+                    <a 
+                      href={request.truck_payment_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full py-3 bg-purple-500 text-white text-center rounded-xl hover:bg-purple-600 font-semibold"
+                      data-testid={`pay-truck-${request.id}`}
+                    >
+                      Pay Truck Rental — ${request.truck_cost?.toFixed(2)} (separate)
+                    </a>
+                  )}
+                  {request.truck_payment_url && request.truck_paid && (
+                    <p className="text-green-400 text-sm text-center font-semibold">Truck rental paid ✓</p>
+                  )}
+                  <p className="text-white/40 text-xs text-center">Route and truck are separate payments. No refunds - All sales are final</p>
                 </div>
               )}
               
@@ -1566,6 +1731,52 @@ function ChatPage() {
   const [lastMessageCount, setLastMessageCount] = useState(0);
   const [newMessageNotification, setNewMessageNotification] = useState(null);
   const notificationAudioRef = useRef(null);
+
+  // Infractions (sign & send back)
+  const [infractionModal, setInfractionModal] = useState(null);
+  const [signatureName, setSignatureName] = useState('');
+  const [signingInfraction, setSigningInfraction] = useState(false);
+
+  const openInfraction = async (infractionId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/infractions`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to load');
+      const data = await res.json();
+      const inf = (data.infractions || []).find(i => i.id === infractionId);
+      if (inf) {
+        setInfractionModal(inf);
+        setSignatureName('');
+      } else {
+        toast.error('Infraction not found');
+      }
+    } catch (err) {
+      toast.error('Failed to load infraction');
+    }
+  };
+
+  const signInfraction = async () => {
+    if (!signatureName.trim()) {
+      toast.error('Please type your full name to sign');
+      return;
+    }
+    setSigningInfraction(true);
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/infractions/${infractionModal.id}/sign`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ signature_name: signatureName })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to sign');
+      toast.success('Infraction signed and sent back to admin');
+      setInfractionModal(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message || 'Failed to sign');
+    } finally {
+      setSigningInfraction(false);
+    }
+  };
 
   // Play notification sound
   const playNotificationSound = () => {
@@ -1823,6 +2034,29 @@ function ChatPage() {
               messages.map((msg, i) => {
                 const user = JSON.parse(localStorage.getItem('user') || '{}');
                 const isMe = msg.sender_id === user.id;
+                if (msg.type === 'infraction' && !isMe) {
+                  return (
+                    <div key={i} className="p-4 rounded-xl bg-red-500/15 border border-red-500/40 mr-8" data-testid={`infraction-msg-${msg.infraction_id}`}>
+                      <p className="text-red-400 text-xs font-bold mb-1">INFRACTION NOTICE</p>
+                      <p className="text-white text-sm">{msg.content}</p>
+                      <button
+                        onClick={() => openInfraction(msg.infraction_id)}
+                        className="mt-2 px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 font-semibold"
+                        data-testid={`review-sign-${msg.infraction_id}`}
+                      >
+                        Review &amp; Sign
+                      </button>
+                    </div>
+                  );
+                }
+                if (msg.type === 'document' && !isMe) {
+                  return (
+                    <div key={i} className="p-4 rounded-xl bg-blue-500/15 border border-blue-500/40 mr-8">
+                      <p className="text-blue-400 text-xs font-bold mb-1">DOCUMENT: {msg.document_title}</p>
+                      <p className="text-white text-sm whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  );
+                }
                 return (
                   <div key={i} className={`p-3 rounded-xl ${isMe ? 'bg-teal-500/30 ml-8' : 'bg-white/10 mr-8'}`}>
                     <p className="text-white/60 text-xs mb-1">{msg.sender_name}</p>
@@ -1851,6 +2085,69 @@ function ChatPage() {
           </div>
         </div>
       </div>
+      {/* Infraction Review & Sign Modal */}
+      {infractionModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setInfractionModal(null)}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+            data-testid="infraction-modal"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-400" />
+              <div>
+                <h3 className="text-xl font-bold text-white">Infraction Notice</h3>
+                <p className="text-white/60 text-sm">Please review carefully and sign below</p>
+              </div>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
+              <p className="text-white font-bold text-lg mb-1">{infractionModal.title}</p>
+              {infractionModal.incident_date && (
+                <p className="text-white/50 text-xs mb-3">Incident date: {infractionModal.incident_date}</p>
+              )}
+              <p className="text-white/80 text-sm whitespace-pre-wrap">{infractionModal.description}</p>
+            </div>
+
+            {infractionModal.status === 'signed' ? (
+              <div className="bg-green-500/20 border border-green-500/40 rounded-xl p-4 text-center">
+                <p className="text-green-400 font-semibold">Signed by {infractionModal.signature_name}</p>
+                <p className="text-white/50 text-xs mt-1">{infractionModal.signed_at ? new Date(infractionModal.signed_at).toLocaleString() : ''}</p>
+              </div>
+            ) : (
+              <>
+                <label className="block text-white/60 mb-2 text-sm">Type your full legal name to sign *</label>
+                <input
+                  type="text"
+                  value={signatureName}
+                  onChange={(e) => setSignatureName(e.target.value)}
+                  placeholder="Your full name"
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 mb-4 italic"
+                  data-testid="infraction-signature-input"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setInfractionModal(null)}
+                    className="flex-1 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={signInfraction}
+                    disabled={signingInfraction || !signatureName.trim()}
+                    className="flex-1 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 font-bold disabled:opacity-40"
+                    data-testid="infraction-sign-btn"
+                  >
+                    {signingInfraction ? 'Signing...' : 'Sign & Send Back'}
+                  </button>
+                </div>
+              </>
+            )}
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2439,6 +2736,8 @@ export default function ContractorDashboard() {
   const [user, setUser] = useState(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadChat, setUnreadChat] = useState(0);
+  const [availableRoutesCount, setAvailableRoutesCount] = useState(0);
+  const [myRoutesUnread, setMyRoutesUnread] = useState(0);
   const [suspension, setSuspension] = useState(null);
   const [myDisputes, setMyDisputes] = useState([]);
   const [disputeText, setDisputeText] = useState('');
@@ -2475,9 +2774,31 @@ export default function ContractorDashboard() {
         console.error('Failed to check unread messages');
       }
     };
+    const checkAvailableRoutes = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/contractor/available-routes`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        setAvailableRoutesCount((data.available_routes || []).length);
+      } catch (err) {
+        console.error('Failed to check available routes');
+      }
+    };
+    const checkMyRoutes = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/contractor/routes`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        setMyRoutesUnread((data.routes || []).filter(r => r.assigned_unread).length);
+      } catch (err) {
+        console.error('Failed to check my routes');
+      }
+    };
     fetchSuspension();
     checkUnreadChat();
-    const interval = setInterval(() => { fetchSuspension(); checkUnreadChat(); }, 15000);
+    checkAvailableRoutes();
+    checkMyRoutes();
+    const interval = setInterval(() => { fetchSuspension(); checkUnreadChat(); checkAvailableRoutes(); checkMyRoutes(); }, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -2666,16 +2987,23 @@ export default function ContractorDashboard() {
           {navItems.map((item) => {
             const isNotifications = item.path === 'notifications';
             const isChat = item.path === 'chat';
-            
+            const isAvailable = item.path === 'available';
+            const isMyRoutes = item.path === 'routes';
+            const flashAvailable = isAvailable && availableRoutesCount > 0;
+            const flashMyRoutes = isMyRoutes && myRoutesUnread > 0;
+
             return (
               <Link
                 key={item.path}
                 to={`/contractor/dashboard/${item.path}`}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition relative ${
-                  currentPath === item.path 
-                    ? 'bg-emerald-500 text-white' 
-                    : 'text-white/60 hover:bg-white/10 hover:text-white'
+                  (flashAvailable || flashMyRoutes)
+                    ? 'flash-yellow text-slate-900 font-semibold'
+                    : currentPath === item.path 
+                      ? 'bg-emerald-500 text-white' 
+                      : 'text-white/60 hover:bg-white/10 hover:text-white'
                 }`}
+                data-testid={flashMyRoutes ? 'my-routes-flash' : flashAvailable ? 'available-routes-flash' : undefined}
               >
                 <div className="relative">
                   <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -2686,6 +3014,11 @@ export default function ContractorDashboard() {
                   )}
                   {isChat && unreadChat > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse" data-testid="chat-unread-dot" />
+                  )}
+                  {isMyRoutes && myRoutesUnread > 0 && (
+                    <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse" data-testid="my-routes-badge">
+                      {myRoutesUnread > 9 ? '9+' : myRoutesUnread}
+                    </span>
                   )}
                 </div>
                 {sidebarOpen && <span>{item.label}</span>}

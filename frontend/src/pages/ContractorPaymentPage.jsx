@@ -28,7 +28,12 @@ function ContractorPaymentPage() {
   const [verse] = useState(() => BIBLE_VERSES[Math.floor(Math.random() * BIBLE_VERSES.length)]);
 
   useEffect(() => {
-    fetchPurchaseDetails();
+    const sid = new URLSearchParams(window.location.search).get('session_id');
+    if (sid) {
+      confirmPayment(sid);
+    } else {
+      fetchPurchaseDetails();
+    }
   }, [paymentToken]);
 
   const fetchPurchaseDetails = async () => {
@@ -39,7 +44,12 @@ function ContractorPaymentPage() {
         throw new Error(data.detail || 'Failed to load purchase details');
       }
       const data = await res.json();
-      setPurchaseDetails(data);
+      if (data.already_paid) {
+        setPurchaseDetails({ num_routes: data.num_routes, truck_rental: data.truck_rental });
+        setPaymentComplete(true);
+      } else {
+        setPurchaseDetails(data);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -47,28 +57,48 @@ function ContractorPaymentPage() {
     }
   };
 
+  const confirmPayment = async (sid, attempt = 0) => {
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/route-purchase/${paymentToken}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sid })
+      });
+      const data = await res.json();
+      if (res.ok && data.paid) {
+        setPurchaseDetails({ num_routes: data.num_routes, truck_rental: data.truck_rental });
+        setPaymentComplete(true);
+        setLoading(false);
+      } else if (attempt < 5) {
+        setTimeout(() => confirmPayment(sid, attempt + 1), 3000);
+      } else {
+        setError('Payment has not been confirmed yet. If you completed payment, please wait a moment and refresh this page.');
+        setLoading(false);
+      }
+    } catch (err) {
+      if (attempt < 5) {
+        setTimeout(() => confirmPayment(sid, attempt + 1), 3000);
+      } else {
+        setError('Could not verify payment. Please contact the admin.');
+        setLoading(false);
+      }
+    }
+  };
+
   const handlePayment = async () => {
     setProcessing(true);
     try {
-      // In production, this would integrate with Square's payment form
-      // For now, we'll simulate a successful payment
-      const res = await fetch(`${API_URL}/api/contractor/route-purchase/${paymentToken}/complete`, {
+      const res = await fetch(`${API_URL}/api/contractor/route-purchase/${paymentToken}/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
       });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || 'Payment failed');
-      }
-      
       const data = await res.json();
-      setPaymentComplete(true);
-      toast.success('Payment successful! Routes added to your account.');
+      if (!res.ok) throw new Error(data.detail || 'Payment failed');
+      // Redirect to Square's secure hosted checkout
+      window.location.href = data.url;
     } catch (err) {
       toast.error(err.message);
-    } finally {
       setProcessing(false);
     }
   };
@@ -115,7 +145,7 @@ function ContractorPaymentPage() {
             <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-4 mb-6">
               <Truck className="w-8 h-8 text-purple-400 mx-auto mb-2" />
               <p className="text-purple-400 font-semibold">Truck Rental Confirmed!</p>
-              <p className="text-white/60 text-sm">Please pick up the truck before 8:00 AM tomorrow.</p>
+              <p className="text-white/60 text-sm">The truck will be available for pick up at 8:00 AM and should be returned by 9:00 PM.</p>
             </div>
           )}
 
@@ -160,7 +190,9 @@ function ContractorPaymentPage() {
         {/* Logo / Brand */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Up-Wash</h1>
-          <p className="text-white/60">Complete Your Route Purchase</p>
+          <p className="text-white/60">
+            {purchaseDetails?.truck_rental && !purchaseDetails?.num_routes ? 'Complete Your Truck Rental Payment' : 'Complete Your Route Purchase'}
+          </p>
         </div>
 
         {/* Purchase Summary Card */}
@@ -216,8 +248,8 @@ function ContractorPaymentPage() {
           <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-4 mb-6 flex items-center gap-4">
             <Truck className="w-8 h-8 text-purple-400 flex-shrink-0" />
             <div>
-              <p className="text-purple-400 font-bold">Truck Pickup Required</p>
-              <p className="text-white/60 text-sm">After payment, you must pick up the truck before 8:00 AM. You'll receive a notification with pickup details.</p>
+              <p className="text-purple-400 font-bold">Truck Pickup Details</p>
+              <p className="text-white/60 text-sm">The truck will be available for pick up at 8:00 AM and should be returned by 9:00 PM. You'll receive a notification with pickup details.</p>
             </div>
           </div>
         )}

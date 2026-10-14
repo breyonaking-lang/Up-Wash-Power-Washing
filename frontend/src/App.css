@@ -148,3 +148,12 @@ select.text-white option,
 select:focus option {
     color: #000000 !important;
 }
+
+/* Flashing yellow for Available Routes when a new route becomes available */
+@keyframes flashYellow {
+  0%, 100% { background-color: rgba(250, 204, 21, 0.95); }
+  50% { background-color: rgba(250, 204, 21, 0.25); }
+}
+.flash-yellow {
+  animation: flashYellow 1.2s ease-in-out infinite;
+}

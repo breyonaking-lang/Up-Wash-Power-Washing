@@ -2987,7 +2987,8 @@ async def assign_route(route_id: str, assignment: RouteAssignment, current_user:
         {"$set": {
             "assigned_contractor_id": assignment.contractor_id,
             "status": "assigned",  # Mark as assigned to remove from pending
-            "assigned_at": datetime.now(timezone.utc).isoformat()
+            "assigned_at": datetime.now(timezone.utc).isoformat(),
+            "assigned_unread": True  # My Routes tab flashes until contractor views it
         }}
     )
     
@@ -4299,6 +4300,15 @@ async def contractor_earnings(current_user: dict = Depends(get_contractor_user))
         "resets_in_days": 6 - now.weekday()
     }
 
+@api_router.post("/contractor/routes/mark-viewed")
+async def mark_routes_viewed(current_user: dict = Depends(get_contractor_user)):
+    """Clear the new-assignment flag once the contractor opens My Routes"""
+    await db.routes.update_many(
+        {"assigned_contractor_id": current_user["user_id"], "assigned_unread": True},
+        {"$set": {"assigned_unread": False}}
+    )
+    return {"success": True}
+
 @api_router.get("/contractor/routes")
 async def contractor_routes(current_user: dict = Depends(get_contractor_user)):
     routes = await db.routes.find(
@@ -4379,6 +4389,8 @@ class StopCompletion(BaseModel):
     status: str  # "completed" or "cns"
     notes: Optional[str] = None
     photo_url: Optional[str] = None
+    before_photo_url: Optional[str] = None
+    after_photo_url: Optional[str] = None
 
 @api_router.post("/contractor/stop/{booking_id}/complete")
 async def complete_stop(booking_id: str, completion: StopCompletion, current_user: dict = Depends(get_contractor_user)):
@@ -4404,6 +4416,11 @@ async def complete_stop(booking_id: str, completion: StopCompletion, current_use
             raise HTTPException(status_code=400, detail="CNS requires a detailed description (at least 10 characters)")
         if not completion.photo_url:
             raise HTTPException(status_code=400, detail="CNS requires a photo upload. No photo = no pay for this stop.")
+
+    if completion.status == "completed":
+        # Route guidelines: before & after photos required for every completed stop
+        if not completion.before_photo_url or not completion.after_photo_url:
+            raise HTTPException(status_code=400, detail="Before and after photos are required to complete a stop")
     
     # Create or update stop completion record
     stop_record = {
@@ -4414,6 +4431,8 @@ async def complete_stop(booking_id: str, completion: StopCompletion, current_use
         "status": completion.status,
         "notes": completion.notes,
         "photo_url": completion.photo_url,
+        "before_photo_url": completion.before_photo_url,
+        "after_photo_url": completion.after_photo_url,
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "pay_eligible": completion.status == "completed"  # Only completed stops get paid
     }
@@ -4432,6 +4451,8 @@ async def complete_stop(booking_id: str, completion: StopCompletion, current_use
             "task_status": completion.status,
             "task_notes": completion.notes,
             "task_photo": completion.photo_url,
+            "before_photo": completion.before_photo_url,
+            "after_photo": completion.after_photo_url,
             "status": "completed" if completion.status == "completed" else "cns",
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
@@ -5186,6 +5207,500 @@ async def get_contractor_released_routes(contractor_id: str, current_user: dict 
         {"_id": 0, "bookings": 0}
     ).sort("released_at", -1).to_list(100)
     return {"released_routes": routes}
+
+# ===================== TRUCK RENTAL APPROVAL =====================
+
+@api_router.get("/admin/truck-rentals")
+async def admin_list_truck_rentals(current_user: dict = Depends(get_admin_user)):
+    rentals = await db.truck_rentals.find({}, {"_id": 0}).sort("requested_at", -1).to_list(100)
+    return {"rentals": rentals}
+
+@api_router.post("/admin/truck-rentals/{rental_id}/approve")
+async def approve_truck_rental(rental_id: str, current_user: dict = Depends(get_admin_user)):
+    rental = await db.truck_rentals.find_one({"id": rental_id}, {"_id": 0})
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental not found")
+    if rental.get("status") != "pending_approval":
+        raise HTTPException(status_code=400, detail="Rental already processed")
+
+    await db.truck_rentals.update_one(
+        {"id": rental_id},
+        {"$set": {
+            "status": "active",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "next_billing": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "approved_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": rental["contractor_id"],
+        "type": "truck_rental_approved",
+        "title": "Truck Rental Approved!",
+        "message": f"Your {rental['truck_type']} truck rental is confirmed (${rental['weekly_cost']}/week). The truck will be available for pick up at 8:00 AM and should be returned by 9:00 PM.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True}
+
+@api_router.post("/admin/truck-rentals/{rental_id}/deny")
+async def deny_truck_rental(rental_id: str, current_user: dict = Depends(get_admin_user)):
+    rental = await db.truck_rentals.find_one({"id": rental_id}, {"_id": 0})
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental not found")
+    if rental.get("status") != "pending_approval":
+        raise HTTPException(status_code=400, detail="Rental already processed")
+
+    await db.truck_rentals.update_one(
+        {"id": rental_id},
+        {"$set": {"status": "denied", "denied_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": rental["contractor_id"],
+        "type": "truck_rental_denied",
+        "title": "Truck Rental Denied",
+        "message": f"Your {rental['truck_type']} truck rental request was not approved. Message the admin with any questions.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True}
+
+# ===================== ROUTE PURCHASE PAYMENT (contractor pays after admin approval) =====================
+
+@api_router.get("/contractor/route-purchase/{payment_token}")
+async def get_route_purchase(payment_token: str):
+    """Public: purchase details for an approved route request payment link (route and truck are separate)"""
+    req = await db.route_requests.find_one(
+        {"$or": [{"payment_token": payment_token}, {"truck_payment_token": payment_token}]},
+        {"_id": 0}
+    )
+    if not req:
+        raise HTTPException(status_code=404, detail="Payment link not found or expired")
+
+    part = "truck" if req.get("truck_payment_token") == payment_token else "route"
+    already_paid = (req.get("status") == "paid") if part == "route" else bool(req.get("truck_paid"))
+    if already_paid:
+        return {"already_paid": True, "part": part, "num_routes": req.get("num_routes_requested") if part == "route" else 0, "truck_rental": part == "truck"}
+    if req.get("status") not in ["approved", "paid"]:
+        raise HTTPException(status_code=400, detail="This request has not been approved for payment")
+
+    if part == "truck":
+        return {
+            "part": "truck",
+            "contractor_name": req.get("contractor_name"),
+            "zip_codes": req.get("zip_codes"),
+            "num_routes": 0,
+            "route_cost": 0,
+            "truck_rental": True,
+            "truck_cost": req.get("truck_cost", 0),
+            "total_price": req.get("truck_cost", 0)
+        }
+    return {
+        "part": "route",
+        "contractor_name": req.get("contractor_name"),
+        "zip_codes": req.get("zip_codes"),
+        "num_routes": req.get("num_routes_requested"),
+        "route_cost": req.get("route_cost", req.get("total_price", 0)),
+        "truck_rental": False,
+        "truck_cost": 0,
+        "total_price": req.get("route_cost", req.get("total_price", 0))
+    }
+
+@api_router.post("/contractor/route-purchase/{payment_token}/checkout")
+async def route_purchase_checkout(payment_token: str):
+    """Public: create a Square hosted checkout for one part (route OR truck) of an approved purchase"""
+    req = await db.route_requests.find_one(
+        {"$or": [{"payment_token": payment_token}, {"truck_payment_token": payment_token}]},
+        {"_id": 0}
+    )
+    if not req:
+        raise HTTPException(status_code=404, detail="Payment link not found or expired")
+
+    part = "truck" if req.get("truck_payment_token") == payment_token else "route"
+    already_paid = (req.get("status") == "paid") if part == "route" else bool(req.get("truck_paid"))
+    if already_paid:
+        raise HTTPException(status_code=400, detail="This payment is already complete")
+    if req.get("status") not in ["approved", "paid"]:
+        raise HTTPException(status_code=400, detail="This request has not been approved for payment")
+    if not square_client:
+        raise HTTPException(status_code=503, detail="Payments are not configured")
+
+    amount = req.get("truck_cost", 0) if part == "truck" else req.get("route_cost", req.get("total_price", 0))
+    amount_cents = int(round(amount * 100))
+    if amount_cents <= 0:
+        raise HTTPException(status_code=400, detail="Nothing to pay for this part")
+
+    session_id = str(uuid.uuid4())
+    base_url = os.environ.get("FRONTEND_URL", "https://up-wash-site.preview.emergentagent.com")
+    item_name = f"Up-Wash Truck Rental - {req.get('contractor_name', 'Contractor')}" if part == "truck" else f"Up-Wash Route Purchase - {req.get('contractor_name', 'Contractor')}"
+
+    try:
+        result = square_client.checkout.payment_links.create(
+            idempotency_key=str(uuid.uuid4()),
+            description=f"Upwash route purchase {req['id']} ({part})",
+            quick_pay={
+                "name": item_name,
+                "price_money": {"amount": amount_cents, "currency": "USD"},
+                "location_id": square_location_id
+            },
+            checkout_options={
+                "redirect_url": f"{base_url}/contractor/pay/{payment_token}?session_id={session_id}"
+            }
+        )
+        link = result.payment_link
+        await db.checkout_sessions.insert_one({
+            "id": session_id,
+            "route_request_id": req["id"],
+            "part": part,
+            "payment_link_id": link.id,
+            "amount_cents": amount_cents,
+            "status": "open",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        return {"url": link.url, "session_id": session_id}
+    except Exception as e:
+        logging.error(f"Route purchase checkout error: {e}")
+        raise HTTPException(status_code=500, detail="Could not create payment link")
+
+@api_router.post("/contractor/route-purchase/{payment_token}/confirm")
+async def route_purchase_confirm(payment_token: str, payload: Dict = {}):
+    """Public: confirm a Square payment completed one part (route OR truck) of a purchase"""
+    req = await db.route_requests.find_one(
+        {"$or": [{"payment_token": payment_token}, {"truck_payment_token": payment_token}]},
+        {"_id": 0}
+    )
+    if not req:
+        raise HTTPException(status_code=404, detail="Payment link not found")
+
+    part = "truck" if req.get("truck_payment_token") == payment_token else "route"
+    already_paid = (req.get("status") == "paid") if part == "route" else bool(req.get("truck_paid"))
+    if already_paid:
+        return {"paid": True, "part": part, "num_routes": req.get("num_routes_requested") if part == "route" else 0, "truck_rental": part == "truck"}
+
+    session_id = payload.get("session_id")
+    session = await db.checkout_sessions.find_one({"id": session_id, "route_request_id": req["id"]}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Checkout session not found")
+
+    paid = False
+    if square_client:
+        try:
+            link = square_client.checkout.payment_links.get(id=session["payment_link_id"]).payment_link
+            order_id = getattr(link, "order_id", None)
+            if order_id:
+                order = square_client.orders.get(order_id=order_id).order
+                paid = order.state == "COMPLETED" or bool(order.tenders)
+        except Exception as e:
+            logging.warning(f"Route purchase status check failed: {e}")
+
+    if not paid:
+        return {"paid": False}
+
+    await db.checkout_sessions.update_one({"id": session_id}, {"$set": {"status": "paid"}})
+
+    if part == "truck":
+        await db.route_requests.update_one(
+            {"id": req["id"]},
+            {"$set": {"truck_paid": True, "truck_paid_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "contractor_id": req["contractor_id"],
+            "type": "truck_rental_approved",
+            "title": "Truck Payment Complete!",
+            "message": "Truck rental payment received. The truck will be available for pick up at 8:00 AM and should be returned by 9:00 PM. Contact admin for pickup location.",
+            "read": False,
+            "play_sound": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        await db.admin_notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": "route_paid",
+            "title": "Truck Rental Paid",
+            "message": f"{req.get('contractor_name')} paid the truck rental (${req.get('truck_cost', 0):.2f}).",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        return {"paid": True, "part": "truck", "num_routes": 0, "truck_rental": True}
+
+    await db.route_requests.update_one(
+        {"id": req["id"]},
+        {"$set": {"status": "paid", "paid_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": req["contractor_id"],
+        "type": "route_paid",
+        "title": "Route Purchase Complete!",
+        "message": f"Payment received for {req.get('num_routes_requested')} route(s). Your routes are now active.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    await db.admin_notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "route_paid",
+        "title": "Route Purchase Paid",
+        "message": f"{req.get('contractor_name')} paid ${req.get('route_cost', req.get('total_price', 0)):.2f} for {req.get('num_routes_requested')} route(s).",
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"paid": True, "part": "route", "num_routes": req.get("num_routes_requested"), "truck_rental": False}
+
+# ===================== ADMIN CHAT BROADCAST =====================
+
+class ChatBroadcastRequest(BaseModel):
+    content: str
+
+@api_router.post("/admin/chat/broadcast")
+async def broadcast_chat_message(request: ChatBroadcastRequest, current_user: dict = Depends(get_admin_user)):
+    """Send an in-app chat message to every contractor"""
+    if not request.content.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    contractors = await db.users.find({"role": "contractor"}, {"_id": 0}).to_list(100)
+    sent = 0
+    for contractor in contractors:
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "sender_id": "admin",
+            "sender_name": "Upwash Admin",
+            "recipient_id": contractor["id"],
+            "content": request.content,
+            "is_group": False,
+            "is_broadcast": True,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.chat_messages.insert_one(message_doc)
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "contractor_id": contractor["id"],
+            "type": "message",
+            "title": "New Message from Admin",
+            "message": request.content[:100],
+            "read": False,
+            "play_sound": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        sent += 1
+    return {"success": True, "sent_to": sent}
+
+# ===================== CONTRACTOR INFRACTIONS =====================
+
+class InfractionCreate(BaseModel):
+    title: str
+    description: str
+    incident_date: Optional[str] = None
+
+@api_router.post("/admin/contractors/{contractor_id}/infractions")
+async def create_infraction(contractor_id: str, data: InfractionCreate, current_user: dict = Depends(get_admin_user)):
+    """Create an infraction document for a company incident"""
+    contractor = await db.users.find_one({"id": contractor_id, "role": "contractor"}, {"_id": 0, "password_hash": 0})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    infraction = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": contractor_id,
+        "contractor_name": contractor.get("full_name", contractor.get("username")),
+        "title": data.title,
+        "description": data.description,
+        "incident_date": data.incident_date,
+        "status": "draft",  # draft -> sent -> signed
+        "signature_name": None,
+        "signed_at": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "sent_at": None
+    }
+    await db.contractor_infractions.insert_one(infraction)
+    infraction.pop("_id", None)
+    return {"success": True, "infraction": infraction}
+
+@api_router.get("/admin/contractors/{contractor_id}/infractions")
+async def list_infractions(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    items = await db.contractor_infractions.find(
+        {"contractor_id": contractor_id}, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return {"infractions": items}
+
+@api_router.post("/admin/infractions/{infraction_id}/send")
+async def send_infraction(infraction_id: str, current_user: dict = Depends(get_admin_user)):
+    """Send an infraction to the contractor's messages for signature"""
+    infraction = await db.contractor_infractions.find_one({"id": infraction_id}, {"_id": 0})
+    if not infraction:
+        raise HTTPException(status_code=404, detail="Infraction not found")
+
+    await db.contractor_infractions.update_one(
+        {"id": infraction_id},
+        {"$set": {"status": "sent", "sent_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    await db.chat_messages.insert_one({
+        "id": str(uuid.uuid4()),
+        "sender_id": "admin",
+        "sender_name": "Upwash Admin",
+        "recipient_id": infraction["contractor_id"],
+        "content": f"INFRACTION NOTICE: {infraction['title']} — please review and sign.",
+        "type": "infraction",
+        "infraction_id": infraction_id,
+        "is_group": False,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": infraction["contractor_id"],
+        "type": "infraction",
+        "title": "Infraction Notice - Signature Required",
+        "message": f"You have received an infraction notice: {infraction['title']}. Open Messages to review and sign it.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True}
+
+@api_router.delete("/admin/infractions/{infraction_id}")
+async def delete_infraction(infraction_id: str, current_user: dict = Depends(get_admin_user)):
+    result = await db.contractor_infractions.delete_one({"id": infraction_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Infraction not found")
+    return {"success": True}
+
+@api_router.get("/contractor/infractions")
+async def get_my_infractions(current_user: dict = Depends(get_contractor_user)):
+    items = await db.contractor_infractions.find(
+        {"contractor_id": current_user["user_id"], "status": {"$ne": "draft"}}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return {"infractions": items}
+
+class InfractionSign(BaseModel):
+    signature_name: str
+
+@api_router.post("/contractor/infractions/{infraction_id}/sign")
+async def sign_infraction(infraction_id: str, data: InfractionSign, current_user: dict = Depends(get_contractor_user)):
+    """Contractor signs an infraction and sends it back"""
+    infraction = await db.contractor_infractions.find_one(
+        {"id": infraction_id, "contractor_id": current_user["user_id"]}, {"_id": 0}
+    )
+    if not infraction:
+        raise HTTPException(status_code=404, detail="Infraction not found")
+    if infraction.get("status") == "signed":
+        raise HTTPException(status_code=400, detail="Already signed")
+    if not data.signature_name.strip():
+        raise HTTPException(status_code=400, detail="Please type your full name to sign")
+
+    await db.contractor_infractions.update_one(
+        {"id": infraction_id},
+        {"$set": {
+            "status": "signed",
+            "signature_name": data.signature_name.strip(),
+            "signed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    await db.chat_messages.insert_one({
+        "id": str(uuid.uuid4()),
+        "sender_id": current_user["user_id"],
+        "sender_name": current_user.get("full_name", current_user.get("username")),
+        "recipient_id": None,
+        "content": f"Signed infraction: {infraction['title']} — signed by {data.signature_name.strip()}",
+        "type": "infraction_signed",
+        "infraction_id": infraction_id,
+        "is_group": False,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    await db.admin_notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "infraction_signed",
+        "title": "Infraction Signed",
+        "message": f"{infraction['contractor_name']} signed the infraction: {infraction['title']}",
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True}
+
+# ===================== SEND DOCUMENT TO CONTRACTOR VIA MESSAGES =====================
+
+class SendDocumentRequest(BaseModel):
+    contractor_id: str
+
+@api_router.post("/admin/contracts/documents/{doc_id}/send")
+async def send_document_to_contractor(doc_id: str, request: SendDocumentRequest, current_user: dict = Depends(get_admin_user)):
+    """Send a stored document to a contractor through Messages"""
+    doc = await db.contract_documents.find_one({"id": doc_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    contractor = await db.users.find_one({"id": request.contractor_id, "role": "contractor"})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
+    await db.chat_messages.insert_one({
+        "id": str(uuid.uuid4()),
+        "sender_id": "admin",
+        "sender_name": "Upwash Admin",
+        "recipient_id": request.contractor_id,
+        "content": doc["content"],
+        "type": "document",
+        "document_title": doc["title"],
+        "is_group": False,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": request.contractor_id,
+        "type": "message",
+        "title": "Document from Admin",
+        "message": f"The admin sent you a document: {doc['title']}. View it in Messages.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True}
+
+# ===================== COMPLETED ROUTES LOG (per contractor) =====================
+
+@api_router.get("/admin/contractors/{contractor_id}/completed-routes")
+async def get_contractor_completed_routes(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Completed + incomplete stop history with before/after photos for a contractor"""
+    completions = await db.stop_completions.find(
+        {"contractor_id": contractor_id}, {"_id": 0}
+    ).sort("completed_at", -1).to_list(300)
+
+    completed = []
+    incomplete = []
+    for c in completions:
+        booking = await db.bookings.find_one({"id": c.get("booking_id")}, {"_id": 0, "customer_name": 1, "customer_address": 1, "booking_dates": 1})
+        entry = {
+            "id": c.get("id"),
+            "booking_id": c.get("booking_id"),
+            "route_id": c.get("route_id"),
+            "customer_name": booking.get("customer_name") if booking else "Unknown",
+            "customer_address": booking.get("customer_address") if booking else "",
+            "service_date": (booking.get("booking_dates") or [None])[0] if booking else None,
+            "status": c.get("status"),
+            "notes": c.get("notes"),
+            "photo_url": c.get("photo_url"),
+            "before_photo_url": c.get("before_photo_url"),
+            "after_photo_url": c.get("after_photo_url"),
+            "completed_at": c.get("completed_at"),
+            "pay_eligible": c.get("pay_eligible", False)
+        }
+        if c.get("status") == "completed":
+            completed.append(entry)
+        else:
+            incomplete.append(entry)
+
+    return {"completed_stops": completed, "incomplete_stops": incomplete}
 
 # ===================== SMS NOTIFICATION ROUTES =====================
 
@@ -7699,9 +8214,9 @@ async def get_truck_rental_prices(current_user: dict = Depends(get_contractor_us
     truck_settings = await db.settings.find_one({"key": "truck_rentals"})
     truck_prices = truck_settings.get("value") if truck_settings else TRUCK_RENTAL_PRICES
     
-    # Get contractor's active rentals
+    # Get contractor's active + pending rentals
     active_rentals = await db.truck_rentals.find(
-        {"contractor_id": current_user["user_id"], "status": "active"},
+        {"contractor_id": current_user["user_id"], "status": {"$in": ["active", "pending_approval"]}},
         {"_id": 0}
     ).to_list(10)
     
@@ -7712,7 +8227,7 @@ async def get_truck_rental_prices(current_user: dict = Depends(get_contractor_us
 
 @api_router.post("/contractor/truck-rentals")
 async def rent_truck(truck_type: str, current_user: dict = Depends(get_contractor_user)):
-    """Contractor rents a truck"""
+    """Contractor requests a truck rental - requires admin approval"""
     if truck_type not in ["small", "large"]:
         raise HTTPException(status_code=400, detail="Invalid truck type. Choose 'small' or 'large'")
     
@@ -7720,31 +8235,39 @@ async def rent_truck(truck_type: str, current_user: dict = Depends(get_contracto
     truck_prices = truck_settings.get("value") if truck_settings else TRUCK_RENTAL_PRICES
     weekly_cost = truck_prices.get(truck_type, 0)
     
+    existing = await db.truck_rentals.find_one({
+        "contractor_id": current_user["user_id"],
+        "status": {"$in": ["active", "pending_approval"]}
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="You already have an active or pending truck rental")
+    
     rental = {
         "id": str(uuid.uuid4()),
         "contractor_id": current_user["user_id"],
         "contractor_name": current_user.get("full_name", current_user.get("username")),
         "truck_type": truck_type,
         "weekly_cost": weekly_cost,
-        "status": "active",
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "next_billing": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+        "status": "pending_approval",
+        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": None,
+        "next_billing": None
     }
     await db.truck_rentals.insert_one(rental)
     
-    # Notify admin
+    # Notify admin - approval required
     notification = {
         "id": str(uuid.uuid4()),
-        "type": "truck_rental",
-        "title": "New Truck Rental",
-        "message": f"{current_user.get('full_name')} rented a {truck_type} truck (${weekly_cost}/week)",
+        "type": "truck_rental_request",
+        "title": "Truck Rental Approval Needed",
+        "message": f"{current_user.get('full_name')} requested a {truck_type} truck rental (${weekly_cost}/week). Approve or deny it from the Route Requests page.",
         "rental_id": rental["id"],
         "read": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.admin_notifications.insert_one(notification)
     
-    return {"message": f"{truck_type.title()} truck rented successfully", "rental_id": rental["id"], "weekly_cost": weekly_cost}
+    return {"message": f"{truck_type.title()} truck rental requested - pending admin approval", "rental_id": rental["id"], "weekly_cost": weekly_cost, "status": "pending_approval"}
 
 @api_router.delete("/contractor/truck-rentals/{rental_id}")
 async def cancel_truck_rental(rental_id: str, current_user: dict = Depends(get_contractor_user)):
@@ -7872,43 +8395,59 @@ async def approve_route_request(request_id: str, current_user: dict = Depends(ge
     if request.get("status") not in ["pending"]:
         raise HTTPException(status_code=400, detail="Request already processed")
     
-    # Generate payment token and URL
+    # Generate SEPARATE payment tokens/links for route and truck rental
     payment_token = str(uuid.uuid4())[:12]
     base_url = os.environ.get("FRONTEND_URL", "https://github-link-finder.preview.emergentagent.com")
     payment_url = f"{base_url}/contractor/pay/{payment_token}"
-    
-    # Update request with approved status and payment link
+    truck_payment_token = None
+    truck_payment_url = None
+    if request.get("truck_rental"):
+        truck_payment_token = str(uuid.uuid4())[:12]
+        truck_payment_url = f"{base_url}/contractor/pay/{truck_payment_token}"
+
+    # Update request with approved status and payment links
     await db.route_requests.update_one(
         {"id": request_id},
         {"$set": {
             "status": "approved",
             "payment_token": payment_token,
             "payment_url": payment_url,
+            "truck_payment_token": truck_payment_token,
+            "truck_payment_url": truck_payment_url,
+            "truck_paid": False,
             "approved_at": datetime.now(timezone.utc).isoformat()
         }}
     )
-    
-    total_price = request.get("total_price", 0)
-    truck_info = " (includes truck rental)" if request.get("truck_rental") else ""
-    
-    # Notify contractor - Request approved, payment pending
+
+    route_cost = request.get("route_cost", request.get("total_price", 0))
+    truck_cost = request.get("truck_cost", 0)
+
+    # Notify contractor - Request approved, payment pending (separate payments)
+    if truck_payment_url:
+        pay_msg = f"Your route request has been approved! Route payment: ${route_cost:.2f}. Truck rental is a SEPARATE payment: ${truck_cost:.2f}. Check the Request Routes page for both payment links."
+    else:
+        pay_msg = f"Your route request has been approved! Route payment: ${route_cost:.2f}. Check the Request Routes page for the payment link."
+
     contractor_notification = {
         "id": str(uuid.uuid4()),
         "contractor_id": request["contractor_id"],
         "type": "route_approved",
         "title": "Route Request Approved!",
-        "message": f"Your route request has been approved! Total: ${total_price:.2f}{truck_info}. Check the Request Routes page for the payment link.",
+        "message": pay_msg,
         "read": False,
         "play_sound": True,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.notifications.insert_one(contractor_notification)
-    
+
     return {
-        "message": "Request approved - payment link generated",
+        "message": "Request approved - payment link(s) generated",
         "payment_url": payment_url,
         "payment_token": payment_token,
-        "total_price": total_price
+        "truck_payment_url": truck_payment_url,
+        "truck_payment_token": truck_payment_token,
+        "route_cost": route_cost,
+        "truck_cost": truck_cost
     }
 
 @api_router.post("/admin/route-requests/{request_id}/deny")
@@ -8042,7 +8581,7 @@ async def complete_route_purchase(payment_token: str, payment_nonce: Optional[st
             "contractor_id": contractor_id,
             "type": "truck_pickup",
             "title": "Truck Ready for Pickup!",
-            "message": "Your truck rental is confirmed. Please pick up the truck before 8:00 AM tomorrow. Contact admin for pickup location.",
+            "message": "Your truck rental is confirmed. The truck will be available for pick up at 8:00 AM and should be returned by 9:00 PM. Contact admin for pickup location.",
             "read": False,
             "play_sound": True,
             "urgent": True,
