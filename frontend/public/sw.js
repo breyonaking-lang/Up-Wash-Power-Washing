@@ -1,4 +1,5 @@
 // Up-Wash Service Worker for PWA and Push Notifications
+/* global clients */
 const CACHE_NAME = 'upwash-v1';
 const urlsToCache = [
   '/',
@@ -105,7 +106,7 @@ self.addEventListener('notificationclick', (event) => {
   const url = event.notification.data?.url || '/';
   
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((windowClients) => {
         // Check if there's already a window open
         for (let client of windowClients) {
@@ -116,8 +117,8 @@ self.addEventListener('notificationclick', (event) => {
           }
         }
         // Open new window if none exists
-        if (clients.openWindow) {
-          return clients.openWindow(url);
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(url);
         }
       })
   );

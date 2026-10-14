@@ -1,33 +1,11 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { Mail, MapPin, Menu, X, Droplets } from "lucide-react";
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
+import { BIBLE_VERSES } from "../data/bibleVerses";
 
-// Bible Verses Collection
-const BIBLE_VERSES = [
-  { verse: "I can do all things through Christ who strengthens me.", reference: "Philippians 4:13" },
-  { verse: "Trust in the LORD with all your heart and lean not on your own understanding.", reference: "Proverbs 3:5" },
-  { verse: "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.", reference: "John 3:16" },
-  { verse: "The LORD is my shepherd; I shall not want.", reference: "Psalm 23:1" },
-  { verse: "Be strong and courageous. Do not be afraid; do not be discouraged, for the LORD your God will be with you wherever you go.", reference: "Joshua 1:9" },
-  { verse: "And we know that in all things God works for the good of those who love him.", reference: "Romans 8:28" },
-  { verse: "The LORD is my light and my salvation—whom shall I fear?", reference: "Psalm 27:1" },
-  { verse: "Come to me, all you who are weary and burdened, and I will give you rest.", reference: "Matthew 11:28" },
-  { verse: "But those who hope in the LORD will renew their strength.", reference: "Isaiah 40:31" },
-  { verse: "Delight yourself in the LORD, and he will give you the desires of your heart.", reference: "Psalm 37:4" },
-  { verse: "The LORD bless you and keep you; the LORD make his face shine on you and be gracious to you.", reference: "Numbers 6:24-25" },
-  { verse: "Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God.", reference: "Philippians 4:6" },
-  { verse: "For I know the plans I have for you, declares the LORD, plans to prosper you and not to harm you, plans to give you hope and a future.", reference: "Jeremiah 29:11" },
-  { verse: "Cast all your anxiety on him because he cares for you.", reference: "1 Peter 5:7" },
-  { verse: "Be still, and know that I am God.", reference: "Psalm 46:10" },
-  { verse: "God is our refuge and strength, an ever-present help in trouble.", reference: "Psalm 46:1" },
-  { verse: "I have told you these things, so that in me you may have peace.", reference: "John 16:33" },
-  { verse: "The joy of the LORD is your strength.", reference: "Nehemiah 8:10" },
-  { verse: "This is the day the LORD has made; let us rejoice and be glad in it.", reference: "Psalm 118:24" },
-  { verse: "Give thanks to the LORD, for he is good; his love endures forever.", reference: "Psalm 107:1" }
-];
-
-// Cross Icon Component
+// Traditional Latin cross icon (the cross Christ Jesus died on)
 const CrossIcon = ({ className, size = 16 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M10 2h4v6h6v4h-6v10h-4V12H4V8h6V2z"/>
@@ -36,21 +14,19 @@ const CrossIcon = ({ className, size = 16 }) => (
 
 const Layout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [currentVerse, setCurrentVerse] = useState(BIBLE_VERSES[0]);
   const location = useLocation();
 
-  // Rotate Bible verse every 15 minutes
+  // Rotate through the 300+ verse collection, one at a time, every 10 seconds
+  const [verseIndex, setVerseIndex] = useState(() => Math.floor(Date.now() / 86400000) % BIBLE_VERSES.length);
+
   useEffect(() => {
-    const getRandomVerse = () => {
-      const randomIndex = Math.floor(Math.random() * BIBLE_VERSES.length);
-      setCurrentVerse(BIBLE_VERSES[randomIndex]);
-    };
-    
-    getRandomVerse(); // Initial random verse
-    const interval = setInterval(getRandomVerse, 15 * 60 * 1000); // 15 minutes
-    
+    const interval = setInterval(() => {
+      setVerseIndex((i) => (i + 1) % BIBLE_VERSES.length);
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const currentVerse = BIBLE_VERSES[verseIndex];
 
   const navLinks = [
     { path: "/", label: "Home" },
@@ -64,13 +40,26 @@ const Layout = () => {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Bible Verse Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 py-2 px-4">
-        <div className="container mx-auto max-w-7xl flex items-center justify-center gap-3">
-          <CrossIcon className="text-white/80 flex-shrink-0" size={16} />
-          <p className="text-white text-center text-sm">
-            <span className="italic">"{currentVerse.verse}"</span>
-            <span className="text-white/80 ml-2">— {currentVerse.reference}</span>
-          </p>
+      <div className="bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 py-1.5 px-4 border-b border-blue-800/50" data-testid="verse-banner">
+        <div className="container mx-auto max-w-7xl flex items-center gap-3">
+          <CrossIcon className="text-amber-300 flex-shrink-0" size={18} data-testid="verse-banner-cross" />
+          <div className="flex-1 min-w-0 text-center">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={verseIndex}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.45 }}
+                className="text-blue-100 text-xs sm:text-sm truncate"
+                data-testid="verse-banner-text"
+              >
+                <span className="italic">"{currentVerse.verse}"</span>
+                <span className="font-semibold text-amber-200 ml-2">— {currentVerse.reference}</span>
+              </motion.p>
+            </AnimatePresence>
+          </div>
+          <CrossIcon className="flex-shrink-0 opacity-0" size={18} />
         </div>
       </div>
 

@@ -115,7 +115,7 @@ const SERVICES = [
   {
     id: "construction_cleanup",
     name: "Construction Site Cleanup",
-    description: "Post-construction cleaning and debris removal",
+    description: "Pressure washing of sidewalks & parking lots, plus window cleaning",
     icon: HardHat,
     color: "bg-amber-500",
     pricingType: "quote",
@@ -173,9 +173,24 @@ const BookingPage = () => {
     name: "",
     email: "",
     phone: "",
-    address: "",
     notes: ""
   });
+
+  // Service address broken into individual fields (combined for distance calc + booking)
+  const [addressParts, setAddressParts] = useState({
+    street: "",
+    street2: "",
+    city: "",
+    state: "TX",
+    zip: ""
+  });
+  const fullAddress = [
+    addressParts.street2 ? `${addressParts.street} ${addressParts.street2}` : addressParts.street,
+    addressParts.city,
+    addressParts.state,
+    addressParts.zip
+  ].filter(Boolean).join(", ");
+  const addressComplete = Boolean(addressParts.street && addressParts.city && addressParts.state && addressParts.zip);
   const [distance, setDistance] = useState(0);
   const [distanceInfo, setDistanceInfo] = useState(null);
   const [calculatingDistance, setCalculatingDistance] = useState(false);
@@ -415,13 +430,15 @@ const BookingPage = () => {
   // Debounce address input for distance calculation
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (customerInfo.address) {
-        calculateDistanceFromAddress(customerInfo.address);
+      if (addressComplete) {
+        calculateDistanceFromAddress(fullAddress);
+      } else {
+        setDistanceInfo(null);
       }
     }, 1000); // Wait 1 second after user stops typing
 
     return () => clearTimeout(timeoutId);
-  }, [customerInfo.address]);
+  }, [fullAddress, addressComplete]);
 
   const isDateDisabled = (date) => {
     return isWeekend(date) || isBefore(date, startOfToday());
@@ -451,7 +468,7 @@ const BookingPage = () => {
       return;
     }
 
-    if (!customerInfo.name || !customerInfo.phone || !customerInfo.address) {
+    if (!customerInfo.name || !customerInfo.phone || !addressComplete) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -492,7 +509,7 @@ const BookingPage = () => {
         customer_name: customerInfo.name,
         customer_email: customerInfo.email || "noemail@upwash.com",
         customer_phone: customerInfo.phone,
-        customer_address: customerInfo.address,
+        customer_address: fullAddress,
         distance_miles: distance,
         services,
         booking_dates: getBookingDates(),
@@ -508,9 +525,9 @@ const BookingPage = () => {
 
       setBookingId(response.data.id);
       
-      // Show scent bomb upsell for bin/dumpster services (if no scent bombs already added)
-      if ((selectedServices.recycling_bin || selectedServices.dumpster) && scentBombs === 0) {
-        setUpsellScentBombs(selectedServices.dumpster ? 2 : binQuantity || 1);
+      // Show scent bomb upsell before checkout (if no scent bombs already added)
+      if (scentBombs === 0) {
+        setUpsellScentBombs(selectedServices.dumpster ? 2 : (binQuantity || 1));
         setShowScentBombUpsell(true);
       } else {
         setStep(4);
@@ -918,7 +935,7 @@ const BookingPage = () => {
                       {/* Select specific days of the month */}
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-2">
-                          <Label className="block text-lg font-semibold">Select Days of the Month</Label>
+                          <Label className="block text-lg font-semibold">Days of Service</Label>
                           <button
                             type="button"
                             onClick={autoPopulateMonthlyDays}
@@ -929,7 +946,7 @@ const BookingPage = () => {
                           </button>
                         </div>
                         <p className="text-sm text-slate-500 mb-4">
-                          Choose {serviceDaysPerMonth} day{serviceDaysPerMonth > 1 ? 's' : ''} when you'd like service each month
+                          What days would you like our service? Choose {serviceDaysPerMonth} day{serviceDaysPerMonth > 1 ? 's' : ''} of the month.
                         </p>
                         <div className="grid grid-cols-7 gap-2 max-w-md">
                           {MONTH_DAYS.map((day) => (
@@ -1029,15 +1046,51 @@ const BookingPage = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="address">Service Address *</Label>
-                      <Input
-                        id="address"
-                        value={customerInfo.address}
-                        onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
-                        placeholder="123 Main St, Burleson, TX"
-                        className="mt-1 rounded-xl"
-                        data-testid="customer-address-input"
-                      />
+                      <Label htmlFor="street">Service Address *</Label>
+                      <div className="space-y-3 mt-1">
+                        <Input
+                          id="street"
+                          value={addressParts.street}
+                          onChange={(e) => setAddressParts({...addressParts, street: e.target.value})}
+                          placeholder="Street address (e.g. 123 Main St)"
+                          className="rounded-xl"
+                          data-testid="customer-street-input"
+                        />
+                        <Input
+                          id="street2"
+                          value={addressParts.street2}
+                          onChange={(e) => setAddressParts({...addressParts, street2: e.target.value})}
+                          placeholder="Apt, suite, unit, etc. (optional)"
+                          className="rounded-xl"
+                          data-testid="customer-street2-input"
+                        />
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          <Input
+                            id="city"
+                            value={addressParts.city}
+                            onChange={(e) => setAddressParts({...addressParts, city: e.target.value})}
+                            placeholder="City"
+                            className="rounded-xl"
+                            data-testid="customer-city-input"
+                          />
+                          <Input
+                            id="state"
+                            value={addressParts.state}
+                            onChange={(e) => setAddressParts({...addressParts, state: e.target.value})}
+                            placeholder="State"
+                            className="rounded-xl"
+                            data-testid="customer-state-input"
+                          />
+                          <Input
+                            id="zip"
+                            value={addressParts.zip}
+                            onChange={(e) => setAddressParts({...addressParts, zip: e.target.value})}
+                            placeholder="ZIP code"
+                            className="rounded-xl col-span-2 sm:col-span-1"
+                            data-testid="customer-zip-input"
+                          />
+                        </div>
+                      </div>
                       
                       {/* Distance calculation result */}
                       {calculatingDistance && (
@@ -1073,23 +1126,23 @@ const BookingPage = () => {
                               )}
                               
                               {/* Map Preview */}
-                              {distanceInfo.customer_coords && distanceInfo.burleson_coords && (
+                              {distanceInfo.customer_coords && (
                                 <div className="mt-3 rounded-xl overflow-hidden border border-slate-200">
-                                  <img 
-                                    src={`https://maps.googleapis.com/maps/api/staticmap?size=400x200&scale=2&markers=color:red%7Clabel:S%7C${distanceInfo.customer_coords.lat},${distanceInfo.customer_coords.lng}&markers=color:blue%7Clabel:B%7C${distanceInfo.burleson_coords.lat},${distanceInfo.burleson_coords.lng}&path=color:0x007AFF%7Cweight:3%7C${distanceInfo.customer_coords.lat},${distanceInfo.customer_coords.lng}%7C${distanceInfo.burleson_coords.lat},${distanceInfo.burleson_coords.lng}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`}
-                                    alt="Service location map"
-                                    className="w-full h-auto"
+                                  <iframe
+                                    title="Service location map"
+                                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${distanceInfo.customer_coords.lng - 0.08},${distanceInfo.customer_coords.lat - 0.05},${distanceInfo.customer_coords.lng + 0.08},${distanceInfo.customer_coords.lat + 0.05}&layer=mapnik&marker=${distanceInfo.customer_coords.lat},${distanceInfo.customer_coords.lng}`}
+                                    className="w-full h-52 border-0"
+                                    loading="lazy"
                                   />
-                                  <div className="p-2 bg-slate-50 text-xs text-slate-600 flex justify-between">
+                                  <div className="p-2 bg-slate-50 text-xs text-slate-600">
                                     <span><span className="text-red-500">●</span> Your Location</span>
-                                    <span><span className="text-blue-500">●</span> Burleson (Base)</span>
                                   </div>
                                 </div>
                               )}
                             </>
                           ) : (
                             <p className="text-red-600">
-                              Could not calculate distance. You can enter manually below.
+                              We couldn't find that address automatically. Please double-check it and try again.
                             </p>
                           )}
                         </div>
@@ -1245,29 +1298,6 @@ const BookingPage = () => {
                       </div>
                     )}
 
-                    {/* Manual distance input - shown if auto-calculation not available */}
-                    {(!distanceInfo || !distanceInfo.success) && !calculatingDistance && customerInfo.address && (
-                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                        <Label htmlFor="distance" className="text-slate-700">Manual Distance Entry (miles from Burleson)</Label>
-                        <div className="flex items-center gap-3 mt-2">
-                          <Input
-                            id="distance"
-                            type="number"
-                            min="0"
-                            value={distance}
-                            onChange={(e) => setDistance(parseFloat(e.target.value) || 0)}
-                            placeholder="0"
-                            className="rounded-xl w-32"
-                            data-testid="distance-input"
-                          />
-                          <p className="text-sm text-slate-500 flex items-center gap-2">
-                            <MapPin size={14} />
-                            Free within 15 miles, $1/mile beyond
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
                     <div>
                       <Label htmlFor="notes">Special Instructions (optional)</Label>
                       <Textarea
@@ -1293,7 +1323,7 @@ const BookingPage = () => {
                     </Button>
                     <Button
                       onClick={handleSubmitBooking}
-                      disabled={loading || !customerInfo.name || !customerInfo.phone || !customerInfo.address || (hasQuoteService() && (!quoteDescription.trim() || quotePhotos.length === 0))}
+                      disabled={loading || !customerInfo.name || !customerInfo.phone || !addressComplete || (hasQuoteService() && (!quoteDescription.trim() || quotePhotos.length === 0))}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 rounded-full"
                       data-testid="submit-booking-btn"
                     >
@@ -1336,7 +1366,7 @@ const BookingPage = () => {
                       )}
                       <p><strong>Name:</strong> {customerInfo.name}</p>
                       <p><strong>Phone:</strong> {customerInfo.phone}</p>
-                      <p><strong>Address:</strong> {customerInfo.address}</p>
+                      <p><strong>Address:</strong> {fullAddress}</p>
                       {smsOptIn && <p className="text-blue-600">✓ Text reminders enabled</p>}
                     </div>
                   </div>
@@ -1525,69 +1555,77 @@ const BookingPage = () => {
 
       {/* Scent Bomb Upsell Popup */}
       {showScentBombUpsell && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" data-testid="scent-bomb-upsell-modal">
           <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
             className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
           >
             <div className="text-center">
-              <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-10 h-10 text-pink-500" />
+              <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="text-pink-500" size={32} />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">Add Fresh Scent?</h3>
-              <p className="text-slate-600 mb-6">
-                Keep your freshly cleaned bins smelling amazing with our Scent Bombs!
+              <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Wait — One More Thing!</h3>
+              <p className="text-slate-500 mb-6">
+                Keep everything smelling fresh for weeks. Add our <strong>Scent Bomb</strong> deodorizing
+                treatment to your order for just <strong className="text-pink-600">$3.50 each</strong>.
               </p>
-              
-              <div className="bg-pink-50 rounded-2xl p-4 mb-6">
-                <p className="text-pink-900 font-bold text-xl mb-2">$5 each</p>
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={() => setUpsellScentBombs(Math.max(0, upsellScentBombs - 1))}
-                    className="w-10 h-10 rounded-full bg-white border border-pink-300 flex items-center justify-center hover:bg-pink-100"
-                  >
-                    <Minus size={18} />
-                  </button>
-                  <span className="text-3xl font-bold text-pink-600 w-12">{upsellScentBombs}</span>
-                  <button
-                    onClick={() => setUpsellScentBombs(upsellScentBombs + 1)}
-                    className="w-10 h-10 rounded-full bg-white border border-pink-300 flex items-center justify-center hover:bg-pink-100"
-                  >
-                    <Plus size={18} />
-                  </button>
-                </div>
-                {upsellScentBombs > 0 && (
-                  <p className="text-pink-600 mt-2 font-medium">
-                    Total: ${(upsellScentBombs * 5).toFixed(2)}
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => {
-                    setShowScentBombUpsell(false);
-                    setStep(4);
-                  }}
-                  variant="outline"
-                  className="flex-1 rounded-full"
+
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <button
+                  onClick={() => setUpsellScentBombs(Math.max(0, upsellScentBombs - 1))}
+                  disabled={upsellScentBombs <= 1}
+                  className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center disabled:opacity-40"
+                  data-testid="upsell-quantity-minus"
                 >
-                  Skip
-                </Button>
-                <Button
-                  onClick={() => {
-                    setScentBombs(prev => prev + upsellScentBombs);
-                    setShowScentBombUpsell(false);
-                    setStep(4);
-                    toast.success(`Added ${upsellScentBombs} Scent Bomb${upsellScentBombs > 1 ? 's' : ''} to your order!`);
-                  }}
-                  disabled={upsellScentBombs === 0}
-                  className="flex-1 bg-pink-500 hover:bg-pink-600 text-white rounded-full"
+                  <Minus size={18} />
+                </button>
+                <span className="w-10 text-center text-xl font-extrabold" data-testid="upsell-quantity-value">{upsellScentBombs}</span>
+                <button
+                  onClick={() => setUpsellScentBombs(Math.min(10, upsellScentBombs + 1))}
+                  disabled={upsellScentBombs >= 10}
+                  className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center disabled:opacity-40"
+                  data-testid="upsell-quantity-plus"
                 >
-                  Yes! Add ${(upsellScentBombs * 5).toFixed(2)}
-                </Button>
+                  <Plus size={18} />
+                </button>
+                <span className="text-pink-600 font-bold text-lg w-20 text-left">${(upsellScentBombs * 3.5).toFixed(2)}</span>
               </div>
+
+              <Button
+                onClick={async () => {
+                  setScentBombs(prev => prev + upsellScentBombs);
+                  try {
+                    const addonRes = await axios.post(`${API}/bookings/${bookingId}/addons`, {
+                      service_id: "scent_bomb",
+                      quantity: upsellScentBombs
+                    });
+                    if (addonRes.data.pricing) {
+                      setPricing(prev => ({ ...prev, ...addonRes.data.pricing }));
+                    }
+                  } catch (error) {
+                    console.error("Error adding scent bombs to booking:", error);
+                  }
+                  setShowScentBombUpsell(false);
+                  setStep(4);
+                  toast.success(`${upsellScentBombs} Scent Bomb${upsellScentBombs > 1 ? 's' : ''} added to your order!`);
+                }}
+                disabled={upsellScentBombs === 0}
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-4 rounded-full mb-3"
+                data-testid="upsell-add-btn"
+              >
+                Add to My Order — ${(upsellScentBombs * 3.5).toFixed(2)}
+              </Button>
+              <button
+                onClick={() => {
+                  setShowScentBombUpsell(false);
+                  setStep(4);
+                }}
+                className="text-slate-400 hover:text-slate-600 text-sm font-medium"
+                data-testid="upsell-decline-btn"
+              >
+                No thanks, continue to payment
+              </button>
             </div>
           </motion.div>
         </div>

@@ -2438,6 +2438,73 @@ export default function ContractorDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadChat, setUnreadChat] = useState(0);
+  const [suspension, setSuspension] = useState(null);
+  const [myDisputes, setMyDisputes] = useState([]);
+  const [disputeText, setDisputeText] = useState('');
+  const [disputeSending, setDisputeSending] = useState(false);
+
+  // Fetch suspension status + poll for unread chat messages
+  useEffect(() => {
+    const fetchSuspension = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/contractor/profile`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.suspended) {
+          setSuspension({ reason: data.suspended_reason || 'No reason provided', since: data.suspended_at });
+          const dres = await fetch(`${API_URL}/api/contractor/disputes`, { headers: getAuthHeaders() });
+          if (dres.ok) {
+            const ddata = await dres.json();
+            setMyDisputes(ddata.disputes || []);
+          }
+        } else {
+          setSuspension(null);
+        }
+      } catch (err) {
+        console.error('Failed to check suspension status');
+      }
+    };
+    const checkUnreadChat = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/chat/unread-count`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        setUnreadChat(data.unread || 0);
+      } catch (err) {
+        console.error('Failed to check unread messages');
+      }
+    };
+    fetchSuspension();
+    checkUnreadChat();
+    const interval = setInterval(() => { fetchSuspension(); checkUnreadChat(); }, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const submitDispute = async () => {
+    if (!disputeText.trim()) {
+      toast.error('Please explain your dispute');
+      return;
+    }
+    setDisputeSending(true);
+    try {
+      const res = await fetch(`${API_URL}/api/contractor/disputes`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ message: disputeText })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to submit');
+      toast.success('Dispute submitted — the admin will review it');
+      setDisputeText('');
+      const dres = await fetch(`${API_URL}/api/contractor/disputes`, { headers: getAuthHeaders() });
+      if (dres.ok) setMyDisputes((await dres.json()).disputes || []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit dispute');
+    } finally {
+      setDisputeSending(false);
+    }
+  };
   const [showNotificationPopup, setShowNotificationPopup] = useState(false);
   const [latestNotification, setLatestNotification] = useState(null);
   const lastNotificationIdRef = useRef(null);
@@ -2598,6 +2665,7 @@ export default function ContractorDashboard() {
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => {
             const isNotifications = item.path === 'notifications';
+            const isChat = item.path === 'chat';
             
             return (
               <Link
@@ -2616,11 +2684,19 @@ export default function ContractorDashboard() {
                       {unreadNotifications > 9 ? '9+' : unreadNotifications}
                     </span>
                   )}
+                  {isChat && unreadChat > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse" data-testid="chat-unread-dot" />
+                  )}
                 </div>
                 {sidebarOpen && <span>{item.label}</span>}
                 {sidebarOpen && isNotifications && unreadNotifications > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
                     {unreadNotifications}
+                  </span>
+                )}
+                {sidebarOpen && isChat && unreadChat > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+                    {unreadChat}
                   </span>
                 )}
               </Link>
@@ -2642,6 +2718,54 @@ export default function ContractorDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto">
+        {/* Suspension Banner + Dispute */}
+        {suspension && (
+          <div className="mb-6 bg-red-500/10 border border-red-500/40 rounded-2xl p-6" data-testid="suspension-banner">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h2 className="text-red-400 font-bold text-lg">Your account has been suspended</h2>
+                <p className="text-white/80 mt-1"><span className="text-white/50">Reason:</span> {suspension.reason}</p>
+                <p className="text-white/50 text-sm mt-1">Your routes and schedule are on hold while your account is suspended. If you believe this is a mistake, you can dispute it below.</p>
+
+                {myDisputes.some(d => d.status === 'open') ? (
+                  <div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                    <p className="text-yellow-400 font-semibold text-sm">Dispute under review</p>
+                    <p className="text-white/60 text-sm">You submitted a dispute on {new Date(myDisputes.find(d => d.status === 'open').created_at).toLocaleDateString()}. The admin has been notified.</p>
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <textarea
+                      value={disputeText}
+                      onChange={(e) => setDisputeText(e.target.value)}
+                      placeholder="Explain why this suspension should be reviewed..."
+                      rows={3}
+                      className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 mb-3 focus:outline-none focus:border-red-400"
+                      data-testid="dispute-textarea"
+                    />
+                    <button
+                      onClick={submitDispute}
+                      disabled={disputeSending}
+                      className="px-6 py-3 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white rounded-xl font-semibold"
+                      data-testid="submit-dispute-btn"
+                    >
+                      {disputeSending ? 'Submitting...' : 'Submit Dispute'}
+                    </button>
+                  </div>
+                )}
+
+                {myDisputes.filter(d => d.status !== 'open').map(d => (
+                  <div key={d.id} className="mt-3 bg-white/5 rounded-xl p-3">
+                    <p className="text-white/60 text-sm">
+                      Dispute {d.resolution === 'reinstate' ? 'accepted — account reinstated' : 'reviewed — suspension upheld'}
+                      {d.admin_response ? ` — ${d.admin_response}` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         <Routes>
           <Route path="/" element={<TodayRoute />} />
           <Route path="routes" element={<MyRoutes />} />

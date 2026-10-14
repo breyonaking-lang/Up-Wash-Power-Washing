@@ -14,6 +14,17 @@ import {
   CheckCircle
 } from "lucide-react";
 
+const SERVICE_IMAGES = {
+  recycling_bin: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwyfHx0cmFzaCUyMGJpbnxlbnwwfHx8fDE3OTE5MjczMTV8MA&ixlib=rb-4.1.0&q=85",
+  scent_bomb: "https://images.unsplash.com/photo-1574120583586-de8847ae992c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwxfHxjbGVhbiUyMHdvb2QlMjBkZWNrfGVufDB8fHx8MTc5MTkyNzMyMnww&ixlib=rb-4.1.0&q=85",
+  patio: "https://images.unsplash.com/photo-1719324923613-ff0884b031ed?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxjbGVhbiUyMHBhdGlvJTIwb3V0ZG9vciUyMGxpdmluZ3xlbnwwfHx8fDE3OTE5MjczMTV8MA&ixlib=rb-4.1.0&q=85",
+  driveway: "https://images.unsplash.com/photo-1762810981576-1b07f76af9d2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxjbGVhbiUyMHJlc2lkZW50aWFsJTIwZHJpdmV3YXl8ZW58MHx8fHwxNzkxOTI3MzE1fDA&ixlib=rb-4.1.0&q=85",
+  dumpster: "https://images.unsplash.com/photo-1510251197878-a2e6d2cb590c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHwyfHxjbGVhbiUyMHBvbW1lcmNpYWwlMjBkdW1wc3RlcnxlbnwwfHx8fDE3OTE5MjczMTV8MA&ixlib=rb-4.1.0&q=85",
+  home_powerwash: "https://images.unsplash.com/photo-1676591492880-1b82ec5c330b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwyfHxob3VzZSUyMGV4dGVyaW9yJTIwc2lkaW5nfGVufDB8fHx8MTc5MTkyNzMxNXww&ixlib=rb-4.1.0&q=85",
+  construction_cleanup: "https://images.unsplash.com/photo-1575281923032-f40d94ef6160?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxjb25zdHJ1Y3Rpb24lMjBzaXRlJTIwY2xlYW51cHxlbnwwfHx8fDE3OTE5MjczMTV8MA&ixlib=rb-4.1.0&q=85",
+  commercial: "https://images.unsplash.com/photo-1718152470408-cfeebeb6b9fc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwzfHxwcmVzc3VyZSUyMHdhc2hlcnxlbnwwfHx8fDE3OTE5MjczMjF8MA&ixlib=rb-4.1.0&q=85"
+};
+
 const ServicesPage = () => {
   const navigate = useNavigate();
   
@@ -79,14 +90,14 @@ const ServicesPage = () => {
     {
       id: "dumpster",
       name: "Restaurant Dumpster Cleaning",
-      description: "Maintain health code compliance and eliminate pest attractions with our commercial dumpster cleaning service. We sanitize the entire dumpster area including surrounding concrete, removing grease, food residue, and odors that can harm your business reputation.",
+      description: "Keep your business clean, sanitary, and up to code with our professional dumpster power washing service. We thoroughly pressure wash the dumpster and the surrounding area, and clear away any overflow trash, eliminating grease, residue, and odors that attract pests and hurt your curb appeal.",
       icon: Warehouse,
       color: "bg-purple-500",
       pricing: [
         { label: "First Dumpster", price: 85, qty: 1 },
         { label: "Each Additional", price: 45, qty: 2 }
       ],
-      features: ["Health code compliant", "Pest prevention", "Grease trap area cleaning", "Scheduled maintenance available"],
+      features: ["Dumpster power washing", "Surrounding area cleaning", "Overflow trash cleanup", "Health code compliant"],
       availableDays: "Wednesday - Friday"
     },
     {
@@ -105,13 +116,13 @@ const ServicesPage = () => {
     {
       id: "construction_cleanup",
       name: "Construction Site Cleanup",
-      description: "Get your project move-in ready with our post-construction cleaning expertise. We remove construction dust, debris, paint overspray, and adhesive residue from all surfaces, ensuring your finished project looks its absolute best for final inspection and client handover.",
+      description: "Professional post-construction pressure washing for sidewalks, walkways, and parking lots, plus expert window cleaning service. We remove concrete dust, dirt, and grime from your hard surfaces and leave every window spotless, so your finished project makes a flawless first impression at handover.",
       icon: HardHat,
       color: "bg-amber-500",
       pricing: [
         { label: "Custom Quote", price: null, isQuote: true }
       ],
-      features: ["Debris & dust removal", "Window & glass cleaning", "Surface detailing", "Final inspection ready"],
+      features: ["Sidewalk & walkway pressure washing", "Parking lot pressure washing", "Professional window cleaning", "Final inspection ready"],
       isQuote: true,
       availableDays: "Thursday & Friday"
     },
@@ -162,6 +173,16 @@ const ServicesPage = () => {
               data-testid={`service-detail-${service.id}`}
               onClick={() => handleBookService(service.id, 1, service.isQuote)}
             >
+              {SERVICE_IMAGES[service.id] && (
+                <div className="h-44 md:h-52 overflow-hidden">
+                  <img
+                    src={SERVICE_IMAGES[service.id]}
+                    alt={service.name}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
                 {/* Service Info */}
                 <div className="lg:col-span-2 p-8 md:p-10">

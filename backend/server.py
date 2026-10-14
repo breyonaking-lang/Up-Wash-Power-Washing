@@ -246,7 +246,7 @@ SERVICES = {
     "dumpster": {
         "service_id": "dumpster",
         "name": "Restaurant Dumpster Cleaning",
-        "description": "Dumpster and surrounding area cleaning",
+        "description": "Professional power washing of the dumpster and surrounding area, plus overflow trash cleanup",
         "base_price": 85.0,
         "pricing_type": "tiered",
         "tier_pricing": {"1": 85.0, "additional": 45.0},
@@ -276,7 +276,7 @@ SERVICES = {
     "construction_cleanup": {
         "service_id": "construction_cleanup",
         "name": "Construction Site Cleanup",
-        "description": "Post-construction cleaning and debris removal",
+        "description": "Post-construction pressure washing of sidewalks and parking lots, plus professional window cleaning",
         "base_price": 0.0,
         "pricing_type": "quote",
         "is_addon": False,
@@ -450,9 +450,11 @@ def geocode_address(address: str) -> Dict:
     return None
 
 def calculate_distance_from_address(customer_address: str) -> Dict:
+    """Driving distance from customer address to Burleson, TX.
+    Uses Google Maps when a key is configured, otherwise free OpenStreetMap + OSRM."""
     if not google_maps_api_key:
-        return {"success": False, "error": "Distance calculation not configured", "distance_miles": 0}
-    
+        return _calculate_distance_osm(customer_address)
+
     customer_coords = geocode_address(customer_address)
     
     try:
@@ -501,8 +503,92 @@ def calculate_distance_from_address(customer_address: str) -> Dict:
             }
     except Exception as e:
         logging.warning(f"Routes API failed: {e}")
-    
-    return {"success": False, "error": "Could not calculate distance", "distance_miles": 0}
+
+    logging.warning("Google distance failed, falling back to free OSM routing")
+    return _calculate_distance_osm(customer_address)
+
+
+def _geocode_address_osm(address: str) -> Dict:
+    """Geocode an address using OpenStreetMap Nominatim (free, no API key)"""
+    try:
+        response = requests.get(
+            'https://nominatim.openstreetmap.org/search',
+            params={'q': address, 'format': 'json', 'limit': 1},
+            headers={'User-Agent': 'UpwashPowerWashing-Booking/1.0'},
+            timeout=10
+        )
+        data = response.json()
+        if data:
+            return {"lat": float(data[0]['lat']), "lng": float(data[0]['lon'])}
+    except Exception as e:
+        logging.warning(f"OSM geocoding failed: {e}")
+    return None
+
+
+def _haversine_miles(a: Dict, b: Dict) -> float:
+    """Straight-line distance between two coordinate pairs"""
+    lat1, lon1, lat2, lon2 = map(math.radians, [a["lat"], a["lng"], b["lat"], b["lng"]])
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    h = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return 2 * 6371 * math.asin(math.sqrt(h)) * 0.621371
+
+
+def _calculate_distance_osm(customer_address: str) -> Dict:
+    """Free distance calculation: Nominatim geocoding + OSRM driving route"""
+    customer_coords = _geocode_address_osm(customer_address)
+    if not customer_coords:
+        return {"success": False, "error": "We couldn't find that address. Please double-check it and try again.", "distance_miles": 0}
+
+    # Use the known-correct base coordinates (Nominatim can mismatch "Burleson, TX" to Burleson County)
+    base_coords = BURLESON_COORDS
+
+    distance_miles = None
+    duration_seconds = None
+    try:
+        route_url = (
+            f"https://router.project-osrm.org/route/v1/driving/"
+            f"{customer_coords['lng']},{customer_coords['lat']};{base_coords['lng']},{base_coords['lat']}"
+        )
+        response = requests.get(
+            route_url,
+            params={'overview': 'false'},
+            headers={'User-Agent': 'UpwashPowerWashing-Booking/1.0'},
+            timeout=10
+        )
+        data = response.json()
+        if data.get('code') == 'Ok' and data.get('routes'):
+            route = data['routes'][0]
+            distance_miles = route['distance'] / 1609.34
+            duration_seconds = route.get('duration')
+    except Exception as e:
+        logging.warning(f"OSRM routing failed, using straight-line estimate: {e}")
+
+    if distance_miles is None:
+        distance_miles = _haversine_miles(customer_coords, base_coords) * 1.3
+
+    if duration_seconds:
+        if duration_seconds >= 3600:
+            hours = int(duration_seconds // 3600)
+            mins = int((duration_seconds % 3600) // 60)
+            duration_text = f"{hours} hr {mins} min" if mins else f"{hours} hr"
+        else:
+            duration_text = f"{int(duration_seconds // 60)} min"
+    else:
+        duration_text = f"~{max(int(distance_miles * 2), 5)} min"
+
+    travel_fee = calculate_travel_fee(distance_miles)
+
+    return {
+        "success": True,
+        "distance_miles": round(distance_miles, 1),
+        "distance_text": f"{distance_miles:.1f} mi",
+        "duration_text": duration_text,
+        "travel_fee": round(travel_fee, 2),
+        "free_radius": SERVICE_AREA["free_radius_miles"],
+        "is_within_free_radius": distance_miles <= SERVICE_AREA["free_radius_miles"],
+        "customer_coords": customer_coords,
+        "burleson_coords": BURLESON_COORDS
+    }
 
 def optimize_route(addresses: List[str]) -> List[Dict]:
     """Optimize route for multiple addresses using Google Maps"""
@@ -686,50 +772,63 @@ async def calculate_distance(request: Dict):
 
 @api_router.post("/upload/photo")
 async def upload_photo(file: UploadFile = File(...), photo_type: str = Form("cns")):
-    """Upload a photo and return the URL"""
+    """Upload a photo (stored in the database) and return the URL"""
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
-    
-    # Generate unique filename
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    unique_filename = f"{photo_type}_{uuid.uuid4()}.{file_ext}"
-    file_path = UPLOAD_DIR / unique_filename
-    
-    # Save file
+
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # Return URL relative to API
-        photo_url = f"/uploads/photos/{unique_filename}"
-        return {"success": True, "photo_url": photo_url, "filename": unique_filename}
+        image_bytes = await file.read()
+        photo_id = str(uuid.uuid4())
+        await db.uploaded_photos.insert_one({
+            "id": photo_id,
+            "type": photo_type,
+            "content_type": file.content_type,
+            "data": base64.b64encode(image_bytes).decode("utf-8"),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        photo_url = f"/api/photos/{photo_id}"
+        return {"success": True, "photo_url": photo_url, "filename": photo_id}
     except Exception as e:
         logging.error(f"Photo upload error: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload photo")
 
+@api_router.get("/photos/{photo_id}")
+async def get_uploaded_photo(photo_id: str):
+    """Serve an uploaded photo stored in the database"""
+    from fastapi.responses import Response
+    photo = await db.uploaded_photos.find_one({"id": photo_id}, {"_id": 0})
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return Response(
+        content=base64.b64decode(photo["data"]),
+        media_type=photo.get("content_type", "image/jpeg")
+    )
+
 @api_router.post("/upload/photo-base64")
 async def upload_photo_base64(request: Dict):
-    """Upload a photo from base64 data"""
+    """Upload a photo from base64 data (stored in the database)"""
     base64_data = request.get("data", "")
     photo_type = request.get("type", "cns")
-    
+
     if not base64_data:
         raise HTTPException(status_code=400, detail="No image data provided")
-    
+
     # Remove data URL prefix if present
     if "," in base64_data:
         base64_data = base64_data.split(",")[1]
-    
+
     try:
         image_data = base64.b64decode(base64_data)
-        unique_filename = f"{photo_type}_{uuid.uuid4()}.jpg"
-        file_path = UPLOAD_DIR / unique_filename
-        
-        with open(file_path, "wb") as f:
-            f.write(image_data)
-        
-        photo_url = f"/uploads/photos/{unique_filename}"
-        return {"success": True, "photo_url": photo_url, "filename": unique_filename}
+        photo_id = str(uuid.uuid4())
+        await db.uploaded_photos.insert_one({
+            "id": photo_id,
+            "type": photo_type,
+            "content_type": "image/jpeg",
+            "data": base64.b64encode(image_data).decode("utf-8"),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        photo_url = f"/api/photos/{photo_id}"
+        return {"success": True, "photo_url": photo_url, "filename": photo_id}
     except Exception as e:
         logging.error(f"Base64 photo upload error: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload photo")
@@ -924,8 +1023,59 @@ async def create_booking(booking_data: BookingCreate):
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.admin_notifications.insert_one(scent_notif)
-    
+
     return booking
+
+class AddonRequest(BaseModel):
+    """Add an add-on service to an existing unpaid booking"""
+    service_id: str = "scent_bomb"
+    quantity: int = 1
+
+@api_router.post("/bookings/{booking_id}/addons")
+async def add_addon_to_booking(booking_id: str, request: AddonRequest):
+    """Add an add-on (e.g. Scent Bomb upsell) to an existing booking and recalculate the total"""
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="Booking already paid")
+
+    service = SERVICES.get(request.service_id)
+    if not service:
+        raise HTTPException(status_code=400, detail="Unknown service")
+    if request.quantity < 1 or request.quantity > 20:
+        raise HTTPException(status_code=400, detail="Invalid quantity")
+
+    services = booking.get("services", [])
+    existing = next((s for s in services if s.get("service_id") == request.service_id), None)
+    if existing:
+        existing["quantity"] = existing.get("quantity", 1) + request.quantity
+    else:
+        services.append({"service_id": request.service_id, "quantity": request.quantity})
+
+    num_days = booking.get("service_days_per_month") or len(booking.get("booking_dates", [])) or 1
+    pricing = calculate_booking_total(
+        services,
+        booking.get("distance_miles", 0),
+        booking.get("is_monthly", False),
+        num_days
+    )
+
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {
+            "services": services,
+            "subtotal": pricing["subtotal"],
+            "travel_fee": pricing["travel_fee"],
+            "discount": pricing["discount"],
+            "tax": pricing["tax"],
+            "total": pricing["total"],
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    updated = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    return {"booking": updated, "pricing": pricing}
 
 @api_router.get("/bookings/{booking_id}")
 async def get_booking(booking_id: str):
@@ -1281,6 +1431,88 @@ async def generate_payment_link(req: GeneratePaymentLinkRequest, current_user: d
         "token": payment_token
     }
 
+# ===================== CUSTOMER CHECKOUT (Square hosted payment link) =====================
+
+class CheckoutSessionRequest(BaseModel):
+    booking_id: str
+    origin_url: str
+
+@api_router.post("/checkout/session")
+async def create_checkout_session(req: CheckoutSessionRequest):
+    """Create a Square hosted checkout link for a booking"""
+    if not square_client:
+        raise HTTPException(status_code=503, detail="Payments are not configured")
+    booking = await db.bookings.find_one({"id": req.booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="Booking already paid")
+    amount_cents = int(round(booking.get("total", 0) * 100))
+    if amount_cents <= 0:
+        raise HTTPException(status_code=400, detail="This booking requires a quote before payment")
+
+    session_id = str(uuid.uuid4())
+    try:
+        result = square_client.checkout.payment_links.create(
+            idempotency_key=str(uuid.uuid4()),
+            description=f"Upwash booking {req.booking_id}",
+            quick_pay={
+                "name": f"Upwash Power Washing - {booking.get('customer_name', 'Booking')}",
+                "price_money": {"amount": amount_cents, "currency": "USD"},
+                "location_id": square_location_id
+            },
+            checkout_options={
+                "redirect_url": f"{req.origin_url}/payment-success?session_id={session_id}"
+            }
+        )
+        link = result.payment_link
+        await db.checkout_sessions.insert_one({
+            "id": session_id,
+            "booking_id": req.booking_id,
+            "payment_link_id": link.id,
+            "amount_cents": amount_cents,
+            "status": "open",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        await db.bookings.update_one(
+            {"id": req.booking_id},
+            {"$set": {"square_payment_link_id": link.id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"url": link.url, "session_id": session_id}
+    except Exception as e:
+        logging.error(f"Square checkout session error: {e}")
+        raise HTTPException(status_code=500, detail="Could not create payment link")
+
+@api_router.get("/checkout/status/{session_id}")
+async def get_checkout_status(session_id: str):
+    """Check whether a Square checkout session has been paid"""
+    session = await db.checkout_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.get("status") == "paid":
+        return {"status": "completed", "payment_status": "paid", "amount_total": session.get("amount_cents", 0)}
+
+    paid = False
+    if square_client:
+        try:
+            link = square_client.checkout.payment_links.get(id=session["payment_link_id"]).payment_link
+            order_id = getattr(link, "order_id", None)
+            if order_id:
+                order = square_client.orders.get(order_id=order_id).order
+                paid = order.state == "COMPLETED" or bool(order.tenders)
+        except Exception as e:
+            logging.warning(f"Square status check failed: {e}")
+
+    if paid:
+        await db.checkout_sessions.update_one({"id": session_id}, {"$set": {"status": "paid"}})
+        await db.bookings.update_one(
+            {"id": session["booking_id"]},
+            {"$set": {"payment_status": "paid", "status": "confirmed", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"status": "completed", "payment_status": "paid", "amount_total": session.get("amount_cents", 0)}
+
+    return {"status": "open", "payment_status": "unpaid", "amount_total": session.get("amount_cents", 0)}
+
 # ===================== PAYMENT ROUTES =====================
 
 @api_router.post("/payments/process")
@@ -1501,7 +1733,7 @@ async def get_sales_tax():
         return float(settings.get("value", DEFAULT_SALES_TAX))
     return DEFAULT_SALES_TAX
 
-async def get_services():
+async def get_services():  # noqa: F811
     """Get current service prices"""
     settings = await db.settings.find_one({"key": "services"})
     if settings:
@@ -2364,7 +2596,7 @@ async def get_admin_messages(current_user: dict = Depends(get_admin_user)):
     return {"messages": messages}
 
 @api_router.get("/client/messages/{booking_id}")
-async def get_client_messages(booking_id: str):
+async def get_client_messages(booking_id: str):  # noqa: F811
     """Get messages for a client (by booking ID)"""
     messages = await db.admin_messages.find({
         "recipient_type": "client",
@@ -2405,6 +2637,63 @@ async def list_contractors(current_user: dict = Depends(get_admin_user)):
         {"_id": 0, "password_hash": 0}
     ).to_list(100)
     return {"contractors": contractors}
+
+@api_router.get("/admin/contractors/weekly-payroll")
+async def get_weekly_payroll(current_user: dict = Depends(get_admin_user)):
+    """Get weekly payroll summary for all contractors"""
+    from datetime import timedelta
+    pay_per_stop = await get_pay_per_stop()
+    week_start = (datetime.now(timezone.utc) - timedelta(days=datetime.now(timezone.utc).weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Get all contractors
+    contractors = await db.users.find(
+        {"role": "contractor"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+
+    payroll = []
+    for contractor in contractors:
+        # Get this week's completed stops
+        completed = await db.stop_completions.count_documents({
+            "contractor_id": contractor["id"],
+            "status": "completed",
+            "completed_at": {"$gte": week_start.isoformat()}
+        })
+
+        cns = await db.stop_completions.count_documents({
+            "contractor_id": contractor["id"],
+            "status": "cns",
+            "completed_at": {"$gte": week_start.isoformat()}
+        })
+
+        # Get this week's payments
+        payments = await db.contractor_payments.find({
+            "contractor_id": contractor["id"],
+            "paid_at": {"$gte": week_start.isoformat()}
+        }, {"_id": 0}).to_list(100)
+
+        week_paid = sum(p.get("amount", 0) for p in payments)
+        week_earnings = completed * pay_per_stop
+        week_owed = week_earnings - week_paid
+
+        payroll.append({
+            "contractor_id": contractor["id"],
+            "contractor_name": contractor.get("full_name", contractor.get("username")),
+            "completed_stops": completed,
+            "cns_stops": cns,
+            "week_earnings": week_earnings,
+            "week_paid": week_paid,
+            "week_owed": week_owed
+        })
+
+    total_owed = sum(p["week_owed"] for p in payroll)
+
+    return {
+        "week_start": week_start.isoformat(),
+        "contractors": payroll,
+        "total_owed": total_owed,
+        "pay_per_stop": pay_per_stop
+    }
 
 @api_router.get("/admin/contractors/{contractor_id}")
 async def get_contractor(contractor_id: str, current_user: dict = Depends(get_admin_user)):
@@ -3664,7 +3953,7 @@ async def decline_released_route(released_route_id: str, current_user: dict = De
 # ===================== ROUTE OPTIMIZATION =====================
 
 @api_router.post("/admin/routes/{route_id}/optimize")
-async def optimize_route(route_id: str, current_user: dict = Depends(get_admin_user)):
+async def optimize_route(route_id: str, current_user: dict = Depends(get_admin_user)):  # noqa: F811
     """
     Optimize route order using Google Maps Directions API
     Returns the most efficient driving order for all stops
@@ -4292,63 +4581,6 @@ async def pay_contractor(contractor_id: str, payment: ContractorPayment, current
         "payment_id": payment_record["id"]
     }
 
-@api_router.get("/admin/contractors/weekly-payroll")
-async def get_weekly_payroll(current_user: dict = Depends(get_admin_user)):
-    """Get weekly payroll summary for all contractors"""
-    from datetime import timedelta
-    pay_per_stop = await get_pay_per_stop()
-    week_start = (datetime.now(timezone.utc) - timedelta(days=datetime.now(timezone.utc).weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Get all contractors
-    contractors = await db.users.find(
-        {"role": "contractor"},
-        {"_id": 0, "password_hash": 0}
-    ).to_list(100)
-    
-    payroll = []
-    for contractor in contractors:
-        # Get this week's completed stops
-        completed = await db.stop_completions.count_documents({
-            "contractor_id": contractor["id"],
-            "status": "completed",
-            "completed_at": {"$gte": week_start.isoformat()}
-        })
-        
-        cns = await db.stop_completions.count_documents({
-            "contractor_id": contractor["id"],
-            "status": "cns",
-            "completed_at": {"$gte": week_start.isoformat()}
-        })
-        
-        # Get this week's payments
-        payments = await db.contractor_payments.find({
-            "contractor_id": contractor["id"],
-            "paid_at": {"$gte": week_start.isoformat()}
-        }, {"_id": 0}).to_list(100)
-        
-        week_paid = sum(p.get("amount", 0) for p in payments)
-        week_earnings = completed * pay_per_stop
-        week_owed = week_earnings - week_paid
-        
-        payroll.append({
-            "contractor_id": contractor["id"],
-            "contractor_name": contractor.get("full_name", contractor.get("username")),
-            "completed_stops": completed,
-            "cns_stops": cns,
-            "week_earnings": week_earnings,
-            "week_paid": week_paid,
-            "week_owed": week_owed
-        })
-    
-    total_owed = sum(p["week_owed"] for p in payroll)
-    
-    return {
-        "week_start": week_start.isoformat(),
-        "contractors": payroll,
-        "total_owed": total_owed,
-        "pay_per_stop": pay_per_stop
-    }
-
 @api_router.post("/contractor/task/{booking_id}/complete")
 async def complete_task(booking_id: str, completion: TaskCompletion, current_user: dict = Depends(get_contractor_user)):
     update_data = {
@@ -4392,7 +4624,7 @@ async def get_contractor_notifications(current_user: dict = Depends(get_contract
     return {"notifications": notifications, "unread_count": unread_count}
 
 @api_router.patch("/contractor/notifications/{notification_id}/read")
-async def mark_notification_read(notification_id: str, current_user: dict = Depends(get_contractor_user)):
+async def mark_notification_read(notification_id: str, current_user: dict = Depends(get_contractor_user)):  # noqa: F811
     await db.notifications.update_one(
         {"id": notification_id, "contractor_id": current_user["user_id"]},
         {"$set": {"read": True}}
@@ -4400,7 +4632,7 @@ async def mark_notification_read(notification_id: str, current_user: dict = Depe
     return {"message": "Marked as read"}
 
 @api_router.patch("/contractor/notifications/read-all")
-async def mark_all_notifications_read(current_user: dict = Depends(get_contractor_user)):
+async def mark_all_notifications_read(current_user: dict = Depends(get_contractor_user)):  # noqa: F811
     await db.notifications.update_many(
         {"contractor_id": current_user["user_id"]},
         {"$set": {"read": True}}
@@ -4720,6 +4952,14 @@ async def get_chat_messages(
             query["recipient_id"] = None
     
     messages = await db.chat_messages.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+    # Mark incoming direct messages as read when a contractor views their inbox
+    if current_user["role"] == "contractor" and not recipient_id and not group_id:
+        await db.chat_messages.update_many(
+            {"recipient_id": current_user["user_id"], "read": False, "is_group": {"$ne": True}},
+            {"$set": {"read": True}}
+        )
+
     return {"messages": messages}
 
 @api_router.post("/chat/groups")
@@ -4742,6 +4982,210 @@ async def get_chat_groups(current_user: dict = Depends(get_current_user)):
         {"_id": 0}
     ).to_list(50)
     return {"groups": groups}
+
+# ===================== ADMIN<->CONTRACTOR CHAT (in-app messages) =====================
+
+@api_router.get("/chat/admin/all")
+async def get_all_admin_chat(current_user: dict = Depends(get_admin_user)):
+    """All direct chat messages between admin and contractors (for grouping into threads)"""
+    messages = await db.chat_messages.find(
+        {"is_group": {"$ne": True}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    return {"messages": messages}
+
+@api_router.get("/chat/admin/thread/{contractor_id}")
+async def get_admin_chat_thread(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Conversation between admin and one contractor; marks their messages to admin as read"""
+    query = {"$or": [
+        {"sender_id": contractor_id, "recipient_id": None},
+        {"sender_id": "admin", "recipient_id": contractor_id}
+    ], "is_group": {"$ne": True}}
+    messages = await db.chat_messages.find(query, {"_id": 0}).sort("created_at", 1).to_list(300)
+    await db.chat_messages.update_many(
+        {"sender_id": contractor_id, "recipient_id": None, "read": False},
+        {"$set": {"read": True}}
+    )
+    return {"messages": messages}
+
+@api_router.get("/chat/unread-count")
+async def get_chat_unread_count(current_user: dict = Depends(get_current_user)):
+    """Unread direct messages for the current user (red-dot badge)"""
+    if current_user["role"] == "admin":
+        count = await db.chat_messages.count_documents({"recipient_id": None, "read": False, "is_group": {"$ne": True}, "sender_id": {"$ne": "admin"}})
+    else:
+        count = await db.chat_messages.count_documents({"recipient_id": current_user["user_id"], "read": False, "is_group": {"$ne": True}})
+    return {"unread": count}
+
+# ===================== CONTRACTOR SUSPENSION & DISPUTES =====================
+
+class SuspendRequest(BaseModel):
+    reason: str
+
+@api_router.post("/admin/contractors/{contractor_id}/suspend")
+async def suspend_contractor(contractor_id: str, request: SuspendRequest, current_user: dict = Depends(get_admin_user)):
+    """Suspend a contractor's account with a reason; they are notified and can dispute"""
+    contractor = await db.users.find_one({"id": contractor_id, "role": "contractor"})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    if not request.reason.strip():
+        raise HTTPException(status_code=400, detail="A reason is required")
+
+    await db.users.update_one(
+        {"id": contractor_id},
+        {"$set": {
+            "suspended": True,
+            "suspended_reason": request.reason,
+            "suspended_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": contractor_id,
+        "type": "account_suspended",
+        "title": "Account Suspended",
+        "message": f"Your account has been suspended. Reason: {request.reason}. If you believe this is a mistake, you can submit a dispute from your portal.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True, "suspended": True}
+
+@api_router.post("/admin/contractors/{contractor_id}/unsuspend")
+async def unsuspend_contractor(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Reinstate a suspended contractor"""
+    contractor = await db.users.find_one({"id": contractor_id, "role": "contractor"})
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
+    await db.users.update_one(
+        {"id": contractor_id},
+        {"$set": {"suspended": False, "suspended_reason": None, "reinstated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": contractor_id,
+        "type": "account_reinstated",
+        "title": "Account Reinstated",
+        "message": "Your account has been reinstated. You have full access again.",
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True, "suspended": False}
+
+class DisputeRequest(BaseModel):
+    message: str
+
+@api_router.post("/contractor/disputes")
+async def submit_dispute(request: DisputeRequest, current_user: dict = Depends(get_contractor_user)):
+    """Contractor disputes their suspension"""
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Please explain your dispute")
+    existing = await db.contractor_disputes.find_one({"contractor_id": current_user["user_id"], "status": "open"})
+    if existing:
+        raise HTTPException(status_code=400, detail="You already have an open dispute under review")
+
+    contractor = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0, "password_hash": 0})
+    dispute = {
+        "id": str(uuid.uuid4()),
+        "contractor_id": current_user["user_id"],
+        "contractor_name": contractor.get("full_name", contractor.get("username", "Contractor")),
+        "suspended_reason": contractor.get("suspended_reason"),
+        "message": request.message,
+        "status": "open",
+        "admin_response": None,
+        "resolution": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "resolved_at": None
+    }
+    await db.contractor_disputes.insert_one(dispute)
+
+    await db.admin_notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "contractor_dispute",
+        "title": "New Suspension Dispute",
+        "message": f"{dispute['contractor_name']} has disputed their suspension.",
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True, "dispute_id": dispute["id"]}
+
+@api_router.get("/contractor/disputes")
+async def get_my_disputes(current_user: dict = Depends(get_contractor_user)):
+    disputes = await db.contractor_disputes.find(
+        {"contractor_id": current_user["user_id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(20)
+    return {"disputes": disputes}
+
+@api_router.get("/admin/disputes")
+async def get_all_disputes(current_user: dict = Depends(get_admin_user)):
+    disputes = await db.contractor_disputes.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    open_count = await db.contractor_disputes.count_documents({"status": "open"})
+    return {"disputes": disputes, "open_count": open_count}
+
+class DisputeResolution(BaseModel):
+    action: str  # "reinstate" or "uphold"
+    response: str
+
+@api_router.post("/admin/disputes/{dispute_id}/resolve")
+async def resolve_dispute(dispute_id: str, resolution: DisputeResolution, current_user: dict = Depends(get_admin_user)):
+    dispute = await db.contractor_disputes.find_one({"id": dispute_id})
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Dispute not found")
+    if dispute.get("status") != "open":
+        raise HTTPException(status_code=400, detail="Dispute already resolved")
+    if resolution.action not in ("reinstate", "uphold"):
+        raise HTTPException(status_code=400, detail="Action must be 'reinstate' or 'uphold'")
+
+    await db.contractor_disputes.update_one(
+        {"id": dispute_id},
+        {"$set": {
+            "status": "resolved",
+            "resolution": resolution.action,
+            "admin_response": resolution.response,
+            "resolved_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    if resolution.action == "reinstate":
+        await db.users.update_one(
+            {"id": dispute["contractor_id"]},
+            {"$set": {"suspended": False, "suspended_reason": None, "reinstated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+    outcome = "Your dispute was accepted and your account has been reinstated." if resolution.action == "reinstate" else "Your dispute was reviewed and the suspension was upheld."
+    if resolution.response:
+        outcome += f" Note from admin: {resolution.response}"
+
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "contractor_id": dispute["contractor_id"],
+        "type": "dispute_resolved",
+        "title": "Dispute Resolved",
+        "message": outcome,
+        "read": False,
+        "play_sound": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True, "resolution": resolution.action}
+
+# ===================== RELEASED ROUTES LOG (per contractor) =====================
+
+@api_router.get("/admin/contractors/{contractor_id}/released-routes")
+async def get_contractor_released_routes(contractor_id: str, current_user: dict = Depends(get_admin_user)):
+    """Log of routes this contractor has released"""
+    routes = await db.released_routes.find(
+        {"released_by_contractor_id": contractor_id},
+        {"_id": 0, "bookings": 0}
+    ).sort("released_at", -1).to_list(100)
+    return {"released_routes": routes}
 
 # ===================== SMS NOTIFICATION ROUTES =====================
 
@@ -7176,7 +7620,7 @@ async def mass_dispatch_released_routes(dispatch: MassDispatchRequest, current_u
     }
 
 @api_router.get("/admin/notifications")
-async def get_admin_notifications(current_user: dict = Depends(get_admin_user)):
+async def get_admin_notifications(current_user: dict = Depends(get_admin_user)):  # noqa: F811
     """Get admin notifications"""
     notifications = await db.admin_notifications.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
     unread_count = len([n for n in notifications if not n.get("read")])
@@ -7694,7 +8138,7 @@ async def login_client(login: ClientLogin):
         # bcrypt hash
         try:
             password_valid = bcrypt.checkpw(login.password.encode(), stored_hash.encode())
-        except:
+        except:  # noqa: E722
             password_valid = False
     else:
         # sha256 hash (legacy)
@@ -8167,7 +8611,7 @@ def get_message_title(message_type):
     return titles.get(message_type, "Notification")
 
 @api_router.patch("/client/notifications/{notification_id}/read")
-async def mark_notification_read(notification_id: str, current_client: dict = Depends(get_client_user)):
+async def mark_notification_read(notification_id: str, current_client: dict = Depends(get_client_user)):  # noqa: F811
     """Mark a notification as read"""
     # Try client_notifications first
     result = await db.client_notifications.update_one(
@@ -8230,13 +8674,13 @@ async def create_quote_request(quote: QuoteRequest):
     return {"message": "Quote request submitted", "quote_id": quote_doc["id"]}
 
 @api_router.get("/admin/quotes")
-async def get_quote_requests(current_user: dict = Depends(get_admin_user)):
+async def get_quote_requests(current_user: dict = Depends(get_admin_user)):  # noqa: F811
     """Get all quote requests"""
     quotes = await db.quote_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return {"quotes": quotes}
 
 @api_router.post("/admin/quotes/{quote_id}/respond")
-async def respond_to_quote(quote_id: str, request: Request, current_user: dict = Depends(get_admin_user)):
+async def respond_to_quote(quote_id: str, request: Request, current_user: dict = Depends(get_admin_user)):  # noqa: F811
     """Respond to a quote request with a price"""
     data = await request.json()
     price = data.get("price")
@@ -8746,7 +9190,7 @@ async def get_message_notifications(request: Request):
     return {"notifications": notifications, "count": len(notifications)}
 
 @api_router.post("/messages/notifications/{notification_id}/read")
-async def mark_notification_read(notification_id: str, request: Request):
+async def mark_notification_read(notification_id: str, request: Request):  # noqa: F811
     """Mark a notification as read"""
     await db.message_notifications.update_one(
         {"id": notification_id},

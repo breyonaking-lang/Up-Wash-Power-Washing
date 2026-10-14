@@ -24,7 +24,7 @@ const QUOTE_SERVICES = {
     name: "Construction Site Cleanup",
     icon: HardHat,
     color: "bg-amber-500",
-    description: "Post-construction cleaning including debris removal, window cleaning, and surface detailing."
+    description: "Post-construction pressure washing of sidewalks and parking lots, plus professional window cleaning service."
   },
   commercial: {
     name: "Commercial Properties",

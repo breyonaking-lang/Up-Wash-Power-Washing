@@ -1,244 +1,654 @@
+#!/usr/bin/env python3
+
 import requests
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
-class UpwashBackendTester:
-    def __init__(self, base_url="https://github-link-finder.preview.emergentagent.com/api"):
+class PowerWashingAPITester:
+    def __init__(self, base_url="https://upwash-booking.preview.emergentagent.com/api"):
         self.base_url = base_url
-        self.token = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.contractors = []
-        
-        # Test credentials from review request
-        self.admin_username = "Hughes0108"
-        self.admin_password = "Godfirst7!"
+        self.failed_tests = []
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None):
-        """Run a single API test"""
-        url = f"{self.base_url}/{endpoint}"
-        request_headers = {'Content-Type': 'application/json'}
-        if self.token:
-            request_headers['Authorization'] = f'Bearer {self.token}'
-        if headers:
-            request_headers.update(headers)
-
+    def log_test(self, name, success, response_data=None, error=None):
+        """Log test result"""
         self.tests_run += 1
-        print(f"\n🔍 Testing {name}...")
-        print(f"   URL: {url}")
-        print(f"   Method: {method}")
-        
-        try:
-            if method == 'GET':
-                response = requests.get(url, headers=request_headers, timeout=30)
-            elif method == 'POST':
-                response = requests.post(url, json=data, headers=request_headers, timeout=30)
-            elif method == 'PATCH':
-                response = requests.patch(url, json=data, headers=request_headers, timeout=30)
-            elif method == 'DELETE':
-                response = requests.delete(url, headers=request_headers, timeout=30)
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {name} - PASSED")
+        else:
+            self.failed_tests.append({
+                "test": name,
+                "error": error,
+                "response": response_data
+            })
+            print(f"❌ {name} - FAILED: {error}")
 
-            success = response.status_code == expected_status
-            print(f"   Status: {response.status_code} (expected {expected_status})")
+    def test_api_root(self):
+        """Test API root endpoint"""
+        try:
+            response = requests.get(f"{self.base_url}/", timeout=10)
+            success = response.status_code == 200
+            data = response.json() if success else {}
+            
+            if success and data.get("message") == "Upwash Power Washing API":
+                self.log_test("API Root", True, data)
+                return True
+            else:
+                self.log_test("API Root", False, data, f"Status: {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("API Root", False, None, str(e))
+            return False
+
+    def test_get_services(self):
+        """Test services endpoint"""
+        try:
+            response = requests.get(f"{self.base_url}/services", timeout=10)
+            success = response.status_code == 200
+            data = response.json() if success else {}
             
             if success:
-                self.tests_passed += 1
-                print(f"✅ {name} - PASSED")
-                try:
-                    resp_json = response.json()
-                    if isinstance(resp_json, dict) and len(str(resp_json)) < 500:
-                        print(f"   Response: {resp_json}")
-                    return True, resp_json
-                except:
-                    return True, response.text
+                services = data.get("services", [])
+                expected_services = ["recycling_bin", "patio", "driveway", "dumpster", "scent_bomb", "home_powerwash", "construction_cleanup"]
+                service_ids = [s.get("service_id") for s in services]
+                
+                # Check for quote-based services specifically
+                quote_services = [s for s in services if s.get("pricing_type") == "quote"]
+                expected_quote_services = ["home_powerwash", "construction_cleanup"]
+                quote_service_ids = [s.get("service_id") for s in quote_services]
+                
+                if all(svc in service_ids for svc in expected_services):
+                    if all(qsvc in quote_service_ids for qsvc in expected_quote_services):
+                        self.log_test("Get Services", True, f"Found {len(services)} services including {len(quote_services)} quote services")
+                        return True, data
+                    else:
+                        self.log_test("Get Services", False, data, f"Missing quote services. Found: {quote_service_ids}")
+                        return False, data
+                else:
+                    missing = [svc for svc in expected_services if svc not in service_ids]
+                    self.log_test("Get Services", False, data, f"Missing services: {missing}")
+                    return False, data
             else:
-                print(f"❌ {name} - FAILED")
-                print(f"   Response: {response.text[:200]}...")
+                self.log_test("Get Services", False, data, f"Status: {response.status_code}")
                 return False, {}
-
         except Exception as e:
-            print(f"❌ {name} - ERROR: {str(e)}")
+            self.log_test("Get Services", False, None, str(e))
             return False, {}
 
-    def authenticate_admin(self):
-        """Test admin login and get token"""
-        print("\n🔑 Authenticating as admin...")
-        success, response = self.run_test(
-            "Admin Login",
-            "POST", 
-            "auth/login",
-            200,
-            data={"username": self.admin_username, "password": self.admin_password}
-        )
-        if success and 'access_token' in response:
-            self.token = response['access_token']
-            print(f"✅ Admin authenticated successfully")
-            return True
-        print(f"❌ Admin authentication failed")
-        return False
+    def test_price_calculation(self):
+        """Test price calculation endpoint"""
+        try:
+            # Test bin pricing - 1 bin should be $15
+            test_cases = [
+                {
+                    "name": "1 Recycling Bin",
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 15.0
+                },
+                {
+                    "name": "2 Recycling Bins", 
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 2}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 25.0
+                },
+                {
+                    "name": "3 Recycling Bins",
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 3}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 33.0  # 25 + 8
+                },
+                {
+                    "name": "Patio Cleaning",
+                    "data": {
+                        "services": [{"service_id": "patio", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 30.0
+                },
+                {
+                    "name": "1 Dumpster",
+                    "data": {
+                        "services": [{"service_id": "dumpster", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 70.0  # First dumpster $70
+                },
+                {
+                    "name": "2 Dumpsters", 
+                    "data": {
+                        "services": [{"service_id": "dumpster", "quantity": 2}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 115.0  # $70 + $45
+                },
+                {
+                    "name": "Scent Bombs Standalone",
+                    "data": {
+                        "services": [{"service_id": "scent_bomb", "quantity": 2}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 7.0  # 2 * 3.50
+                },
+                {
+                    "name": "Monthly Discount Test",
+                    "data": {
+                        "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": True
+                    },
+                    "expected_subtotal": 15.0,
+                    "expected_discount": 0.75  # 5% of 15
+                },
+                {
+                    "name": "Travel Fee Test",
+                    "data": {
+                        "services": [{"service_id": "patio", "quantity": 1}],
+                        "distance_miles": 20,  # 5 miles beyond free radius
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 30.0,
+                    "expected_travel_fee": 5.0
+                },
+                {
+                    "name": "Home Power Washing Quote Service",
+                    "data": {
+                        "services": [{"service_id": "home_powerwash", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 0.0  # Quote services should not add to subtotal
+                },
+                {
+                    "name": "Construction Cleanup Quote Service",
+                    "data": {
+                        "services": [{"service_id": "construction_cleanup", "quantity": 1}],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 0.0  # Quote services should not add to subtotal
+                },
+                {
+                    "name": "Mixed Priced and Quote Services",
+                    "data": {
+                        "services": [
+                            {"service_id": "patio", "quantity": 1},  # $30
+                            {"service_id": "home_powerwash", "quantity": 1},  # Quote (should be $0)
+                            {"service_id": "recycling_bin", "quantity": 1}   # $15
+                        ],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 45.0  # Only priced services: $30 + $15
+                },
+                {
+                    "name": "Quote Services Only",
+                    "data": {
+                        "services": [
+                            {"service_id": "home_powerwash", "quantity": 1},
+                            {"service_id": "construction_cleanup", "quantity": 1}
+                        ],
+                        "distance_miles": 0,
+                        "is_monthly": False
+                    },
+                    "expected_subtotal": 0.0  # Only quote services, should be $0
+                }
+            ]
 
-    def test_contractors_list(self):
-        """Test fetching contractors list for messages page"""
-        success, response = self.run_test(
-            "Get Contractors List",
-            "GET",
-            "admin/contractors",
-            200
-        )
-        if success and 'contractors' in response:
-            self.contractors = response['contractors']
-            print(f"   Found {len(self.contractors)} contractors")
-            return True
-        return False
-
-    def test_sms_to_contractor(self):
-        """Test sending SMS to contractor"""
-        if not self.contractors:
-            print("❌ No contractors available for SMS test")
-            return False
-            
-        contractor = self.contractors[0]
-        contractor_id = contractor.get('id')
-        contractor_name = contractor.get('full_name', 'Unknown')
-        
-        success, response = self.run_test(
-            f"Send SMS to Contractor ({contractor_name})",
-            "POST",
-            "admin/sms/contractor", 
-            200,
-            data={
-                "contractor_id": contractor_id,
-                "message": f"Test message from API testing at {datetime.now().strftime('%H:%M:%S')}"
-            }
-        )
-        return success
-
-    def test_sms_history(self):
-        """Test getting SMS history for contractor"""
-        if not self.contractors:
-            print("❌ No contractors available for SMS history test")
-            return False
-            
-        contractor_id = self.contractors[0].get('id')
-        contractor_name = self.contractors[0].get('full_name', 'Unknown')
-        
-        success, response = self.run_test(
-            f"Get SMS History for Contractor ({contractor_name})",
-            "GET",
-            f"admin/sms/contractor/history/{contractor_id}",
-            200
-        )
-        
-        if success and 'messages' in response:
-            messages = response['messages']
-            print(f"   Found {len(messages)} message(s) in history")
-            # Check if messages have timestamps
-            if messages:
-                first_msg = messages[0]
-                if 'created_at' in first_msg or 'timestamp' in first_msg:
-                    print(f"   ✅ Messages have timestamps")
+            for test_case in test_cases:
+                response = requests.post(f"{self.base_url}/calculate-price", json=test_case["data"], timeout=10)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    # Check subtotal
+                    if abs(result.get("subtotal", 0) - test_case["expected_subtotal"]) < 0.01:
+                        
+                        # Check discount if expected
+                        if "expected_discount" in test_case:
+                            if abs(result.get("discount", 0) - test_case["expected_discount"]) < 0.01:
+                                self.log_test(f"Price Calc - {test_case['name']}", True, result)
+                            else:
+                                self.log_test(f"Price Calc - {test_case['name']}", False, result, f"Wrong discount: {result.get('discount')} vs {test_case['expected_discount']}")
+                        
+                        # Check travel fee if expected
+                        elif "expected_travel_fee" in test_case:
+                            if abs(result.get("travel_fee", 0) - test_case["expected_travel_fee"]) < 0.01:
+                                self.log_test(f"Price Calc - {test_case['name']}", True, result)
+                            else:
+                                self.log_test(f"Price Calc - {test_case['name']}", False, result, f"Wrong travel fee: {result.get('travel_fee')} vs {test_case['expected_travel_fee']}")
+                        else:
+                            self.log_test(f"Price Calc - {test_case['name']}", True, result)
+                    else:
+                        self.log_test(f"Price Calc - {test_case['name']}", False, result, f"Wrong subtotal: {result.get('subtotal')} vs {test_case['expected_subtotal']}")
                 else:
-                    print(f"   ⚠️  Messages may be missing timestamps")
-        return success
+                    self.log_test(f"Price Calc - {test_case['name']}", False, {}, f"Status: {response.status_code}")
 
-    def test_bin_placement_reminders(self):
-        """Test bin placement reminder cron endpoint"""
-        success, response = self.run_test(
-            "Bin Placement Reminders Cron",
-            "POST",
-            "cron/bin-placement-reminders",
-            200
-        )
-        return success
+        except Exception as e:
+            self.log_test("Price Calculation", False, None, str(e))
 
-    def test_services_endpoint(self):
-        """Test services endpoint to verify Scent Bomb and Trash Bin services"""
-        success, response = self.run_test(
-            "Get Services Configuration", 
-            "GET",
-            "services",
-            200
-        )
-        
-        if success and 'services' in response:
-            services = response['services']
-            service_ids = [s.get('service_id') for s in services]
+    def test_check_date(self):
+        """Test date availability endpoint"""
+        try:
+            # Test weekday availability - no time slots needed
+            today = datetime.now()
+            weekday_date = today + timedelta(days=1)
+            while weekday_date.weekday() > 4:  # Find next weekday
+                weekday_date += timedelta(days=1)
             
-            # Check for Scent Bomb
-            if 'scent_bomb' in service_ids:
-                print(f"   ✅ Scent Bomb service found")
-            else:
-                print(f"   ❌ Scent Bomb service NOT found")
-                
-            # Check for Trash/Recycling Bin (could be recycling_bin or trash_bin)
-            trash_services = [sid for sid in service_ids if 'bin' in sid.lower()]
-            if trash_services:
-                print(f"   ✅ Bin services found: {trash_services}")
-            else:
-                print(f"   ❌ No bin cleaning services found")
-                
-            print(f"   Available services: {service_ids}")
+            weekday_str = weekday_date.strftime("%Y-%m-%d")
             
-        return success
+            response = requests.post(f"{self.base_url}/check-date", 
+                                   json={"date": weekday_str}, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                available = result.get("available", False)
+                
+                # Should be available for weekdays
+                if available:
+                    self.log_test("Date Check - Weekday", True, f"Date {weekday_str} available")
+                else:
+                    self.log_test("Date Check - Weekday", False, result, "Weekday not available")
+            else:
+                self.log_test("Date Check - Weekday", False, {}, f"Status: {response.status_code}")
 
-    def test_admin_stats(self):
-        """Test admin dashboard stats"""
-        success, response = self.run_test(
-            "Admin Dashboard Stats",
-            "GET", 
-            "admin/stats",
-            200
-        )
-        return success
+            # Test weekend (should not be available)
+            weekend_date = today + timedelta(days=1)
+            while weekend_date.weekday() < 5:  # Find next weekend
+                weekend_date += timedelta(days=1)
+            
+            weekend_str = weekend_date.strftime("%Y-%m-%d")
+            
+            response = requests.post(f"{self.base_url}/check-date", 
+                                   json={"date": weekend_str}, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                available = result.get("available", False)
+                
+                if not available:
+                    self.log_test("Date Check - Weekend", True, "Correctly unavailable on weekend")
+                else:
+                    self.log_test("Date Check - Weekend", False, result, "Weekend should not be available")
+            else:
+                self.log_test("Date Check - Weekend", False, {}, f"Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Date Check", False, None, str(e))
+
+    def test_booking_creation(self):
+        """Test booking creation endpoint"""
+        try:
+            # Get a valid future weekday
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "Test Customer",
+                "customer_email": "test@example.com",
+                "customer_phone": "(817) 555-1234",
+                "customer_address": "123 Test St, Burleson, TX",
+                "distance_miles": 5.0,
+                "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],  # Array of dates
+                "is_monthly": False,
+                "sms_opt_in": True,  # Test SMS opt-in
+                "notes": "Test booking"
+            }
+
+            response = requests.post(f"{self.base_url}/bookings", 
+                                   json=booking_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                booking_id = result.get("id")
+                
+                if booking_id:
+                    self.log_test("Create Booking", True, f"Booking ID: {booking_id}")
+                    return booking_id
+                else:
+                    self.log_test("Create Booking", False, result, "No booking ID returned")
+                    return None
+            else:
+                self.log_test("Create Booking", False, {}, f"Status: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            self.log_test("Create Booking", False, None, str(e))
+            return None
+
+    def test_get_booking(self, booking_id):
+        """Test get booking by ID"""
+        if not booking_id:
+            return
+            
+        try:
+            response = requests.get(f"{self.base_url}/bookings/{booking_id}", timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                self.log_test("Get Booking", True, f"Retrieved booking for {result.get('customer_name')}")
+            else:
+                self.log_test("Get Booking", False, {}, f"Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Get Booking", False, None, str(e))
+
+    def test_admin_endpoints(self):
+        """Test admin endpoints"""
+        try:
+            # Test stats
+            response = requests.get(f"{self.base_url}/admin/stats", timeout=10)
+            if response.status_code == 200:
+                stats = response.json()
+                required_fields = ["total_bookings", "pending", "confirmed", "completed", "today_bookings", "total_revenue"]
+                
+                if all(field in stats for field in required_fields):
+                    self.log_test("Admin Stats", True, stats)
+                else:
+                    self.log_test("Admin Stats", False, stats, "Missing required fields")
+            else:
+                self.log_test("Admin Stats", False, {}, f"Status: {response.status_code}")
+
+            # Test calendar
+            response = requests.get(f"{self.base_url}/admin/calendar", timeout=10)
+            if response.status_code == 200:
+                calendar_data = response.json()
+                self.log_test("Admin Calendar", True, f"Calendar data retrieved")
+            else:
+                self.log_test("Admin Calendar", False, {}, f"Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Admin Endpoints", False, None, str(e))
+
+    def test_sms_status(self):
+        """Test SMS configuration status"""
+        try:
+            response = requests.get(f"{self.base_url}/sms/status", timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                configured = result.get("configured", False)
+                phone_number = result.get("phone_number", "")
+                
+                if configured and phone_number:
+                    self.log_test("SMS Status - Configured", True, f"SMS configured with phone: {phone_number}")
+                    return True
+                else:
+                    self.log_test("SMS Status - Configured", False, result, "SMS not properly configured")
+                    return False
+            else:
+                self.log_test("SMS Status", False, {}, f"Status: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("SMS Status", False, None, str(e))
+            return False
+
+    def test_booking_with_sms_optin(self):
+        """Test booking creation with SMS opt-in"""
+        try:
+            # Get a valid future weekday
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "SMS Test Customer",
+                "customer_email": "smstest@example.com",
+                "customer_phone": "+15005550006",  # Twilio test number (valid format)
+                "customer_address": "456 SMS Test St, Burleson, TX",
+                "distance_miles": 3.0,
+                "services": [{"service_id": "patio", "quantity": 1}],
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],
+                "is_monthly": False,
+                "sms_opt_in": True,  # SMS opt-in enabled
+                "notes": "SMS test booking"
+            }
+
+            response = requests.post(f"{self.base_url}/bookings", 
+                                   json=booking_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                booking_id = result.get("id")
+                sms_opt_in = result.get("sms_opt_in", False)
+                
+                if booking_id and sms_opt_in:
+                    self.log_test("SMS Booking Creation", True, f"Booking {booking_id} with SMS opt-in")
+                    return booking_id
+                else:
+                    self.log_test("SMS Booking Creation", False, result, "SMS opt-in not saved correctly")
+                    return None
+            else:
+                self.log_test("SMS Booking Creation", False, {}, f"Status: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            self.log_test("SMS Booking Creation", False, None, str(e))
+            return None
+
+    def test_manual_sms_send(self, booking_id):
+        """Test manual SMS sending via API"""
+        if not booking_id:
+            self.log_test("Manual SMS Send", False, None, "No booking ID provided")
+            return
+            
+        try:
+            sms_data = {
+                "booking_id": booking_id,
+                "message_type": "reminder"
+            }
+
+            response = requests.post(f"{self.base_url}/sms/send", 
+                                   json=sms_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                message = result.get("message", "")
+                to_phone = result.get("to", "")
+                
+                if "SMS sent successfully" in message:
+                    self.log_test("Manual SMS Send", True, f"SMS sent to {to_phone}")
+                else:
+                    self.log_test("Manual SMS Send", False, result, "Unexpected response message")
+            else:
+                error_detail = "Unknown error"
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get("detail", "Unknown error")
+                except:
+                    pass
+                self.log_test("Manual SMS Send", False, {}, f"Status: {response.status_code}, Error: {error_detail}")
+                
+        except Exception as e:
+            self.log_test("Manual SMS Send", False, None, str(e))
+
+    def test_booking_with_quote_services(self):
+        """Test booking creation with quote-based services"""
+        try:
+            # Get a valid future weekday
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "Quote Service Customer",
+                "customer_email": "quote@example.com",
+                "customer_phone": "(817) 555-9999",
+                "customer_address": "999 Quote St, Burleson, TX",
+                "distance_miles": 10.0,
+                "services": [
+                    {"service_id": "home_powerwash", "quantity": 1},
+                    {"service_id": "patio", "quantity": 1}  # Mix quote + regular service
+                ],
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],
+                "is_monthly": False,
+                "sms_opt_in": False,
+                "notes": "Quote services test booking"
+            }
+
+            response = requests.post(f"{self.base_url}/bookings", 
+                                   json=booking_data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                booking_id = result.get("id")
+                subtotal = result.get("subtotal", 0)
+                total = result.get("total", 0)
+                
+                # Should have subtotal of $30 (only patio service counted)
+                if booking_id and abs(subtotal - 30.0) < 0.01:
+                    self.log_test("Quote Services Booking", True, f"Booking {booking_id} with mixed services, subtotal: ${subtotal}")
+                    return booking_id
+                else:
+                    self.log_test("Quote Services Booking", False, result, f"Wrong subtotal: ${subtotal}, expected $30")
+                    return None
+            else:
+                self.log_test("Quote Services Booking", False, {}, f"Status: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            self.log_test("Quote Services Booking", False, None, str(e))
+            return None
+
+    def test_sms_send_without_optin(self):
+        """Test SMS send attempt for booking without SMS opt-in (should fail)"""
+        try:
+            # Create booking without SMS opt-in
+            today = datetime.now()
+            booking_date = today + timedelta(days=1)
+            while booking_date.weekday() > 4:  # Find next weekday
+                booking_date += timedelta(days=1)
+            
+            booking_data = {
+                "customer_name": "No SMS Customer",
+                "customer_email": "nosms@example.com",
+                "customer_phone": "+15559876543",
+                "customer_address": "789 No SMS St, Burleson, TX",
+                "distance_miles": 2.0,
+                "services": [{"service_id": "recycling_bin", "quantity": 1}],
+                "booking_dates": [booking_date.strftime("%Y-%m-%d")],
+                "is_monthly": False,
+                "sms_opt_in": False,  # SMS opt-in disabled
+                "notes": "No SMS test booking"
+            }
+
+            # Create the booking
+            booking_response = requests.post(f"{self.base_url}/bookings", 
+                                           json=booking_data, timeout=10)
+            
+            if booking_response.status_code == 200:
+                booking_result = booking_response.json()
+                booking_id = booking_result.get("id")
+                
+                # Try to send SMS (should fail)
+                sms_data = {
+                    "booking_id": booking_id,
+                    "message_type": "reminder"
+                }
+
+                sms_response = requests.post(f"{self.base_url}/sms/send", 
+                                           json=sms_data, timeout=10)
+                
+                if sms_response.status_code == 400:
+                    try:
+                        error_data = sms_response.json()
+                        if "has not opted in for SMS" in error_data.get("detail", ""):
+                            self.log_test("SMS Send Without Opt-in", True, "Correctly blocked SMS for non-opted customer")
+                        else:
+                            self.log_test("SMS Send Without Opt-in", False, error_data, "Wrong error message")
+                    except:
+                        self.log_test("SMS Send Without Opt-in", False, {}, "Could not parse error response")
+                else:
+                    self.log_test("SMS Send Without Opt-in", False, {}, f"Expected 400, got {sms_response.status_code}")
+            else:
+                self.log_test("SMS Send Without Opt-in", False, {}, "Could not create test booking")
+                
+        except Exception as e:
+            self.log_test("SMS Send Without Opt-in", False, None, str(e))
 
     def run_all_tests(self):
-        """Run all backend tests"""
+        """Run all API tests"""
+        print("🧪 Starting Upwash Power Washing API Tests")
         print("=" * 60)
-        print("🚀 Starting Upwash Backend API Tests")
-        print("=" * 60)
-        
-        # Test authentication first
-        if not self.authenticate_admin():
-            print("\n❌ Cannot proceed without admin authentication")
-            return False
-            
-        # Test core features from the review request
-        print(f"\n📋 Testing Core Features...")
-        
-        # 1. Admin Messages page loads and shows contractor list
-        self.test_contractors_list()
-        
-        # 2. POST /api/admin/sms/contractor sends SMS to contractor
-        self.test_sms_to_contractor()
-        
-        # 3. GET /api/admin/sms/contractor/history/{id} returns messages with timestamps  
-        self.test_sms_history()
-        
-        # 4. POST /api/cron/bin-placement-reminders works
-        self.test_bin_placement_reminders()
-        
-        # 5. Services page shows Scent Bomb and Trash Bin
-        self.test_services_endpoint()
-        
-        # Additional tests
-        self.test_admin_stats()
-        
-        # Print final results
-        print("\n" + "=" * 60)
-        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} passed")
-        
-        if self.tests_passed == self.tests_run:
-            print("🎉 All tests passed!")
-            return True
-        else:
-            print(f"⚠️  {self.tests_run - self.tests_passed} tests failed")
-            return False
 
-def main():
-    tester = UpwashBackendTester()
-    success = tester.run_all_tests()
-    return 0 if success else 1
+        # Test basic connectivity
+        self.test_api_root()
+        
+        # Test services
+        self.test_get_services()
+        
+        # Test pricing
+        self.test_price_calculation()
+        
+        # Test date checking (no time slots)
+        self.test_check_date()
+        
+        # Test SMS configuration status
+        sms_configured = self.test_sms_status()
+        
+        # Test booking flow
+        booking_id = self.test_booking_creation()
+        if booking_id:
+            self.test_get_booking(booking_id)
+        
+        # Test quote services booking
+        quote_booking_id = self.test_booking_with_quote_services()
+        if quote_booking_id:
+            self.test_get_booking(quote_booking_id)
+        
+        # Test SMS-specific functionality if configured
+        if sms_configured:
+            print("\n🔔 Testing SMS functionality...")
+            
+            # Test booking with SMS opt-in 
+            sms_booking_id = self.test_booking_with_sms_optin()
+            
+            # Test manual SMS sending
+            if sms_booking_id:
+                self.test_manual_sms_send(sms_booking_id)
+            
+            # Test SMS rejection for non-opted customers
+            self.test_sms_send_without_optin()
+        else:
+            print("\n⚠️  SMS not configured - skipping SMS tests")
+        
+        # Test admin endpoints
+        self.test_admin_endpoints()
+
+        print("\n" + "=" * 60)
+        print(f"📊 Results: {self.tests_passed}/{self.tests_run} tests passed")
+        
+        if self.failed_tests:
+            print("\n❌ Failed Tests:")
+            for failure in self.failed_tests:
+                print(f"  - {failure['test']}: {failure['error']}")
+        
+        return self.tests_passed == self.tests_run
 
 if __name__ == "__main__":
-    sys.exit(main())
+    tester = PowerWashingAPITester()
+    success = tester.run_all_tests()
+    sys.exit(0 if success else 1)

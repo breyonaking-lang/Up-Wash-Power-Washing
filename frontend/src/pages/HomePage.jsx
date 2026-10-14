@@ -1,7 +1,6 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "../components/ui/button";
-import DailyBibleVerse from "../components/shared/DailyBibleVerse";
 import { 
   Trash2, 
   Warehouse, 
@@ -11,12 +10,10 @@ import {
   ArrowRight,
   Clock,
   MapPin,
-  Mail,
+  Phone,
   Star,
   Home,
-  HardHat,
-  Droplets,
-  Building2
+  HardHat
 } from "lucide-react";
 
 const services = [
@@ -27,15 +24,6 @@ const services = [
     price: "From $15",
     icon: Trash2,
     color: "bg-green-500"
-  },
-  {
-    id: "scent_bomb",
-    name: "Scent Bombs",
-    description: "Deodorizing scent treatment for your bins - No travel fee!",
-    price: "$3.50 each",
-    icon: Droplets,
-    color: "bg-pink-500",
-    link: "/scent-bombs"
   },
   {
     id: "patio",
@@ -57,18 +45,9 @@ const services = [
     id: "dumpster",
     name: "Dumpster Cleaning",
     description: "Commercial dumpster & area cleaning",
-    price: "From $85",
+    price: "From $70",
     icon: Warehouse,
     color: "bg-purple-500"
-  },
-  {
-    id: "commercial",
-    name: "Commercial Properties",
-    description: "Schools, apartments & commercial buildings",
-    price: "Get Quote",
-    icon: Building2,
-    color: "bg-indigo-500",
-    isQuote: true
   },
   {
     id: "home_powerwash",
@@ -100,28 +79,15 @@ const features = [
 ];
 
 const HomePage = () => {
-  const navigate = useNavigate();
-  
-  const handleBookService = (service) => {
-    if (service.link) {
-      navigate(service.link);
-    } else {
-      navigate('/booking', { state: { preselectedService: service.id } });
-    }
-  };
-
   return (
     <div className="min-h-screen">
-      {/* Daily Bible Verse Banner */}
-      <DailyBibleVerse variant="banner" />
-      
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/60" />
+        <div className="absolute inset-0 hero-gradient opacity-95" />
         <div 
-          className="absolute inset-0"
+          className="absolute inset-0 opacity-20"
           style={{
-            backgroundImage: `url("https://static.prod-images.emergentagent.com/jobs/cc387344-04aa-4cc2-931c-8b395a7f28d6/images/f00bede8c9294ee07a6cd65f0bd457e9f962b482bbae2d7587e561e03b923fa7.png")`,
+            backgroundImage: `url("https://images.unsplash.com/photo-1718152470408-cfeebeb6b9fc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwzfHxwcmVzc3VyZSUyMHdhc2hlcnxlbnwwfHx8fDE3OTE5MjczMjF8MA&ixlib=rb-4.1.0&q=85")`,
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}
@@ -133,14 +99,14 @@ const HomePage = () => {
             transition={{ duration: 0.6 }}
             className="max-w-3xl"
           >
-            <span className="inline-block bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-medium mb-6">
+            <span className="inline-block bg-white/20 text-white px-4 py-2 rounded-full text-sm font-medium mb-6">
               Serving Burleson, TX & Surrounding Areas
             </span>
-            <h1 className="text-5xl md:text-7xl font-extrabold text-white uppercase tracking-tight leading-none mb-6 drop-shadow-lg">
+            <h1 className="text-5xl md:text-7xl font-extrabold text-white uppercase tracking-tight leading-none mb-6">
               Power Washing<br />
               <span className="text-cyan-300">Done Right</span>
             </h1>
-            <p className="text-xl text-white/90 mb-8 max-w-xl drop-shadow-md">
+            <p className="text-xl text-white/90 mb-8 max-w-xl">
               Professional cleaning services for recycling bins, patios, driveways, and commercial dumpsters. 
               Restore your property's curb appeal today.
             </p>
@@ -197,7 +163,7 @@ const HomePage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="service-card group bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-shadow"
+                className="service-card group bg-white p-8 rounded-3xl border border-slate-100 shadow-sm"
                 data-testid={`service-card-${service.id}`}
               >
                 <div className={`w-14 h-14 ${service.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
@@ -205,22 +171,9 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h3>
                 <p className="text-slate-500 mb-4">{service.description}</p>
-                <p className={`text-2xl font-extrabold price-tag mb-4 ${service.isQuote ? 'text-amber-600' : service.id === 'scent_bomb' ? 'text-pink-600' : 'text-blue-600'}`}>
+                <p className={`text-2xl font-extrabold price-tag ${service.isQuote ? 'text-amber-600' : 'text-blue-600'}`}>
                   {service.price}
                 </p>
-                <button
-                  onClick={() => handleBookService(service)}
-                  className={`w-full py-3 rounded-xl font-bold transition-colors ${
-                    service.isQuote 
-                      ? 'bg-amber-500 hover:bg-amber-600 text-white' 
-                      : service.id === 'scent_bomb'
-                      ? 'bg-pink-500 hover:bg-pink-600 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                  data-testid={`book-${service.id}-btn`}
-                >
-                  {service.isQuote ? 'Get Quote' : service.id === 'scent_bomb' ? 'Shop Now' : 'Book Now'}
-                </button>
               </motion.div>
             ))}
           </div>
@@ -234,6 +187,64 @@ const HomePage = () => {
                 View All Services & Pricing
               </Button>
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Our Work Gallery */}
+      <section className="py-20 md:py-28 bg-white">
+        <div className="container mx-auto max-w-7xl px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wide">Our Work</span>
+            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mt-2 uppercase">
+              Results That Shine
+            </h2>
+            <p className="text-lg text-slate-500 mt-4 max-w-2xl mx-auto">
+              A look at the kind of clean we deliver on every job.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                src: "https://images.unsplash.com/photo-1574120583586-de8847ae992c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwxfHxjbGVhbiUyMHdvb2QlMjBkZWNrfGVufDB8fHx8MTc5MTkyNzMyMnww&ixlib=rb-4.1.0&q=85",
+                alt: "Freshly cleaned wood deck"
+              },
+              {
+                src: "https://images.unsplash.com/photo-1533391120950-2d65c72e5969?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwzfHxjbGVhbiUyMGNvbmNyZXRlJTIwZGVja3xlbnwwfHx8fDE3OTE5MjczMTV8MA&ixlib=rb-4.1.0&q=85",
+                alt: "Clean concrete patio"
+              },
+              {
+                src: "https://images.unsplash.com/photo-1785554997581-3c7100703339?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwyfHxjbGVhbiUyMGhvdXNlJTIwc2lkaW5nfGVufDB8fHx8MTc5MTkyNzMyMnww&ixlib=rb-4.1.0&q=85",
+                alt: "Clean modern house siding"
+              },
+              {
+                src: "https://images.unsplash.com/photo-1573869908170-64b53a60d8da?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwyfHxjbGVhbiUyMHdvb2QlMjBkZWNrfGVufDB8fHx8MTc5MTkyNzMyMnww&ixlib=rb-4.1.0&q=85",
+                alt: "Restored deck flooring"
+              }
+            ].map((photo, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                className="rounded-3xl overflow-hidden shadow-sm border border-slate-100 group"
+                data-testid={`gallery-photo-${index}`}
+              >
+                <img
+                  src={photo.src}
+                  alt={photo.alt}
+                  loading="lazy"
+                  className="w-full h-56 md:h-72 object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
@@ -288,9 +299,9 @@ const HomePage = () => {
                 <p className="text-slate-400">Free Travel</p>
               </div>
               <div className="bg-slate-800 p-6 rounded-3xl col-span-2">
-                <Mail className="text-orange-400 mb-4" size={32} />
-                <h4 className="text-xl font-extrabold mb-1">upwashpowerwashing@gmail.com</h4>
-                <p className="text-slate-400">Email for inquiries</p>
+                <Phone className="text-orange-400 mb-4" size={32} />
+                <h4 className="text-3xl font-extrabold mb-1">(817) 750-3211</h4>
+                <p className="text-slate-400">Call for immediate service</p>
               </div>
             </motion.div>
           </div>
@@ -348,16 +359,6 @@ const HomePage = () => {
               <div className="flex items-center gap-2 text-slate-700">
                 <div className="w-12 h-8 bg-slate-200 rounded flex items-center justify-center text-xs font-bold">
                   MC
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700">
-                <div className="w-16 h-8 bg-slate-900 rounded flex items-center justify-center text-xs font-bold text-white">
-                  Apple Pay
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700">
-                <div className="w-20 h-8 bg-blue-500 rounded flex items-center justify-center text-xs font-bold text-white">
-                  Google Pay
                 </div>
               </div>
             </div>

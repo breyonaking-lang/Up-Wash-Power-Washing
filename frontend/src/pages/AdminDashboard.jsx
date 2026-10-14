@@ -53,6 +53,7 @@ const navItems = [
   { path: 'documents', icon: FileText, label: 'Documents' },
   { path: 'deleted-subscriptions', icon: Trash2, label: 'Deleted Subscriptions' },
   { path: 'contractors', icon: UserPlus, label: 'Contractors' },
+  { path: 'disputes', icon: AlertCircle, label: 'Disputes' },
   { path: 'payroll', icon: Banknote, label: 'Payroll' },
   { path: 'pending-routes', icon: RouteIcon, label: 'Pending Routes' },
   { path: 'released-routes', icon: AlertTriangle, label: 'Released Routes' },
@@ -2317,6 +2318,9 @@ function ContractorsPage() {
   const [managingRoute, setManagingRoute] = useState(null);
   const [showRescheduleStop, setShowRescheduleStop] = useState(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
+  // Released routes log + suspension
+  const [releasedRoutesLog, setReleasedRoutesLog] = useState([]);
+  const [suspendLoading, setSuspendLoading] = useState(false);
 
   useEffect(() => {
     fetchContractors();
@@ -2389,6 +2393,57 @@ function ContractorsPage() {
   const openContractorDetails = async (contractor) => {
     setSelectedContractor(contractor);
     await fetchContractorEarnings(contractor.id);
+    fetchReleasedRoutesLog(contractor.id);
+  };
+
+  const fetchReleasedRoutesLog = async (contractorId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractorId}/released-routes`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setReleasedRoutesLog(data.released_routes || []);
+    } catch (err) {
+      setReleasedRoutesLog([]);
+    }
+  };
+
+  const suspendContractor = async (contractor) => {
+    const reason = prompt(`Suspend ${contractor.full_name}?\n\nEnter the reason (the contractor will see this and can dispute it):`);
+    if (!reason || !reason.trim()) return;
+    setSuspendLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractor.id}/suspend`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason: reason.trim() })
+      });
+      if (!res.ok) throw new Error('Failed to suspend');
+      toast.success(`${contractor.full_name} has been suspended and notified`);
+      fetchContractors();
+      setSelectedContractor({ ...contractor, suspended: true, suspended_reason: reason.trim() });
+    } catch (err) {
+      toast.error('Failed to suspend contractor');
+    } finally {
+      setSuspendLoading(false);
+    }
+  };
+
+  const unsuspendContractor = async (contractor) => {
+    setSuspendLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors/${contractor.id}/unsuspend`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to reinstate');
+      toast.success(`${contractor.full_name} has been reinstated`);
+      fetchContractors();
+      setSelectedContractor({ ...contractor, suspended: false, suspended_reason: null });
+    } catch (err) {
+      toast.error('Failed to reinstate contractor');
+    } finally {
+      setSuspendLoading(false);
+    }
   };
 
   const createContractor = async () => {
@@ -2943,11 +2998,23 @@ function ContractorsPage() {
               <div>
                 <h2 className="text-2xl font-bold text-white">{selectedContractor.full_name}</h2>
                 <p className="text-white/60">@{selectedContractor.username}</p>
+                {selectedContractor.suspended && (
+                  <span className="inline-flex items-center gap-1 mt-2 bg-red-500/20 text-red-400 text-xs font-bold px-3 py-1 rounded-full" data-testid="contractor-suspended-badge">
+                    <AlertTriangle className="w-3 h-3" /> SUSPENDED
+                  </span>
+                )}
               </div>
               <button onClick={() => { setSelectedContractor(null); setContractorEarnings(null); }} className="text-white/60 hover:text-white">
                 <X className="w-6 h-6" />
               </button>
             </div>
+
+            {selectedContractor.suspended && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6">
+                <p className="text-red-400 font-semibold text-sm">Suspension reason:</p>
+                <p className="text-white/80 text-sm">{selectedContractor.suspended_reason}</p>
+              </div>
+            )}
 
             <div className="space-y-6">
               {/* Contact Info */}
@@ -3065,6 +3132,37 @@ function ContractorsPage() {
                 )}
               </div>
 
+              {/* Released Routes Log */}
+              <div className="bg-white/10 rounded-xl p-4" data-testid="released-routes-log">
+                <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-orange-400" />
+                  Released Routes Log
+                </h3>
+                {releasedRoutesLog.length === 0 ? (
+                  <p className="text-white/60 text-sm">No routes released by this contractor</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {releasedRoutesLog.map(rr => (
+                      <div key={rr.id} className="bg-white/5 rounded-lg p-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-white font-medium">{rr.route_name || 'Route'}</p>
+                            <p className="text-white/50 text-xs">{rr.route_area || ''} {rr.zip_code ? `· ${rr.zip_code}` : ''} · {rr.num_stops || 0} stops</p>
+                            {rr.release_reason && <p className="text-orange-300/80 text-xs mt-1">Reason: {rr.release_reason}</p>}
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${rr.status === 'available' ? 'bg-yellow-500/20 text-yellow-400' : rr.status === 'claimed' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                              {(rr.status || 'available').toUpperCase()}
+                            </span>
+                            <p className="text-white/40 text-xs mt-1">{rr.released_at ? new Date(rr.released_at).toLocaleDateString() : ''}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Payment History */}
               {contractorEarnings?.payment_history?.length > 0 && (
                 <div className="bg-white/10 rounded-xl p-4">
@@ -3084,21 +3182,42 @@ function ContractorsPage() {
               )}
 
               {/* Quick Actions */}
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 <button
                   onClick={() => sendSMS(selectedContractor)}
-                  className="flex-1 py-3 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2"
+                  className="flex-1 min-w-[140px] py-3 bg-green-500 text-white rounded-xl flex items-center justify-center gap-2"
                 >
                   <Phone className="w-5 h-5" />
                   Send SMS
                 </button>
                 <button
                   onClick={() => resetPassword(selectedContractor.id)}
-                  className="flex-1 py-3 bg-yellow-500 text-white rounded-xl flex items-center justify-center gap-2"
+                  className="flex-1 min-w-[140px] py-3 bg-yellow-500 text-white rounded-xl flex items-center justify-center gap-2"
                 >
                   <Key className="w-5 h-5" />
                   Reset Password
                 </button>
+                {selectedContractor.suspended ? (
+                  <button
+                    onClick={() => unsuspendContractor(selectedContractor)}
+                    disabled={suspendLoading}
+                    className="flex-1 min-w-[140px] py-3 bg-emerald-500 text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                    data-testid="reinstate-contractor-btn"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Reinstate
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => suspendContractor(selectedContractor)}
+                    disabled={suspendLoading}
+                    className="flex-1 min-w-[140px] py-3 bg-red-500 text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                    data-testid="suspend-contractor-btn"
+                  >
+                    <AlertTriangle className="w-5 h-5" />
+                    Suspend
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -6145,6 +6264,395 @@ function QuotesPage() {
 
 
 // Messages Page - 2-Way Admin-Contractor Messaging with Timestamps
+// Admin <-> Contractor in-app Messages (matches the contractor portal Messages tab)
+function AdminChatPage() {
+  const [contractors, setContractors] = useState([]);
+  const [allMessages, setAllMessages] = useState([]);
+  const [selectedContractor, setSelectedContractor] = useState(null);
+  const [thread, setThread] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [newMessageNotification, setNewMessageNotification] = useState(null);
+  const lastMessageIdRef = useRef(null);
+  const notificationAudioRef = useRef(null);
+  const threadEndRef = useRef(null);
+
+  const playNotificationSound = () => {
+    try {
+      if (notificationAudioRef.current) {
+        notificationAudioRef.current.currentTime = 0;
+        notificationAudioRef.current.play();
+      }
+    } catch (e) {
+      console.log('Could not play notification sound');
+    }
+  };
+
+  const fetchContractors = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/contractors`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setContractors(data.contractors || []);
+    } catch (err) {
+      console.error('Failed to load contractors');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllMessages = async (isPolling = false) => {
+    try {
+      const res = await fetch(`${API_URL}/api/chat/admin/all`, { headers: getAuthHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const msgs = data.messages || [];
+      setAllMessages(msgs);
+
+      if (isPolling && msgs.length > 0) {
+        const latest = msgs.find(m => m.sender_id !== 'admin');
+        if (latest && latest.id !== lastMessageIdRef.current) {
+          lastMessageIdRef.current = latest.id;
+          const sender = contractors.find(c => c.id === latest.sender_id);
+          setNewMessageNotification({
+            sender: latest.sender_name || sender?.full_name || 'Contractor',
+            message: (latest.content || '').substring(0, 60),
+            contractorId: latest.sender_id
+          });
+          playNotificationSound();
+          setTimeout(() => setNewMessageNotification(null), 5000);
+        }
+      } else if (msgs.length > 0) {
+        const latest = msgs.find(m => m.sender_id !== 'admin');
+        if (latest) lastMessageIdRef.current = latest.id;
+      }
+    } catch (err) {
+      console.error('Failed to load chat messages');
+    }
+  };
+
+  const fetchThread = async (contractorId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/chat/admin/thread/${contractorId}`, { headers: getAuthHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setThread(data.messages || []);
+    } catch (err) {
+      console.error('Failed to load thread');
+    }
+  };
+
+  useEffect(() => {
+    fetchContractors();
+    fetchAllMessages();
+    const poll = setInterval(() => fetchAllMessages(true), 8000);
+    return () => clearInterval(poll);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedContractor) return;
+    fetchThread(selectedContractor);
+    const t = setInterval(() => fetchThread(selectedContractor), 8000);
+    return () => clearInterval(t);
+  }, [selectedContractor]);
+
+  useEffect(() => {
+    if (threadEndRef.current) {
+      threadEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [thread]);
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedContractor) return;
+    setSending(true);
+    try {
+      const res = await fetch(`${API_URL}/api/chat/send`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content: newMessage, recipient_id: selectedContractor })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      setNewMessage('');
+      await fetchThread(selectedContractor);
+      await fetchAllMessages();
+    } catch (err) {
+      toast.error('Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getUnreadFor = (cid) =>
+    allMessages.filter(m => m.sender_id === cid && !m.recipient_id && !m.read).length;
+
+  const getLastFor = (cid) =>
+    allMessages.find(m =>
+      (m.sender_id === cid && !m.recipient_id) ||
+      (m.sender_id === 'admin' && m.recipient_id === cid)
+    );
+
+  const formatTime = (ts) => {
+    if (!ts) return '';
+    return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  if (loading) return <LoadingSpinner />;
+
+  const selectedInfo = contractors.find(c => c.id === selectedContractor);
+
+  return (
+    <div className="space-y-4" data-testid="admin-chat-page">
+      <audio ref={notificationAudioRef} src={NOTIFICATION_SOUND} preload="auto" />
+
+      <AnimatePresence>
+        {newMessageNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: 50 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 right-4 z-50 bg-teal-600 text-white p-4 rounded-xl shadow-2xl max-w-sm cursor-pointer border border-teal-400"
+            onClick={() => {
+              setSelectedContractor(newMessageNotification.contractorId);
+              setNewMessageNotification(null);
+            }}
+            data-testid="chat-new-message-popup"
+          >
+            <p className="font-bold">New message from {newMessageNotification.sender}</p>
+            <p className="text-teal-100 text-sm mt-1">{newMessageNotification.message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div>
+        <h1 className="text-3xl font-bold text-white">Messages</h1>
+        <p className="text-white/60">Direct messages between you and your contractors</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ minHeight: '60vh' }}>
+        {/* Contractor list */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/10">
+            <h2 className="text-white font-semibold">Conversations</h2>
+          </div>
+          <div className="divide-y divide-white/5 max-h-[55vh] overflow-y-auto">
+            {contractors.length === 0 && (
+              <p className="p-4 text-white/50 text-sm">No contractors yet</p>
+            )}
+            {contractors.map(c => {
+              const unread = getUnreadFor(c.id);
+              const last = getLastFor(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedContractor(c.id)}
+                  className={`w-full text-left p-4 hover:bg-white/5 transition flex items-center gap-3 ${selectedContractor === c.id ? 'bg-white/10' : ''}`}
+                  data-testid={`chat-contractor-${c.id}`}
+                >
+                  <div className="relative w-10 h-10 rounded-full bg-blue-500/30 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold">{(c.full_name || c.username || '?')[0].toUpperCase()}</span>
+                    {unread > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse" data-testid={`chat-unread-dot-${c.id}`} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate">{c.full_name || c.username}</p>
+                    <p className="text-white/40 text-xs truncate">{last ? last.content : 'No messages yet'}</p>
+                  </div>
+                  {unread > 0 && (
+                    <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{unread}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Thread */}
+        <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-2xl flex flex-col overflow-hidden">
+          {selectedContractor ? (
+            <>
+              <div className="p-4 border-b border-white/10 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-emerald-500/30 flex items-center justify-center">
+                  <span className="text-white font-bold">{(selectedInfo?.full_name || '?')[0].toUpperCase()}</span>
+                </div>
+                <div>
+                  <p className="text-white font-semibold">{selectedInfo?.full_name || 'Contractor'}</p>
+                  <p className="text-white/40 text-xs">@{selectedInfo?.username}</p>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: '45vh' }} data-testid="chat-thread">
+                {thread.length === 0 && (
+                  <p className="text-white/40 text-sm text-center py-8">No messages yet — start the conversation below.</p>
+                )}
+                {thread.map(m => {
+                  const mine = m.sender_id === 'admin';
+                  return (
+                    <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${mine ? 'bg-blue-500 text-white' : 'bg-white/10 text-white'}`}>
+                        <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                        <p className={`text-[10px] mt-1 ${mine ? 'text-blue-100' : 'text-white/40'}`}>{formatTime(m.created_at)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={threadEndRef} />
+              </div>
+              <div className="p-4 border-t border-white/10 flex gap-2">
+                <input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                  placeholder={`Message ${selectedInfo?.full_name || 'contractor'}...`}
+                  className="flex-1 bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-blue-400"
+                  data-testid="chat-message-input"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={sending || !newMessage.trim()}
+                  className="px-5 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white rounded-xl font-semibold"
+                  data-testid="chat-send-btn"
+                >
+                  Send
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-10">
+              <p className="text-white/40">Select a contractor to view your conversation</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Contractor suspension disputes review page
+function DisputesPage() {
+  const [disputes, setDisputes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [responses, setResponses] = useState({});
+  const [resolving, setResolving] = useState(null);
+
+  const fetchDisputes = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/disputes`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setDisputes(data.disputes || []);
+    } catch (err) {
+      toast.error('Failed to load disputes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchDisputes(); }, []);
+
+  const resolveDispute = async (disputeId, action) => {
+    setResolving(disputeId);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/disputes/${disputeId}/resolve`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action, response: responses[disputeId] || '' })
+      });
+      if (!res.ok) throw new Error('Failed to resolve');
+      toast.success(action === 'reinstate' ? 'Dispute accepted — account reinstated' : 'Suspension upheld');
+      fetchDisputes();
+    } catch (err) {
+      toast.error('Failed to resolve dispute');
+    } finally {
+      setResolving(null);
+    }
+  };
+
+  const formatTime = (ts) => ts ? new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+
+  if (loading) return <LoadingSpinner />;
+
+  const openDisputes = disputes.filter(d => d.status === 'open');
+  const resolvedDisputes = disputes.filter(d => d.status !== 'open');
+
+  return (
+    <div className="space-y-6" data-testid="disputes-page">
+      <div>
+        <h1 className="text-3xl font-bold text-white">Contractor Disputes</h1>
+        <p className="text-white/60">Review suspension disputes submitted by contractors</p>
+      </div>
+
+      {openDisputes.length === 0 && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+          <p className="text-white/50">No open disputes</p>
+        </div>
+      )}
+
+      {openDisputes.map(d => (
+        <div key={d.id} className="bg-white/5 border border-red-500/30 rounded-2xl p-6" data-testid={`dispute-${d.id}`}>
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-white font-bold text-lg">{d.contractor_name}</p>
+              <p className="text-white/40 text-sm">{formatTime(d.created_at)}</p>
+            </div>
+            <span className="bg-red-500/20 text-red-400 text-xs font-bold px-3 py-1 rounded-full">OPEN</span>
+          </div>
+          {d.suspended_reason && (
+            <p className="text-white/60 text-sm mb-2"><span className="text-white/40">Suspended for:</span> {d.suspended_reason}</p>
+          )}
+          <div className="bg-white/5 rounded-xl p-4 mb-4">
+            <p className="text-white whitespace-pre-wrap">{d.message}</p>
+          </div>
+          <textarea
+            value={responses[d.id] || ''}
+            onChange={(e) => setResponses(prev => ({ ...prev, [d.id]: e.target.value }))}
+            placeholder="Response to contractor (optional)..."
+            className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 mb-3 focus:outline-none focus:border-blue-400"
+            rows={2}
+            data-testid={`dispute-response-${d.id}`}
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={() => resolveDispute(d.id, 'reinstate')}
+              disabled={resolving === d.id}
+              className="flex-1 py-3 bg-green-500 hover:bg-green-600 disabled:opacity-40 text-white rounded-xl font-semibold"
+              data-testid={`dispute-reinstate-${d.id}`}
+            >
+              Accept &amp; Reinstate Account
+            </button>
+            <button
+              onClick={() => resolveDispute(d.id, 'uphold')}
+              disabled={resolving === d.id}
+              className="flex-1 py-3 bg-red-500/80 hover:bg-red-600 disabled:opacity-40 text-white rounded-xl font-semibold"
+              data-testid={`dispute-uphold-${d.id}`}
+            >
+              Uphold Suspension
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {resolvedDisputes.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-white/70 font-semibold">Resolved</h2>
+          {resolvedDisputes.map(d => (
+            <div key={d.id} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-white font-medium">{d.contractor_name}</p>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${d.resolution === 'reinstate' ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20 text-slate-300'}`}>
+                  {d.resolution === 'reinstate' ? 'REINSTATED' : 'UPHELD'}
+                </span>
+              </div>
+              <p className="text-white/50 text-sm mt-1">{d.message}</p>
+              {d.admin_response && <p className="text-white/40 text-xs mt-1">Your response: {d.admin_response}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MessagesPage() {
   const [messages, setMessages] = useState([]);
   const [contractors, setContractors] = useState([]);
@@ -7959,6 +8467,7 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [openDisputes, setOpenDisputes] = useState(0);
   const [unreadInquiries, setUnreadInquiries] = useState(0);
   const [releasedRoutesCount, setReleasedRoutesCount] = useState(0);
   const [pendingRoutesCount, setPendingRoutesCount] = useState(0);
@@ -8068,6 +8577,22 @@ export default function AdminDashboard() {
       checkPendingRoutes();
     }, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchOpenDisputes = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/admin/disputes`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        setOpenDisputes(data.open_count || 0);
+      } catch (err) {
+        console.error('Failed to check disputes');
+      }
+    };
+    fetchOpenDisputes();
+    const disputeInterval = setInterval(fetchOpenDisputes, 15000);
+    return () => clearInterval(disputeInterval);
   }, []);
 
   useEffect(() => {
@@ -8275,6 +8800,7 @@ export default function AdminDashboard() {
             const badge = item.path === 'messages' ? unreadCount : 
                          item.path === 'inquiries' ? unreadInquiries : 
                          item.path === 'released-routes' ? releasedRoutesCount :
+                         item.path === 'disputes' ? openDisputes :
                          item.path === 'pending-routes' ? pendingRoutesCount : 0;
             
             const isReleasedRoutes = item.path === 'released-routes' && releasedRoutesCount > 0;
@@ -8354,13 +8880,14 @@ export default function AdminDashboard() {
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="deleted-subscriptions" element={<DeletedSubscriptionsPage />} />
           <Route path="contractors" element={<ContractorsPage />} />
+          <Route path="disputes" element={<DisputesPage />} />
           <Route path="payroll" element={<PayrollPage />} />
           <Route path="sms-logs" element={<SMSLogsPage />} />
           <Route path="pending-routes" element={<RoutesPage />} />
           <Route path="released-routes" element={<ReleasedRoutesPage />} />
           <Route path="route-requests" element={<RouteRequestsPage />} />
           <Route path="quotes" element={<QuotesPage />} />
-          <Route path="messages" element={<MessagesPage />} />
+          <Route path="messages" element={<AdminChatPage />} />
           <Route path="inquiries" element={<InquiryMessagesPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Routes>

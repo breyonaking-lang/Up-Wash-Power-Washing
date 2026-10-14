@@ -287,7 +287,24 @@ export const BIBLE_VERSES = [
   { verse: "Because he loves me, says the Lord, I will rescue him.", reference: "Psalm 91:14" },
   { verse: "He will call on me, and I will answer him.", reference: "Psalm 91:15" },
   { verse: "I will be with him in trouble.", reference: "Psalm 91:15" },
-  { verse: "With long life I will satisfy him.", reference: "Psalm 91:16" }
+  { verse: "With long life I will satisfy him.", reference: "Psalm 91:16" },
+  { verse: "The LORD bless thee, and keep thee.", reference: "Numbers 6:24" },
+  { verse: "The eternal God is thy refuge, and underneath are the everlasting arms.", reference: "Deuteronomy 33:27" },
+  { verse: "As for me and my house, we will serve the LORD.", reference: "Joshua 24:15" },
+  { verse: "The battle is the LORD's.", reference: "1 Samuel 17:47" },
+  { verse: "I know that my redeemer liveth.", reference: "Job 19:25" },
+  { verse: "Weeping may endure for a night, but joy cometh in the morning.", reference: "Psalm 30:5" },
+  { verse: "Thy word is a lamp unto my feet, and a light unto my path.", reference: "Psalm 119:105" },
+  { verse: "A soft answer turneth away wrath.", reference: "Proverbs 15:1" },
+  { verse: "He hath made every thing beautiful in his time.", reference: "Ecclesiastes 3:11" },
+  { verse: "Fear thou not; for I am with thee.", reference: "Isaiah 41:10" },
+  { verse: "Great is thy faithfulness.", reference: "Lamentations 3:23" },
+  { verse: "Not by might, nor by power, but by my spirit, saith the LORD of hosts.", reference: "Zechariah 4:6" },
+  { verse: "With God all things are possible.", reference: "Matthew 19:26" },
+  { verse: "I am the way, the truth, and the life.", reference: "John 14:6" },
+  { verse: "It is more blessed to give than to receive.", reference: "Acts 20:35" },
+  { verse: "If God be for us, who can be against us?", reference: "Romans 8:31" },
+  { verse: "Walk by faith, not by sight.", reference: "2 Corinthians 5:7" }
 ];
 
 export default BIBLE_VERSES;
